@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { RentalItem } from '@/lib/types';
+import { RentalItem, Vendor } from '@/lib/types';
 import { Calendar as CalendarIcon, PlusCircle } from 'lucide-react';
 import { Textarea } from '../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
@@ -23,6 +23,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Calendar } from '../ui/calendar';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { vendors } from '@/lib/data'; // Assuming vendors are available in data
 
 interface AddItemDialogProps {
   onItemAdded: (item: RentalItem) => void;
@@ -41,6 +42,7 @@ export function AddItemDialog({ onItemAdded, item, trigger }: AddItemDialogProps
   const [condition, setCondition] = useState<RentalItem['condition']>('New');
   const [expiryDate, setExpiryDate] = useState<Date | undefined>();
   const [tempRange, setTempRange] = useState('');
+  const [vendorId, setVendorId] = useState('');
 
   useEffect(() => {
     if (item && open) {
@@ -53,6 +55,7 @@ export function AddItemDialog({ onItemAdded, item, trigger }: AddItemDialogProps
         setCondition(item.condition);
         setExpiryDate(item.expiryDate ? new Date(item.expiryDate) : undefined);
         setTempRange(item.temperatureRange);
+        setVendorId(item.vendorId);
     }
   }, [item, open]);
 
@@ -66,6 +69,7 @@ export function AddItemDialog({ onItemAdded, item, trigger }: AddItemDialogProps
     setCondition('New');
     setExpiryDate(undefined);
     setTempRange('');
+    setVendorId('');
   }
 
   const handleOpenChange = (isOpen: boolean) => {
@@ -77,9 +81,9 @@ export function AddItemDialog({ onItemAdded, item, trigger }: AddItemDialogProps
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!expiryDate) {
+    if (!expiryDate || !vendorId) {
         // Ideally show a toast or error message
-        console.error("Expiry date is required");
+        console.error("Expiry date and vendor are required");
         return;
     }
 
@@ -96,6 +100,7 @@ export function AddItemDialog({ onItemAdded, item, trigger }: AddItemDialogProps
       temperatureRange: tempRange,
       images: [],
       rentalCycles: ['daily', 'weekly'], // Default value
+      vendorId,
     };
 
     onItemAdded(newItem);
@@ -130,8 +135,17 @@ export function AddItemDialog({ onItemAdded, item, trigger }: AddItemDialogProps
                 <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g., Gourmet Cheese Platter" required />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="category">Category</Label>
-                <Input id="category" value={category} onChange={(e) => setCategory(e.target.value)} placeholder="e.g., Food" required />
+                 <Label htmlFor="vendor">Vendor</Label>
+                <Select value={vendorId} onValueChange={setVendorId} required>
+                    <SelectTrigger id="vendor">
+                        <SelectValue placeholder="Select a vendor" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {vendors.map((vendor: Vendor) => (
+                            <SelectItem key={vendor.id} value={vendor.id}>{vendor.name}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
               </div>
               <div className="space-y-2 col-span-2">
                 <Label htmlFor="description">Description</Label>
@@ -156,6 +170,7 @@ export function AddItemDialog({ onItemAdded, item, trigger }: AddItemDialogProps
                             <SelectItem value="kg">kg</SelectItem>
                             <SelectItem value="units">units</SelectItem>
                             <SelectItem value="liters">liters</SelectItem>
+                            <SelectItem value="weights">weights</SelectItem>
                         </SelectContent>
                     </Select>
                 </div>

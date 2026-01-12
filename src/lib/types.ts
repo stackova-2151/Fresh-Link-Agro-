@@ -8,6 +8,20 @@ export type User = {
   role?: 'Admin' | 'Manager' | 'Gate Keeper' | 'Store Keeper' | 'Checker' | 'Accountant';
 };
 
+export type Vendor = {
+  id: string;
+  name: string;
+};
+
+export type Customer = {
+  id: string;
+  name: string;
+  // Fields for monthly agreements, billing preferences, etc.
+  billingCycle: '15-day' | 'monthly';
+  rentAmount: number;
+  pendingPayment: number;
+};
+
 export type RentalItem = {
   id: string;
   name: string;
@@ -18,9 +32,15 @@ export type RentalItem = {
   quantityAvailable: number;
   condition: 'New' | 'Good' | 'Used';
   images: (string | StaticImageData)[];
-  unit: 'kg' | 'units' | 'liters';
+  unit: 'kg' | 'units' | 'liters' | 'weights';
   expiryDate: Date;
   temperatureRange: string;
+  vendorId: string; // To link to a vendor
+  boxDimensions?: {
+    length: number;
+    width: number;
+    height: number;
+  };
 };
 
 export type Platform = 'WedMeGood' | 'Urban Company' | 'Internal';
@@ -41,8 +61,8 @@ export type StockTransaction = {
 export type Chamber = {
   id: string;
   name: string;
-  capacity: number;
-  occupied: number;
+  capacity: number; // This could be in cubic meters
+  occupied: number; // This could be in cubic meters
   temperature: string;
   dailyRentRate?: number;
   contactPerson?: string;
@@ -61,13 +81,15 @@ export type GatePass = {
   vehicleNumber: string;
   driverName: string;
   driverPhone: string;
-  customerName: string;
+  customerName: string; // Or customerId
   items: {
     name: string;
     quantity: number;
     unit: string;
   }[];
-  temperature: number; // Vehicle temperature on entry/exit
+  inboundTemperature: number;
+  outboundTemperature?: number;
+  dockNumber?: 1 | 2 | 3 | 4 | 5;
   status: 'Pending' | 'Approved' | 'On-Premises' | 'Completed';
   notes?: string;
 };

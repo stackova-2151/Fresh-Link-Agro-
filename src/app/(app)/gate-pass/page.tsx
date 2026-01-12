@@ -150,7 +150,7 @@ export default function GatePassPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Gate Pass #</TableHead>
-                <TableHead>Customer</TableHead>
+                <TableHead>Customer/Vendor</TableHead>
                 <TableHead>Vehicle No.</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead>Time</TableHead>
@@ -175,7 +175,7 @@ export default function GatePassPage() {
                   <TableCell>
                     <div className="flex items-center gap-1">
                       <Thermometer className="h-4 w-4 text-muted-foreground" />
-                      {gatePass.temperature}°C
+                      {gatePass.inboundTemperature}°C
                     </div>
                   </TableCell>
                   <TableCell>

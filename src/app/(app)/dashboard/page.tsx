@@ -2,8 +2,8 @@ import { StatCard } from "@/components/stat-card";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { rentalItems, gatePasses, chambers } from "@/lib/data";
-import { AlertCircle, Archive, ArrowDownRight, ArrowUpRight, CheckCircle2, Clock, Truck, Warehouse } from "lucide-react";
+import { rentalItems, gatePasses, chambers, users, vendors } from "@/lib/data";
+import { AlertCircle, Archive, ArrowDownRight, ArrowUpRight, CheckCircle2, Clock, Truck, Warehouse, Users, UserPlus } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
@@ -53,10 +53,10 @@ export default function DashboardPage() {
                     icon={<AlertCircle className="h-4 w-4 text-muted-foreground" />}
                 />
                  <StatCard 
-                    title="Inventory Items"
-                    value={rentalItems.length.toString()}
-                    description="Total distinct items"
-                    icon={<Archive className="h-4 w-4 text-muted-foreground" />}
+                    title="Total Customers"
+                    value={"5"} // Replace with dynamic data
+                    description="Active clients"
+                    icon={<Users className="h-4 w-4 text-muted-foreground" />}
                 />
             </div>
 
@@ -71,7 +71,7 @@ export default function DashboardPage() {
                             <TableHeader>
                                 <TableRow>
                                     <TableHead>Vehicle No.</TableHead>
-                                    <TableHead>Customer</TableHead>
+                                    <TableHead>Customer/Vendor</TableHead>
                                     <TableHead className="text-center">Type</TableHead>
                                     <TableHead>Time</TableHead>
                                     <TableHead className="text-right">Status</TableHead>
@@ -85,10 +85,10 @@ export default function DashboardPage() {
                                         <TableCell className="text-center">
                                             {pass.type === 'IN' ? <ArrowDownRight className="h-5 w-5 mx-auto text-green-500" /> : <ArrowUpRight className="h-5 w-5 mx-auto text-red-500" />}
                                         </TableCell>
-                                        <TableCell>{pass.exitTime ? pass.exitTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : pass.entryTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</TableCell>
+                                        <TableCell>{pass.exitTime ? new Date(pass.exitTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : new Date(pass.entryTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</TableCell>
                                         <TableCell className="text-right">
                                             <Badge variant={pass.status === 'Completed' ? 'secondary' : 'default'} className={
-                                                pass.status === 'On-Premises' ? 'bg-blue-100 text-blue-800' : 
+                                                pass.status === 'On-Premises' ? 'bg-primary/10 text-primary' : 
                                                 pass.status === 'Completed' ? 'bg-gray-100 text-gray-800' : 'bg-green-100 text-green-800'
                                             }>
                                                 {pass.status}

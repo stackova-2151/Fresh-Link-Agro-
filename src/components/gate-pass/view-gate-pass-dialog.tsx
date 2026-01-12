@@ -9,7 +9,7 @@ import type { GatePass } from '@/lib/types';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { Separator } from '../ui/separator';
-import { Calendar, Clock, Hash, Phone, Thermometer, Truck, User, FileText } from 'lucide-react';
+import { Calendar, Clock, Hash, Phone, Thermometer, Truck, User, FileText, Anchor } from 'lucide-react';
 
 interface ViewGatePassDialogProps {
   gatePass: GatePass;
@@ -44,16 +44,18 @@ export function ViewGatePassDialog({ gatePass, open, onOpenChange }: ViewGatePas
         </DialogHeader>
         <div className="space-y-4 py-4">
             <div className="grid grid-cols-2 gap-4">
-                <DetailItem icon={<User className="h-4 w-4" />} label="Customer" value={gatePass.customerName} />
+                <DetailItem icon={<User className="h-4 w-4" />} label="Customer/Vendor" value={gatePass.customerName} />
                 <DetailItem icon={<Truck className="h-4 w-4" />} label="Vehicle No." value={gatePass.vehicleNumber} />
                 <DetailItem icon={<User className="h-4 w-4" />} label="Driver Name" value={gatePass.driverName} />
                 <DetailItem icon={<Phone className="h-4 w-4" />} label="Driver Phone" value={gatePass.driverPhone} />
                 <DetailItem icon={<Calendar className="h-4 w-4" />} label="Entry Date" value={new Date(gatePass.entryTime).toLocaleDateString()} />
                 <DetailItem icon={<Clock className="h-4 w-4" />} label="Entry Time" value={new Date(gatePass.entryTime).toLocaleTimeString()} />
-                <DetailItem icon={<Thermometer className="h-4 w-4" />} label="Vehicle Temp." value={`${gatePass.temperature}°C`} />
+                <DetailItem icon={<Thermometer className="h-4 w-4" />} label="Inbound Temp." value={`${gatePass.inboundTemperature}°C`} />
+                {gatePass.outboundTemperature && <DetailItem icon={<Thermometer className="h-4 w-4" />} label="Outbound Temp." value={`${gatePass.outboundTemperature}°C`} />}
+                {gatePass.dockNumber && <DetailItem icon={<Anchor className="h-4 w-4" />} label="Dock Number" value={gatePass.dockNumber} />}
                 <DetailItem icon={<Hash className="h-4 w-4" />} label="Status" value={<Badge variant={gatePass.status === 'Completed' ? 'secondary' : 'default'} className={
                     gatePass.status === 'On-Premises' ? 'bg-blue-100 text-blue-800' : 
-                    pass.status === 'Completed' ? 'bg-gray-100 text-gray-800' : 'bg-green-100 text-green-800'
+                    gatePass.status === 'Completed' ? 'bg-gray-100 text-gray-800' : 'bg-green-100 text-green-800'
                 }>{gatePass.status}</Badge>} />
             </div>
             <Separator />
@@ -77,7 +79,7 @@ export function ViewGatePassDialog({ gatePass, open, onOpenChange }: ViewGatePas
         </div>
         <div className="flex justify-end gap-2">
             <Button variant="outline">Print</Button>
-            <Button>Close</Button>
+            <Button onClick={() => onOpenChange(false)}>Close</Button>
         </div>
       </DialogContent>
     </Dialog>

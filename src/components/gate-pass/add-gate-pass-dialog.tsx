@@ -17,6 +17,7 @@ import { Label } from '@/components/ui/label';
 import { GatePass } from '@/lib/types';
 import { PlusCircle } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 
 interface AddGatePassDialogProps {
   onGatePassAdded: (gatePass: GatePass) => void;
@@ -40,9 +41,10 @@ export function AddGatePassDialog({ onGatePassAdded }: AddGatePassDialogProps) {
       driverPhone: data.driverPhone as string,
       customerName: data.customerName as string,
       items: [{ name: data.items as string, quantity: parseFloat(data.quantity as string), unit: data.unit as string }],
-      temperature: parseFloat(data.temperature as string),
+      inboundTemperature: parseFloat(data.temperature as string),
       status: 'On-Premises',
       notes: data.notes as string,
+      dockNumber: data.dockNumber ? parseInt(data.dockNumber as string) as GatePass['dockNumber'] : undefined
     };
 
     onGatePassAdded(newGatePass);
@@ -81,7 +83,7 @@ export function AddGatePassDialog({ onGatePassAdded }: AddGatePassDialogProps) {
                 </RadioGroup>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="customerName">Customer Name</Label>
+                <Label htmlFor="customerName">Customer/Vendor Name</Label>
                 <Input id="customerName" name="customerName" placeholder="e.g., Prestige Catering" required />
               </div>
               <div className="space-y-2">
@@ -99,6 +101,21 @@ export function AddGatePassDialog({ onGatePassAdded }: AddGatePassDialogProps) {
                <div className="space-y-2">
                 <Label htmlFor="temperature">Vehicle Temperature (°C)</Label>
                 <Input id="temperature" name="temperature" type="number" step="0.1" placeholder="e.g., 4.5" required />
+              </div>
+              <div className="space-y-2">
+                  <Label htmlFor="dockNumber">Dock Number</Label>
+                  <Select name="dockNumber">
+                      <SelectTrigger>
+                          <SelectValue placeholder="Select a dock" />
+                      </SelectTrigger>
+                      <SelectContent>
+                          <SelectItem value="1">Dock 1</SelectItem>
+                          <SelectItem value="2">Dock 2</SelectItem>
+                          <SelectItem value="3">Dock 3</SelectItem>
+                          <SelectItem value="4">Dock 4</SelectItem>
+                          <SelectItem value="5">Dock 5</SelectItem>
+                      </SelectContent>
+                  </Select>
               </div>
                <div className="space-y-2 col-span-1 md:col-span-2">
                 <Label>Items</Label>
