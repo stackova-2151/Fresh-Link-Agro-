@@ -19,8 +19,8 @@ export default function DashboardPage() {
 
     const onPremisesCount = gatePasses.filter(gp => gp.status === 'On-Premises').length;
 
-    const totalCapacity = chambers.reduce((acc, chamber) => acc + chamber.capacity, 0);
-    const totalOccupied = chambers.reduce((acc, chamber) => acc + chamber.occupied, 0);
+    const totalCapacity = chambers.reduce((acc, chamber) => acc + (chamber.boxDimensions ? chamber.boxDimensions.length * chamber.boxDimensions.width * chamber.boxDimensions.height : 0), 0);
+    const totalOccupied = 0; // This needs to be calculated based on items in chambers
     const occupancyPercentage = totalCapacity > 0 ? (totalOccupied / totalCapacity * 100).toFixed(1) : 0;
 
     const recentActivity = [
@@ -37,7 +37,7 @@ export default function DashboardPage() {
                 <StatCard 
                     title="Warehouse Occupancy"
                     value={`${occupancyPercentage}%`}
-                    description={`${totalOccupied.toLocaleString()} / ${totalCapacity.toLocaleString()} kg occupied`}
+                    description={`${(totalOccupied/1000000).toLocaleString()} / ${(totalCapacity/1000000).toLocaleString()} m³ occupied`}
                     icon={<Warehouse className="h-4 w-4 text-muted-foreground" />}
                 />
                 <StatCard 

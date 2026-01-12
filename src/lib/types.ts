@@ -63,8 +63,6 @@ export type StockTransaction = {
 export type Chamber = {
   id: string;
   name: string;
-  capacity: number; // This could be in cubic meters
-  occupied: number; // This could be in cubic meters
   temperature: string;
   dailyRentRate?: number;
   contactPerson?: string;
@@ -72,6 +70,11 @@ export type Chamber = {
   address?: string;
   isActive: boolean;
   products: Pick<RentalItem, 'id' | 'name' | 'quantityAvailable' | 'unit'>[];
+  boxDimensions?: {
+    length: number;
+    width: number;
+    height: number;
+  };
 };
 
 export type GatePass = {

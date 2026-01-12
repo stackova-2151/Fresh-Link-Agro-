@@ -26,8 +26,6 @@ const OptimizeChamberPlacementInputSchema = z.object({
   chambers: z.array(
     z.object({
       name: z.string().describe('The name of the chamber.'),
-      capacity: z.number().describe('The capacity of the chamber in kg.'),
-      occupied: z.number().describe('The currently occupied space in the chamber in kg.'),
       temperature: z.string().describe('The temperature of the chamber (e.g., 2-8°C).'),
     })
   ).describe('A list of available chambers.'),
@@ -76,7 +74,7 @@ Items:
 
 Chambers:
 {{#each chambers}}
-- Name: {{this.name}}, Capacity: {{this.capacity}}, Occupied: {{this.occupied}}, Temperature: {{this.temperature}}
+- Name: {{this.name}}, Temperature: {{this.temperature}}
 {{/each}}
 
 Output the optimal chamber placement for each item and the reason for the suggestion.  Suggest the quantity to put in each chamber.  If an item does not fit in any chamber, suggest reducing the quantity ordered.  If there is not enough information available to make a determination, leave the suggestion blank.

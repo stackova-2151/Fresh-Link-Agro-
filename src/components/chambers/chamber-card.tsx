@@ -1,7 +1,7 @@
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import type { Chamber } from "@/lib/types";
-import { Thermometer, Box, MoreHorizontal } from "lucide-react";
+import { Thermometer, Box, MoreHorizontal, Scaling } from "lucide-react";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "../ui/dropdown-menu";
@@ -15,7 +15,9 @@ type ChamberCardProps = {
 };
 
 export function ChamberCard({ chamber, onEdit, onDelete, onChamberUpdated }: ChamberCardProps) {
-    const occupancyPercentage = chamber.capacity > 0 ? (chamber.occupied / chamber.capacity) * 100 : 0;
+    const occupancyPercentage = 0; // chamber.capacity > 0 ? (chamber.occupied / chamber.capacity) * 100 : 0;
+    const capacity = chamber.boxDimensions ? (chamber.boxDimensions.length * chamber.boxDimensions.width * chamber.boxDimensions.height / 1000000).toFixed(2) : 0;
+    const occupied = 0;
 
     return (
         <Card>
@@ -54,7 +56,7 @@ export function ChamberCard({ chamber, onEdit, onDelete, onChamberUpdated }: Cha
                         </DropdownMenu>
                     </div>
                 </div>
-                <CardDescription>Capacity: {chamber.capacity} kg</CardDescription>
+                <CardDescription>Capacity: {capacity} m³</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
                 <div>
@@ -63,7 +65,7 @@ export function ChamberCard({ chamber, onEdit, onDelete, onChamberUpdated }: Cha
                         <span className="text-sm text-muted-foreground">{occupancyPercentage.toFixed(1)}%</span>
                     </div>
                     <Progress value={occupancyPercentage} />
-                    <p className="text-xs text-muted-foreground mt-1">{chamber.occupied.toLocaleString()} kg used</p>
+                    <p className="text-xs text-muted-foreground mt-1">{occupied.toLocaleString()} m³ used</p>
                 </div>
                 <div className="flex justify-between items-center text-sm">
                     <div className="flex items-center gap-2">
@@ -75,6 +77,10 @@ export function ChamberCard({ chamber, onEdit, onDelete, onChamberUpdated }: Cha
                         <span>{chamber.products.length} Items</span>
                     </div>
                 </div>
+                 {chamber.boxDimensions && <div className="flex items-center gap-2 text-sm">
+                    <Scaling className="h-4 w-4 text-muted-foreground" />
+                    <span>{chamber.boxDimensions.length}x{chamber.boxDimensions.width}x{chamber.boxDimensions.height} cm</span>
+                </div>}
             </CardContent>
             <CardFooter>
                 <p className="text-xs text-muted-foreground">Daily Rate: ₹{chamber.dailyRentRate?.toLocaleString() || 'N/A'}</p>

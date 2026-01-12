@@ -27,26 +27,29 @@ export function AddChamberDialog({ onChamberAdded, chamber, trigger }: AddChambe
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
   const [dailyRate, setDailyRate] = useState('');
-  const [capacity, setCapacity] = useState('1000');
-  const [occupied, setOccupied] = useState('0');
   const [temperature, setTemperature] = useState('2-8°C');
+  const [boxLength, setBoxLength] = useState('');
+  const [boxWidth, setBoxWidth] = useState('');
+  const [boxHeight, setBoxHeight] = useState('');
 
   useEffect(() => {
     if (chamber && open) {
         setName(chamber.name);
         setDailyRate(chamber.dailyRentRate?.toString() || '');
-        setCapacity(chamber.capacity.toString());
-        setOccupied(chamber.occupied.toString());
         setTemperature(chamber.temperature);
+        setBoxLength(chamber.boxDimensions?.length.toString() || '');
+        setBoxWidth(chamber.boxDimensions?.width.toString() || '');
+        setBoxHeight(chamber.boxDimensions?.height.toString() || '');
     }
   }, [chamber, open]);
 
   const resetForm = () => {
     setName('');
     setDailyRate('');
-    setCapacity('1000');
-    setOccupied('0');
     setTemperature('2-8°C');
+    setBoxLength('');
+    setBoxWidth('');
+    setBoxHeight('');
   };
 
   const handleOpenChange = (isOpen: boolean) => {
@@ -62,14 +65,17 @@ export function AddChamberDialog({ onChamberAdded, chamber, trigger }: AddChambe
       id: chamber?.id || `chamber_${Date.now()}`,
       name: name || `Chamber ${Math.floor(Math.random() * 100) + 1}`,
       dailyRentRate: parseFloat(dailyRate) || 0,
-      capacity: parseInt(capacity) || 1000,
-      occupied: parseInt(occupied) || 0,
       contactPerson: chamber?.contactPerson || '',
       contactNumber: chamber?.contactNumber || '',
       address: chamber?.address || '',
       isActive: chamber?.isActive ?? true,
       products: chamber?.products || [],
       temperature: temperature,
+      boxDimensions: {
+        length: parseFloat(boxLength) || 0,
+        width: parseFloat(boxWidth) || 0,
+        height: parseFloat(boxHeight) || 0,
+      }
     };
 
     onChamberAdded(newChamber);
@@ -107,22 +113,17 @@ export function AddChamberDialog({ onChamberAdded, chamber, trigger }: AddChambe
                     <Label htmlFor="dailyRate" className="text-right">Daily Rate (₹)</Label>
                     <Input id="dailyRate" type="number" value={dailyRate} onChange={(e) => setDailyRate(e.target.value)} className="col-span-3" placeholder="e.g., 500" />
                 </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="capacity" className="text-right">Capacity (kg)</Label>
-                    <Input id="capacity" type="number" value={capacity} onChange={(e) => setCapacity(e.target.value)} className="col-span-3" placeholder="e.g., 1000" />
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="occupied" className="text-right">Occupied (kg)</Label>
-                    <Input id="occupied" type="number" value={occupied} onChange={(e) => setOccupied(e.target.value)} className="col-span-3" placeholder="e.g., 250" />
+                 <div className="col-span-2 space-y-2">
+                    <Label>Dimensions (cm)</Label>
+                    <div className="grid grid-cols-3 gap-2">
+                        <Input id="boxLength" value={boxLength} onChange={e => setBoxLength(e.target.value)} placeholder="Length" type="number" />
+                        <Input id="boxWidth" value={boxWidth} onChange={e => setBoxWidth(e.target.value)} placeholder="Width" type="number" />
+                        <Input id="boxHeight" value={boxHeight} onChange={e => setBoxHeight(e.target.value)} placeholder="Height" type="number" />
+                    </div>
                 </div>
                 <div className="grid grid-cols-4 items-center gap-4">
                     <Label htmlFor="temperature" className="text-right">Temp. Range</Label>
                     <Input id="temperature" value={temperature} onChange={(e) => setTemperature(e.target.value)} className="col-span-3" placeholder="e.g., 2-8°C or -18°C" />
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                    <div className="col-start-2 col-span-3 text-sm text-muted-foreground">
-                        Available: {Math.max(0, (parseInt(capacity) || 0) - (parseInt(occupied) || 0))} kg
-                    </div>
                 </div>
             </div>
             <DialogFooter>

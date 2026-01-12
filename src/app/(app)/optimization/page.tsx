@@ -32,8 +32,6 @@ export default function OptimizationPage() {
             
             const availableChambers = initialChambers.map(chamber => ({
                 name: chamber.name,
-                capacity: chamber.capacity,
-                occupied: chamber.occupied,
                 temperature: chamber.temperature,
             }));
 
