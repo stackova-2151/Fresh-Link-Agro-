@@ -75,15 +75,16 @@ export function SidebarNav() {
         <SidebarMenu>
           {menuItems.map((item) => (
             <SidebarMenuItem key={item.href}>
-              <Link href={item.href} legacyBehavior passHref>
-                <SidebarMenuButton
-                  isActive={pathname === item.href}
-                  tooltip={{ children: item.label, side: 'right' }}
-                >
+              <SidebarMenuButton
+                asChild
+                isActive={pathname === item.href}
+                tooltip={{ children: item.label, side: 'right' }}
+              >
+                <Link href={item.href}>
                   <item.icon />
                   <span>{item.label}</span>
-                </SidebarMenuButton>
-              </Link>
+                </Link>
+              </SidebarMenuButton>
             </SidebarMenuItem>
           ))}
         </SidebarMenu>
@@ -91,26 +92,28 @@ export function SidebarNav() {
       <SidebarFooter>
         <SidebarMenu>
           <SidebarMenuItem>
-            <Link href="/settings" legacyBehavior passHref>
-              <SidebarMenuButton
-                isActive={pathname === '/settings'}
-                tooltip={{ children: 'Settings', side: 'right' }}
-              >
+            <SidebarMenuButton
+              asChild
+              isActive={pathname === '/settings'}
+              tooltip={{ children: 'Settings', side: 'right' }}
+            >
+              <Link href="/settings">
                 <Settings />
                 <span>Settings</span>
-              </SidebarMenuButton>
-            </Link>
+              </Link>
+            </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
-             <Link href="/support" legacyBehavior passHref>
-              <SidebarMenuButton
+             <SidebarMenuButton
+                asChild
                 isActive={pathname === '/support'}
                 tooltip={{ children: 'Support', side: 'right' }}
               >
-                <LifeBuoy />
-                <span>Support</span>
-              </SidebarMenuButton>
-            </Link>
+                <Link href="/support">
+                    <LifeBuoy />
+                    <span>Support</span>
+                </Link>
+            </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>
