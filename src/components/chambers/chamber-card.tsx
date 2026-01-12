@@ -1,14 +1,20 @@
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import type { Chamber } from "@/lib/types";
-import { Thermometer, Box } from "lucide-react";
+import { Thermometer, Box, MoreHorizontal } from "lucide-react";
 import { Badge } from "../ui/badge";
+import { Button } from "../ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "../ui/dropdown-menu";
+import { AddChamberDialog } from "./add-chamber-dialog";
 
 type ChamberCardProps = {
     chamber: Chamber;
+    onEdit: (chamber: Chamber) => void;
+    onDelete: (chamber: Chamber) => void;
+    onChamberUpdated: (chamber: Chamber) => void;
 };
 
-export function ChamberCard({ chamber }: ChamberCardProps) {
+export function ChamberCard({ chamber, onEdit, onDelete, onChamberUpdated }: ChamberCardProps) {
     const occupancyPercentage = chamber.capacity > 0 ? (chamber.occupied / chamber.capacity) * 100 : 0;
 
     return (
@@ -16,9 +22,37 @@ export function ChamberCard({ chamber }: ChamberCardProps) {
             <CardHeader>
                 <div className="flex justify-between items-start">
                     <CardTitle className="font-headline">{chamber.name}</CardTitle>
-                    <Badge variant={chamber.isActive ? "default" : "destructive"} className={chamber.isActive ? "bg-green-100 text-green-800" : ""}>
-                        {chamber.isActive ? 'Active' : 'Inactive'}
-                    </Badge>
+                    <div className="flex items-center gap-1">
+                        <Badge variant={chamber.isActive ? "default" : "destructive"} className={chamber.isActive ? "bg-green-100 text-green-800" : ""}>
+                            {chamber.isActive ? 'Active' : 'Inactive'}
+                        </Badge>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-6 w-6">
+                                    <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                <AddChamberDialog 
+                                    chamber={chamber}
+                                    onChamberAdded={onChamberUpdated}
+                                    trigger={
+                                        <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                                            Edit
+                                        </DropdownMenuItem>
+                                    }
+                                />
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem 
+                                    className="text-destructive" 
+                                    onClick={() => onDelete(chamber)}
+                                >
+                                    Delete
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    </div>
                 </div>
                 <CardDescription>Capacity: {chamber.capacity} kg</CardDescription>
             </CardHeader>

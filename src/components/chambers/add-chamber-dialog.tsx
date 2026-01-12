@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -20,16 +20,41 @@ import { PlusCircle } from 'lucide-react';
 interface AddChamberDialogProps {
   onChamberAdded: (chamber: Chamber) => void;
   chamber?: Chamber; // For edit mode
+  trigger?: React.ReactNode;
 }
 
-export function AddChamberDialog({ onChamberAdded, chamber }: AddChamberDialogProps) {
+export function AddChamberDialog({ onChamberAdded, chamber, trigger }: AddChamberDialogProps) {
   const [open, setOpen] = useState(false);
-  const [name, setName] = useState(chamber?.name || '');
-  const [dailyRate, setDailyRate] = useState(chamber?.dailyRentRate?.toString() || '');
-  const [capacity, setCapacity] = useState(chamber?.capacity?.toString() || '1000');
-  const [occupied, setOccupied] = useState(chamber?.occupied?.toString() || '0');
-  const [temperature, setTemperature] = useState(chamber?.temperature || '2-8°C');
+  const [name, setName] = useState('');
+  const [dailyRate, setDailyRate] = useState('');
+  const [capacity, setCapacity] = useState('1000');
+  const [occupied, setOccupied] = useState('0');
+  const [temperature, setTemperature] = useState('2-8°C');
 
+  useEffect(() => {
+    if (chamber && open) {
+        setName(chamber.name);
+        setDailyRate(chamber.dailyRentRate?.toString() || '');
+        setCapacity(chamber.capacity.toString());
+        setOccupied(chamber.occupied.toString());
+        setTemperature(chamber.temperature);
+    }
+  }, [chamber, open]);
+
+  const resetForm = () => {
+    setName('');
+    setDailyRate('');
+    setCapacity('1000');
+    setOccupied('0');
+    setTemperature('2-8°C');
+  };
+
+  const handleOpenChange = (isOpen: boolean) => {
+    if (isOpen && !chamber) {
+        resetForm();
+    }
+    setOpen(isOpen);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,24 +74,22 @@ export function AddChamberDialog({ onChamberAdded, chamber }: AddChamberDialogPr
 
     onChamberAdded(newChamber);
     setOpen(false);
-    
-    if (!chamber) {
-      setName('');
-      setDailyRate('');
-      setCapacity('1000');
-      setOccupied('0');
-      setTemperature('2-8°C');
-    }
   };
-
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
+  
+  const dialogTrigger = trigger ? (
+    <DialogTrigger asChild onClick={() => setOpen(true)}>{trigger}</DialogTrigger>
+  ) : (
+    <DialogTrigger asChild>
         <Button>
             <PlusCircle className="mr-2 h-4 w-4" />
-            {chamber ? 'Edit Chamber' : 'Add Chamber'}
+            Add Chamber
         </Button>
-      </DialogTrigger>
+    </DialogTrigger>
+  );
+
+  return (
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      {dialogTrigger}
       <DialogContent className="sm:max-w-[480px]">
         <DialogHeader>
           <DialogTitle className="font-headline">{chamber ? 'Edit Chamber' : 'Add New Chamber'}</DialogTitle>
