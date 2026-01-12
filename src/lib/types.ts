@@ -37,6 +37,7 @@ export type RentalItem = {
   temperatureRange:string;
   vendorId:string; // To link to a vendor
   clientId:string; // To link to a client
+  chamberId?:string; // To link to a chamber
   boxDimensions?:{
     length:number;
     width:number;

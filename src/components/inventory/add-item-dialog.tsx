@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { RentalItem, Vendor, Client } from '@/lib/types';
+import { RentalItem, Vendor, Client, Chamber } from '@/lib/types';
 import { Calendar as CalendarIcon, PlusCircle } from 'lucide-react';
 import { Textarea } from '../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
@@ -23,7 +23,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Calendar } from '../ui/calendar';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { vendors, clients } from '@/lib/data'; // Assuming vendors are available in data
+import { vendors, clients, chambers } from '@/lib/data'; // Assuming vendors are available in data
 
 interface AddItemDialogProps {
   onItemAdded: (item: RentalItem) => void;
@@ -44,6 +44,7 @@ export function AddItemDialog({ onItemAdded, item, trigger }: AddItemDialogProps
   const [tempRange, setTempRange] = useState('');
   const [vendorId, setVendorId] = useState('');
   const [clientId, setClientId] = useState('');
+  const [chamberId, setChamberId] = useState('');
   const [boxLength, setBoxLength] = useState('');
   const [boxWidth, setBoxWidth] = useState('');
   const [boxHeight, setBoxHeight] = useState('');
@@ -62,6 +63,7 @@ export function AddItemDialog({ onItemAdded, item, trigger }: AddItemDialogProps
         setTempRange(item.temperatureRange);
         setVendorId(item.vendorId);
         setClientId(item.clientId);
+        setChamberId(item.chamberId || '');
         setBoxLength(item.boxDimensions?.length.toString() || '');
         setBoxWidth(item.boxDimensions?.width.toString() || '');
         setBoxHeight(item.boxDimensions?.height.toString() || '');
@@ -80,6 +82,7 @@ export function AddItemDialog({ onItemAdded, item, trigger }: AddItemDialogProps
     setTempRange('');
     setVendorId('');
     setClientId('');
+    setChamberId('');
     setBoxLength('');
     setBoxWidth('');
     setBoxHeight('');
@@ -115,6 +118,7 @@ export function AddItemDialog({ onItemAdded, item, trigger }: AddItemDialogProps
       rentalCycles: ['daily', 'weekly'], // Default value
       vendorId,
       clientId,
+      chamberId,
       boxDimensions: {
         length: parseFloat(boxLength) || 0,
         width: parseFloat(boxWidth) || 0,
@@ -136,6 +140,8 @@ export function AddItemDialog({ onItemAdded, item, trigger }: AddItemDialogProps
       </Button>
     </DialogTrigger>
   );
+
+  const selectedChamber = chambers.find(c => c.id === chamberId);
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -256,6 +262,25 @@ export function AddItemDialog({ onItemAdded, item, trigger }: AddItemDialogProps
                     <Input id="boxWidth" value={boxWidth} onChange={e => setBoxWidth(e.target.value)} placeholder="Width" type="number" />
                     <Input id="boxHeight" value={boxHeight} onChange={e => setBoxHeight(e.target.value)} placeholder="Height" type="number" />
                 </div>
+              </div>
+              <div className="col-span-2 space-y-2">
+                 <Label htmlFor="chamber">Chamber</Label>
+                <Select value={chamberId} onValueChange={setChamberId}>
+                    <SelectTrigger id="chamber">
+                        <SelectValue placeholder="Select a chamber" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {chambers.map((chamber: Chamber) => (
+                            <SelectItem key={chamber.id} value={chamber.id}>{chamber.name}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+                {selectedChamber && (
+                    <div className="text-sm text-muted-foreground pt-1">
+                        Capacity: {selectedChamber.occupied} / {selectedChamber.capacity} kg used. 
+                        ({selectedChamber.capacity - selectedChamber.occupied} kg available)
+                    </div>
+                )}
               </div>
             </div>
             <DialogFooter>
