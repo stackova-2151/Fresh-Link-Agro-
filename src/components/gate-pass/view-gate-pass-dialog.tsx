@@ -10,6 +10,7 @@ import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { Separator } from '../ui/separator';
 import { Calendar, Clock, Hash, Phone, Thermometer, Truck, User, FileText, Anchor } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 interface ViewGatePassDialogProps {
   gatePass: GatePass;
@@ -28,6 +29,13 @@ const DetailItem = ({ icon, label, value }: { icon: React.ReactNode, label: stri
 );
 
 export function ViewGatePassDialog({ gatePass, open, onOpenChange }: ViewGatePassDialogProps) {
+  const router = useRouter();
+
+  const handlePrint = () => {
+    onOpenChange(false);
+    router.push(`/gate-pass/${gatePass.id}/print`);
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
@@ -79,7 +87,7 @@ export function ViewGatePassDialog({ gatePass, open, onOpenChange }: ViewGatePas
             )}
         </div>
         <div className="flex justify-end gap-2">
-            <Button variant="outline">Print</Button>
+            <Button variant="outline" onClick={handlePrint}>Print</Button>
             <Button onClick={() => onOpenChange(false)}>Close</Button>
         </div>
       </DialogContent>

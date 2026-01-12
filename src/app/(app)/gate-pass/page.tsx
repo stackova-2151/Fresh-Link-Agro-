@@ -40,12 +40,14 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
   } from "@/components/ui/dropdown-menu"
+import { useRouter } from 'next/navigation';
 
 export default function GatePassPage() {
   const [gatePasses, setGatePasses] = useState<GatePass[]>(initialGatePasses);
   const [selectedGatePass, setSelectedGatePass] = useState<GatePass | null>(null);
   const [showViewDialog, setShowViewDialog] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const router = useRouter();
 
   const { todayIn, todayOut, onPremises } = useMemo(() => {
     const today = new Date().toDateString();
@@ -189,7 +191,7 @@ export default function GatePassPage() {
                     <DropdownMenuContent align="end">
                     <DropdownMenuLabel>Actions</DropdownMenuLabel>
                     <DropdownMenuItem onClick={() => handleViewGatePass(gatePass)}>View Details</DropdownMenuItem>
-                    <DropdownMenuItem>Print Pass</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => router.push(`/gate-pass/${gatePass.id}/print`)}>Print Pass</DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>
                   </TableCell>
