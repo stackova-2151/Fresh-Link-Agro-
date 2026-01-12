@@ -11,7 +11,7 @@ import { Separator } from '@/components/ui/separator';
 import { Download, Send } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useMemo } from 'react';
-import { format } from 'date-fns';
+import { format, differenceInDays } from 'date-fns';
 
 export default function CreateInvoicePage() {
   const params = useParams();
@@ -26,13 +26,17 @@ export default function CreateInvoicePage() {
     const dueDate = new Date();
     dueDate.setDate(invoiceDate.getDate() + 30);
 
-    const items = clientItems.map(item => ({
-      name: item.name,
-      quantity: item.quantityAvailable,
-      unit: item.unit,
-      rate: item.rentalRate,
-      amount: item.quantityAvailable * item.rentalRate,
-    }));
+    const items = clientItems.map(item => {
+      const daysStored = differenceInDays(invoiceDate, item.storageDate) || 1; // Ensure at least 1 day is charged
+      const amount = item.quantityAvailable * item.rentalRate * daysStored;
+      return {
+        name: `${item.name} (${daysStored} days)`,
+        quantity: item.quantityAvailable,
+        unit: item.unit,
+        rate: item.rentalRate,
+        amount: amount,
+      };
+    });
 
     const subtotal = items.reduce((acc, item) => acc + item.amount, 0);
     const taxRate = 0.18; // 18% GST
@@ -86,7 +90,7 @@ export default function CreateInvoicePage() {
               <TableRow>
                 <TableHead className="w-[50%]">Item Description</TableHead>
                 <TableHead>Quantity</TableHead>
-                <TableHead>Rate (₹)</TableHead>
+                <TableHead>Daily Rate (₹)</TableHead>
                 <TableHead className="text-right">Amount (₹)</TableHead>
               </TableRow>
             </TableHeader>

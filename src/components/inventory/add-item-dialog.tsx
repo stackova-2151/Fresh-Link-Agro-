@@ -41,6 +41,7 @@ export function AddItemDialog({ onItemAdded, item, trigger }: AddItemDialogProps
   const [unit, setUnit] = useState<RentalItem['unit']>('kg');
   const [condition, setCondition] = useState<RentalItem['condition']>('New');
   const [expiryDate, setExpiryDate] = useState<Date | undefined>();
+  const [storageDate, setStorageDate] = useState<Date | undefined>();
   const [tempRange, setTempRange] = useState('');
   const [vendorId, setVendorId] = useState('');
   const [clientId, setClientId] = useState('');
@@ -60,6 +61,7 @@ export function AddItemDialog({ onItemAdded, item, trigger }: AddItemDialogProps
         setUnit(item.unit);
         setCondition(item.condition);
         setExpiryDate(item.expiryDate ? new Date(item.expiryDate) : undefined);
+        setStorageDate(item.storageDate ? new Date(item.storageDate) : undefined);
         setTempRange(item.temperatureRange);
         setVendorId(item.vendorId);
         setClientId(item.clientId);
@@ -67,6 +69,8 @@ export function AddItemDialog({ onItemAdded, item, trigger }: AddItemDialogProps
         setBoxLength(item.boxDimensions?.length.toString() || '');
         setBoxWidth(item.boxDimensions?.width.toString() || '');
         setBoxHeight(item.boxDimensions?.height.toString() || '');
+    } else if (!item) {
+        setStorageDate(new Date());
     }
   }, [item, open]);
 
@@ -79,6 +83,7 @@ export function AddItemDialog({ onItemAdded, item, trigger }: AddItemDialogProps
     setUnit('kg');
     setCondition('New');
     setExpiryDate(undefined);
+    setStorageDate(new Date());
     setTempRange('');
     setVendorId('');
     setClientId('');
@@ -97,9 +102,9 @@ export function AddItemDialog({ onItemAdded, item, trigger }: AddItemDialogProps
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!expiryDate || !vendorId || !clientId) {
+    if (!expiryDate || !vendorId || !clientId || !storageDate) {
         // Ideally show a toast or error message
-        console.error("Expiry date, vendor, and client are required");
+        console.error("Expiry date, storage date, vendor, and client are required");
         return;
     }
 
@@ -113,6 +118,7 @@ export function AddItemDialog({ onItemAdded, item, trigger }: AddItemDialogProps
       unit,
       condition,
       expiryDate,
+      storageDate,
       temperatureRange: tempRange,
       images: [],
       rentalCycles: ['daily', 'weekly'], // Default value
@@ -186,8 +192,8 @@ export function AddItemDialog({ onItemAdded, item, trigger }: AddItemDialogProps
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="rentalRate">Rental Rate (₹)</Label>
-                <Input id="rentalRate" type="number" value={rentalRate} onChange={(e) => setRentalRate(e.target.value)} placeholder="e.g., 1200" required/>
+                <Label htmlFor="rentalRate">Daily Rental Rate (₹)</Label>
+                <Input id="rentalRate" type="number" value={rentalRate} onChange={(e) => setRentalRate(e.target.value)} placeholder="e.g., 12" required/>
               </div>
                <div className="space-y-2 col-span-2">
                 <Label htmlFor="description">Description</Label>
@@ -225,6 +231,31 @@ export function AddItemDialog({ onItemAdded, item, trigger }: AddItemDialogProps
                         <SelectItem value="Used">Used</SelectItem>
                     </SelectContent>
                 </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="storageDate">Storage Date</Label>
+                 <Popover>
+                    <PopoverTrigger asChild>
+                    <Button
+                        variant={"outline"}
+                        className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !storageDate && "text-muted-foreground"
+                        )}
+                    >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {storageDate ? format(storageDate, "PPP") : <span>Pick a date</span>}
+                    </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                    <Calendar
+                        mode="single"
+                        selected={storageDate}
+                        onSelect={setStorageDate}
+                        initialFocus
+                    />
+                    </PopoverContent>
+                </Popover>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="expiryDate">Expiry Date</Label>

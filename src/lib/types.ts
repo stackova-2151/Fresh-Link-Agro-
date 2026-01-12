@@ -35,6 +35,7 @@ export type RentalItem = {
   images:(string | StaticImageData)[];
   unit:'kg' | 'units' | 'liters' | 'weights';
   expiryDate:Date;
+  storageDate: Date;
   temperatureRange:string;
   vendorId:string; // To link to a vendor
   clientId:string; // To link to a client

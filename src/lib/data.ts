@@ -23,13 +23,14 @@ export const rentalItems: RentalItem[] = [
     name: 'Gourmet Cheese Platter',
     category: 'Food',
     description: 'Assortment of fine cheeses, crackers, fruits',
-    rentalRate: 1200,
+    rentalRate: 12, // Assuming rate per kg per day
     rentalCycles: ['weekly', 'monthly'],
     quantityAvailable: 15,
     condition: 'New',
     images: ['/placeholder-images/cheese-platter.jpg'],
     unit: 'kg',
     expiryDate: new Date('2024-12-31'),
+    storageDate: new Date(new Date().setDate(new Date().getDate() - 10)), // Stored 10 days ago
     temperatureRange: '2-8°C',
     vendorId: 'vendor_01',
     clientId: 'cust_01'
@@ -39,13 +40,14 @@ export const rentalItems: RentalItem[] = [
     name: 'Fresh Strawberries',
     category: 'Food',
     description: 'Premium organic strawberries',
-    rentalRate: 800,
+    rentalRate: 8, // Assuming rate per kg per day
     rentalCycles: ['daily', 'weekly'],
     quantityAvailable: 50,
     condition: 'New',
     images: ['/placeholder-images/strawberries.jpg'],
     unit: 'kg',
     expiryDate: new Date('2024-11-30'),
+    storageDate: new Date(new Date().setDate(new Date().getDate() - 5)), // Stored 5 days ago
     temperatureRange: '0-4°C',
     vendorId: 'vendor_02',
     clientId: 'cust_02'
@@ -55,13 +57,14 @@ export const rentalItems: RentalItem[] = [
     name: 'Frozen Seafood Mix',
     category: 'Food',
     description: 'Assorted frozen seafood',
-    rentalRate: 1500,
+    rentalRate: 15, // Assuming rate per kg per day
     rentalCycles: ['monthly'],
     quantityAvailable: 20,
     condition: 'Good',
     images: ['/placeholder-images/seafood-mix.jpg'],
     unit: 'kg',
     expiryDate: new Date('2025-06-30'),
+    storageDate: new Date(new Date().setDate(new Date().getDate() - 25)), // Stored 25 days ago
     temperatureRange: '-18°C',
     vendorId: 'vendor_01',
     clientId: 'cust_01'
@@ -71,13 +74,14 @@ export const rentalItems: RentalItem[] = [
     name: 'Artisanal Ice Cream',
     category: 'Food',
     description: 'Hand-crafted vanilla bean ice cream',
-    rentalRate: 950,
+    rentalRate: 9, // Assuming rate per liter per day
     rentalCycles: ['weekly'],
     quantityAvailable: 30,
     condition: 'New',
     images: [],
     unit: 'liters',
     expiryDate: new Date('2025-02-28'),
+    storageDate: new Date(new Date().setDate(new Date().getDate() - 15)), // Stored 15 days ago
     temperatureRange: '-20°C',
     vendorId: 'vendor_02',
     clientId: 'cust_03'
