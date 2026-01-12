@@ -1,10 +1,13 @@
 
+'use client';
+
+import { useState } from "react";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { rentalItems } from "@/lib/data";
+import { rentalItems as initialRentalItems } from "@/lib/data";
 import { PlusCircle, Search } from "lucide-react";
 import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
@@ -18,15 +21,20 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { MoreHorizontal } from "lucide-react"
 import { cn } from "@/lib/utils";
+import { RentalItem } from "@/lib/types";
+import { AddItemDialog } from "@/components/inventory/add-item-dialog";
 
 export default function InventoryPage() {
+    const [rentalItems, setRentalItems] = useState<RentalItem[]>(initialRentalItems);
+
+    const handleItemAdded = (newItem: RentalItem) => {
+        setRentalItems(prev => [newItem, ...prev]);
+    };
+
     return (
         <div className="space-y-6">
             <PageHeader title="Inventory" description="Manage your rental food items.">
-                <Button>
-                    <PlusCircle className="mr-2 h-4 w-4" />
-                    Add Item
-                </Button>
+                <AddItemDialog onItemAdded={handleItemAdded} />
             </PageHeader>
             <Card>
                 <CardHeader>
@@ -53,8 +61,8 @@ export default function InventoryPage() {
                         </TableHeader>
                         <TableBody>
                             {rentalItems.map(item => {
-                                const isExpiringSoon = (item.expiryDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24) <= 30;
-                                const isExpired = item.expiryDate.getTime() < new Date().getTime();
+                                const isExpiringSoon = (new Date(item.expiryDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24) <= 30;
+                                const isExpired = new Date(item.expiryDate).getTime() < new Date().getTime();
 
                                 return (
                                     <TableRow key={item.id}>
@@ -78,7 +86,7 @@ export default function InventoryPage() {
                                         </TableCell>
                                         <TableCell>
                                             <span className={cn(isExpiringSoon && 'text-orange-500', isExpired && 'text-red-500 font-semibold')}>
-                                                {item.expiryDate.toLocaleDateString()}
+                                                {new Date(item.expiryDate).toLocaleDateString()}
                                             </span>
                                         </TableCell>
                                         <TableCell>{item.temperatureRange}</TableCell>
