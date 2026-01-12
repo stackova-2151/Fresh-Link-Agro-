@@ -5,17 +5,20 @@ import {
   SidebarInset,
   SidebarProvider,
 } from '@/components/ui/sidebar';
+import { UserProvider } from '@/context/user-context';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
-    <SidebarProvider>
-      <Sidebar>
-        <SidebarNav />
-      </Sidebar>
-      <SidebarInset>
-        <Header />
-        <main className="p-4 sm:p-6 lg:p-8">{children}</main>
-      </SidebarInset>
-    </SidebarProvider>
+    <UserProvider>
+        <SidebarProvider>
+        <Sidebar>
+            <SidebarNav />
+        </Sidebar>
+        <SidebarInset>
+            <Header />
+            <main className="p-4 sm:p-6 lg:p-8">{children}</main>
+        </SidebarInset>
+        </SidebarProvider>
+    </UserProvider>
   );
 }

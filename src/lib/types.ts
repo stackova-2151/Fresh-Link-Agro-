@@ -5,7 +5,7 @@ export type User = {
   name: string;
   email?: string;
   avatar?: string;
-  role?: 'Admin' | 'Manager' | 'Gate Keeper' | 'Store Keeper' | 'Checker' | 'Accountant';
+  role?: 'Admin' | 'Gatekeeper' | 'Storekeeper';
 };
 
 export type Vendor = {

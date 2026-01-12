@@ -21,52 +21,67 @@ import {
   Users
 } from 'lucide-react';
 import Link from 'next/link';
+import { useUser } from '@/context/user-context';
+import { User } from '@/lib/types';
 
-const menuItems = [
+const allMenuItems = [
   {
     href: '/dashboard',
     label: 'Dashboard',
     icon: LayoutDashboard,
+    roles: ['Admin', 'Storekeeper'],
   },
   {
     href: '/inventory',
     label: 'Inventory',
     icon: Archive,
+    roles: ['Admin', 'Storekeeper'],
   },
   {
     href: '/chambers',
     label: 'Chambers',
     icon: Warehouse,
+    roles: ['Admin', 'Storekeeper'],
   },
   {
     href: '/clients',
     label: 'Clients',
     icon: Users,
+    roles: ['Admin', 'Storekeeper'],
   },
   {
     href: '/gate-pass',
     label: 'Gate Pass',
     icon: Truck,
+    roles: ['Admin', 'Gatekeeper', 'Storekeeper'],
   },
   {
     href: '/optimization',
     label: 'AI Optimizer',
     icon: BrainCircuit,
+    roles: ['Admin', 'Storekeeper'],
   },
   {
     href: '/reports',
     label: 'Reports',
-    icon: FileText
+    icon: FileText,
+    roles: ['Admin', 'Storekeeper'],
   },
   {
     href: '/invoices',
     label: 'Invoices',
     icon: FileText,
+    roles: ['Admin', 'Storekeeper'],
   }
 ];
 
 export function SidebarNav() {
   const pathname = usePathname();
+  const { user } = useUser();
+
+  const menuItems = allMenuItems.filter(item => 
+    user?.role && item.roles.includes(user.role)
+  );
 
   return (
     <>
