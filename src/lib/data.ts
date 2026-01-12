@@ -12,9 +12,9 @@ export const vendors: Vendor[] = [
 ];
 
 export const clients: Client[] = [
-    { id: 'cust_01', name: 'Prestige Catering', billingCycle: 'monthly', rentAmount: 50000, pendingPayment: 10000 },
-    { id: 'cust_02', name: 'Royal Orchid Hotels', billingCycle: 'weekly', rentAmount: 25000, pendingPayment: 0 },
-    { id: 'cust_03', name: 'Daily Fresh', billingCycle: 'monthly', rentAmount: 30000, pendingPayment: 5000 },
+    { id: 'cust_01', name: 'Prestige Catering', phone: '9876543210', address: '123 Food Street, Bangalore', billingCycle: 'monthly', rentAmount: 50000, pendingPayment: 10000 },
+    { id: 'cust_02', name: 'Royal Orchid Hotels', phone: '9876543211', address: '456 Royal Lane, Bangalore', billingCycle: 'weekly', rentAmount: 25000, pendingPayment: 0 },
+    { id: 'cust_03', name: 'Daily Fresh', phone: '9876543212', address: '789 Market Road, Bangalore', billingCycle: 'monthly', rentAmount: 30000, pendingPayment: 5000 },
 ];
 
 export const rentalItems: RentalItem[] = [

@@ -16,6 +16,8 @@ export type Vendor = {
 export type Client = {
   id: string;
   name: string;
+  phone?: string;
+  address?: string;
   billingCycle: 'weekly' | 'monthly';
   rentAmount: number;
   pendingPayment: number;
