@@ -1,4 +1,4 @@
-import type { RentalItem, StockTransaction, Chamber, GatePass, User, Vendor, Client } from '@/lib/types';
+import type { RentalItem, StockTransaction, Chamber, GatePass, User, Vendor, Client, Invoice } from '@/lib/types';
 
 export const users: User[] = [
   { id: 'user_01', name: 'Alex', email: 'alex@example.com', role: 'Admin' },
@@ -33,7 +33,9 @@ export const rentalItems: RentalItem[] = [
     storageDate: new Date(new Date().setDate(new Date().getDate() - 10)), // Stored 10 days ago
     temperatureRange: '2-8°C',
     vendorId: 'vendor_01',
-    clientId: 'cust_01'
+    clientId: 'cust_01',
+    chamberId: 'chamber_01',
+    boxDimensions: { length: 30, width: 20, height: 10 }
   },
   {
     id: 'item_008',
@@ -50,7 +52,9 @@ export const rentalItems: RentalItem[] = [
     storageDate: new Date(new Date().setDate(new Date().getDate() - 5)), // Stored 5 days ago
     temperatureRange: '0-4°C',
     vendorId: 'vendor_02',
-    clientId: 'cust_02'
+    clientId: 'cust_02',
+    chamberId: 'chamber_01',
+    boxDimensions: { length: 25, width: 15, height: 10 }
   },
   {
     id: 'item_009',
@@ -67,7 +71,9 @@ export const rentalItems: RentalItem[] = [
     storageDate: new Date(new Date().setDate(new Date().getDate() - 25)), // Stored 25 days ago
     temperatureRange: '-18°C',
     vendorId: 'vendor_01',
-    clientId: 'cust_01'
+    clientId: 'cust_01',
+    chamberId: 'chamber_02',
+    boxDimensions: { length: 40, width: 30, height: 15 }
   },
   {
     id: 'item_010',
@@ -84,7 +90,9 @@ export const rentalItems: RentalItem[] = [
     storageDate: new Date(new Date().setDate(new Date().getDate() - 15)), // Stored 15 days ago
     temperatureRange: '-20°C',
     vendorId: 'vendor_02',
-    clientId: 'cust_03'
+    clientId: 'cust_03',
+    chamberId: 'chamber_02',
+    boxDimensions: { length: 20, width: 20, height: 15 }
   },
 ];
 
@@ -126,6 +134,7 @@ export const chambers: Chamber[] = [
         { id: 'item_007', name: 'Gourmet Cheese Platter', quantityAvailable: 5, unit: 'kg' },
         { id: 'item_008', name: 'Fresh Strawberries', quantityAvailable: 20, unit: 'kg' },
     ],
+    boxDimensions: { length: 500, width: 400, height: 250 }
   },
   {
     id: 'chamber_02',
@@ -137,23 +146,24 @@ export const chambers: Chamber[] = [
         { id: 'item_009', name: 'Frozen Seafood Mix', quantityAvailable: 10, unit: 'kg' },
         { id: 'item_010', name: 'Artisanal Ice Cream', quantityAvailable: 15, unit: 'liters' },
     ],
+    boxDimensions: { length: 500, width: 400, height: 250 }
   },
-  { id: 'chamber_03', name: 'Chamber C', temperature: '0-5°C', isActive: true, dailyRentRate: 400, products: [], },
-  { id: 'chamber_04', name: 'Chamber D', temperature: '15-20°C', isActive: false, dailyRentRate: 200, products: [], },
-  { id: 'chamber_05', name: 'Chamber E', temperature: '2-8°C', isActive: true, dailyRentRate: 500, products: [], },
-  { id: 'chamber_06', name: 'Chamber F', temperature: '-18°C', isActive: true, dailyRentRate: 750, products: [], },
-  { id: 'chamber_07', name: 'Chamber G', temperature: '0-5°C', isActive: true, dailyRentRate: 450, products: [], },
-  { id: 'chamber_08', name: 'Chamber H', temperature: '0-5°C', isActive: true, dailyRentRate: 450, products: [], },
-  { id: 'chamber_09', name: 'Chamber I', temperature: '2-8°C', isActive: true, dailyRentRate: 550, products: [], },
-  { id: 'chamber_10', name: 'Chamber J', temperature: '-20°C', isActive: true, dailyRentRate: 800, products: [], },
-  { id: 'chamber_11', name: 'Chamber K', temperature: '0-5°C', isActive: true, dailyRentRate: 400, products: [], },
-  { id: 'chamber_12', name: 'Chamber L', temperature: '0-5°C', isActive: true, dailyRentRate: 400, products: [], },
-  { id: 'chamber_13', name: 'Chamber M', temperature: '2-8°C', isActive: true, dailyRentRate: 500, products: [], },
-  { id: 'chamber_14', name: 'Chamber N', temperature: '-18°C', isActive: true, dailyRentRate: 750, products: [], },
-  { id: 'chamber_15', name: 'Chamber O', temperature: '0-5°C', isActive: true, dailyRentRate: 400, products: [], },
-  { id: 'chamber_16', name: 'Chamber P', temperature: '15-20°C', isActive: true, dailyRentRate: 250, products: [], },
-  { id: 'chamber_17', name: 'Chamber Q', temperature: '-25°C', isActive: true, dailyRentRate: 900, products: [], },
-  { id: 'chamber_18', name: 'Chamber R', temperature: '2-8°C', isActive: true, dailyRentRate: 500, products: [], },
+  { id: 'chamber_03', name: 'Chamber C', temperature: '0-5°C', isActive: true, dailyRentRate: 400, products: [], boxDimensions: { length: 400, width: 300, height: 250 } },
+  { id: 'chamber_04', name: 'Chamber D', temperature: '15-20°C', isActive: false, dailyRentRate: 200, products: [], boxDimensions: { length: 600, width: 400, height: 250 } },
+  { id: 'chamber_05', name: 'Chamber E', temperature: '2-8°C', isActive: true, dailyRentRate: 500, products: [], boxDimensions: { length: 500, width: 400, height: 250 } },
+  { id: 'chamber_06', name: 'Chamber F', temperature: '-18°C', isActive: true, dailyRentRate: 750, products: [], boxDimensions: { length: 500, width: 400, height: 250 } },
+  { id: 'chamber_07', name: 'Chamber G', temperature: '0-5°C', isActive: true, dailyRentRate: 450, products: [], boxDimensions: { length: 400, width: 300, height: 250 } },
+  { id: 'chamber_08', name: 'Chamber H', temperature: '0-5°C', isActive: true, dailyRentRate: 450, products: [], boxDimensions: { length: 400, width: 300, height: 250 } },
+  { id: 'chamber_09', name: 'Chamber I', temperature: '2-8°C', isActive: true, dailyRentRate: 550, products: [], boxDimensions: { length: 500, width: 400, height: 250 } },
+  { id: 'chamber_10', name: 'Chamber J', temperature: '-20°C', isActive: true, dailyRentRate: 800, products: [], boxDimensions: { length: 500, width: 400, height: 250 } },
+  { id: 'chamber_11', name: 'Chamber K', temperature: '0-5°C', isActive: true, dailyRentRate: 400, products: [], boxDimensions: { length: 400, width: 300, height: 250 } },
+  { id: 'chamber_12', name: 'Chamber L', temperature: '0-5°C', isActive: true, dailyRentRate: 400, products: [], boxDimensions: { length: 400, width: 300, height: 250 } },
+  { id: 'chamber_13', name: 'Chamber M', temperature: '2-8°C', isActive: true, dailyRentRate: 500, products: [], boxDimensions: { length: 500, width: 400, height: 250 } },
+  { id: 'chamber_14', name: 'Chamber N', temperature: '-18°C', isActive: true, dailyRentRate: 750, products: [], boxDimensions: { length: 500, width: 400, height: 250 } },
+  { id: 'chamber_15', name: 'Chamber O', temperature: '0-5°C', isActive: true, dailyRentRate: 400, products: [], boxDimensions: { length: 400, width: 300, height: 250 } },
+  { id: 'chamber_16', name: 'Chamber P', temperature: '15-20°C', isActive: true, dailyRentRate: 250, products: [], boxDimensions: { length: 600, width: 400, height: 250 } },
+  { id: 'chamber_17', name: 'Chamber Q', temperature: '-25°C', isActive: true, dailyRentRate: 900, products: [], boxDimensions: { length: 500, width: 400, height: 250 } },
+  { id: 'chamber_18', name: 'Chamber R', temperature: '2-8°C', isActive: true, dailyRentRate: 500, products: [], boxDimensions: { length: 500, width: 400, height: 250 } },
 ];
 
 export const gatePasses: GatePass[] = [
@@ -220,4 +230,56 @@ export const gatePasses: GatePass[] = [
     status: 'On-Premises',
     dockNumber: 5,
   }
+];
+
+export const invoices: Invoice[] = [
+    {
+        id: 'inv_001',
+        invoiceNumber: 'INV-2024-001',
+        clientId: 'cust_01',
+        date: new Date('2024-07-01'),
+        dueDate: new Date('2024-07-31'),
+        items: [
+            { itemId: 'item_007', name: 'Gourmet Cheese Platter (21 days)', quantity: 15, rate: 12, amount: 3780 },
+            { itemId: 'item_009', name: 'Frozen Seafood Mix (15 days)', quantity: 20, rate: 15, amount: 4500 }
+        ],
+        subtotal: 8280,
+        tax: 1490.40,
+        total: 9770.40,
+        paidAmount: 0,
+        balance: 9770.40,
+        status: 'Pending'
+    },
+    {
+        id: 'inv_002',
+        invoiceNumber: 'INV-2024-002',
+        clientId: 'cust_02',
+        date: new Date('2024-07-05'),
+        dueDate: new Date('2024-08-04'),
+        items: [
+            { itemId: 'item_008', name: 'Fresh Strawberries (30 days)', quantity: 50, rate: 8, amount: 12000 }
+        ],
+        subtotal: 12000,
+        tax: 2160,
+        total: 14160,
+        paidAmount: 14160,
+        balance: 0,
+        status: 'Paid'
+    },
+     {
+        id: 'inv_003',
+        invoiceNumber: 'INV-2024-003',
+        clientId: 'cust_03',
+        date: new Date('2024-06-01'),
+        dueDate: new Date('2024-06-30'),
+        items: [
+            { itemId: 'item_010', name: 'Artisanal Ice Cream (30 days)', quantity: 30, rate: 9, amount: 8100 }
+        ],
+        subtotal: 8100,
+        tax: 1458,
+        total: 9558,
+        paidAmount: 0,
+        balance: 9558,
+        status: 'Overdue'
+    }
 ];
