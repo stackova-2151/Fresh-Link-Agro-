@@ -153,7 +153,7 @@ export function AddItemDialog({ onItemAdded, item, trigger }: AddItemDialogProps
               </div>
               <div className="space-y-2">
                 <Label htmlFor="rentalRate">Rental Rate (₹)</Label>
-                <Input id="rentalRate" type="number" value={rentalRate} onChange={(e) => setRentalRate(e.target.value)} placeholder="e.g., 1200" />
+                <Input id="rentalRate" type="number" value={rentalRate} onChange={(e) => setRentalRate(e.target.value)} placeholder="e.g., 1200" required/>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div className='space-y-2'>
