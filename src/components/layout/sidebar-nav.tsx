@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -59,7 +60,7 @@ const allMenuItems = [
     href: '/optimization',
     label: 'AI Optimizer',
     icon: BrainCircuit,
-    roles: ['Admin', 'Storekeeper'],
+    roles: ['Admin'],
   },
   {
     href: '/reports',
