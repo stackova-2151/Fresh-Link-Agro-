@@ -14,6 +14,7 @@ export const vendors: Vendor[] = [
 export const customers: Customer[] = [
     { id: 'cust_01', name: 'Prestige Catering', billingCycle: 'monthly', rentAmount: 50000, pendingPayment: 10000 },
     { id: 'cust_02', name: 'Royal Orchid Hotels', billingCycle: '15-day', rentAmount: 25000, pendingPayment: 0 },
+    { id: 'cust_03', name: 'Daily Fresh', billingCycle: 'monthly', rentAmount: 30000, pendingPayment: 5000 },
 ];
 
 export const rentalItems: RentalItem[] = [
@@ -30,7 +31,8 @@ export const rentalItems: RentalItem[] = [
     unit: 'kg',
     expiryDate: new Date('2024-12-31'),
     temperatureRange: '2-8°C',
-    vendorId: 'vendor_01'
+    vendorId: 'vendor_01',
+    customerId: 'cust_01'
   },
   {
     id: 'item_008',
@@ -45,7 +47,8 @@ export const rentalItems: RentalItem[] = [
     unit: 'kg',
     expiryDate: new Date('2024-11-30'),
     temperatureRange: '0-4°C',
-    vendorId: 'vendor_02'
+    vendorId: 'vendor_02',
+    customerId: 'cust_02'
   },
   {
     id: 'item_009',
@@ -60,7 +63,8 @@ export const rentalItems: RentalItem[] = [
     unit: 'kg',
     expiryDate: new Date('2025-06-30'),
     temperatureRange: '-18°C',
-    vendorId: 'vendor_01'
+    vendorId: 'vendor_01',
+    customerId: 'cust_01'
   },
   {
     id: 'item_010',
@@ -75,7 +79,8 @@ export const rentalItems: RentalItem[] = [
     unit: 'liters',
     expiryDate: new Date('2025-02-28'),
     temperatureRange: '-20°C',
-    vendorId: 'vendor_02'
+    vendorId: 'vendor_02',
+    customerId: 'cust_03'
   },
 ];
 

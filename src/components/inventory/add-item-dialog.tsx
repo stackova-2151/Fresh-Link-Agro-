@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { RentalItem, Vendor } from '@/lib/types';
+import { RentalItem, Vendor, Customer } from '@/lib/types';
 import { Calendar as CalendarIcon, PlusCircle } from 'lucide-react';
 import { Textarea } from '../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
@@ -23,7 +23,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Calendar } from '../ui/calendar';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { vendors } from '@/lib/data'; // Assuming vendors are available in data
+import { vendors, customers } from '@/lib/data'; // Assuming vendors are available in data
 
 interface AddItemDialogProps {
   onItemAdded: (item: RentalItem) => void;
@@ -43,6 +43,7 @@ export function AddItemDialog({ onItemAdded, item, trigger }: AddItemDialogProps
   const [expiryDate, setExpiryDate] = useState<Date | undefined>();
   const [tempRange, setTempRange] = useState('');
   const [vendorId, setVendorId] = useState('');
+  const [customerId, setCustomerId] = useState('');
 
   useEffect(() => {
     if (item && open) {
@@ -56,6 +57,7 @@ export function AddItemDialog({ onItemAdded, item, trigger }: AddItemDialogProps
         setExpiryDate(item.expiryDate ? new Date(item.expiryDate) : undefined);
         setTempRange(item.temperatureRange);
         setVendorId(item.vendorId);
+        setCustomerId(item.customerId);
     }
   }, [item, open]);
 
@@ -70,6 +72,7 @@ export function AddItemDialog({ onItemAdded, item, trigger }: AddItemDialogProps
     setExpiryDate(undefined);
     setTempRange('');
     setVendorId('');
+    setCustomerId('');
   }
 
   const handleOpenChange = (isOpen: boolean) => {
@@ -81,9 +84,9 @@ export function AddItemDialog({ onItemAdded, item, trigger }: AddItemDialogProps
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!expiryDate || !vendorId) {
+    if (!expiryDate || !vendorId || !customerId) {
         // Ideally show a toast or error message
-        console.error("Expiry date and vendor are required");
+        console.error("Expiry date, vendor, and customer are required");
         return;
     }
 
@@ -101,6 +104,7 @@ export function AddItemDialog({ onItemAdded, item, trigger }: AddItemDialogProps
       images: [],
       rentalCycles: ['daily', 'weekly'], // Default value
       vendorId,
+      customerId,
     };
 
     onItemAdded(newItem);
@@ -134,6 +138,19 @@ export function AddItemDialog({ onItemAdded, item, trigger }: AddItemDialogProps
                 <Label htmlFor="name">Item Name</Label>
                 <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g., Gourmet Cheese Platter" required />
               </div>
+               <div className="space-y-2">
+                 <Label htmlFor="customer">Customer</Label>
+                <Select value={customerId} onValueChange={setCustomerId} required>
+                    <SelectTrigger id="customer">
+                        <SelectValue placeholder="Select a customer" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {customers.map((customer: Customer) => (
+                            <SelectItem key={customer.id} value={customer.id}>{customer.name}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+              </div>
               <div className="space-y-2">
                  <Label htmlFor="vendor">Vendor</Label>
                 <Select value={vendorId} onValueChange={setVendorId} required>
@@ -147,13 +164,13 @@ export function AddItemDialog({ onItemAdded, item, trigger }: AddItemDialogProps
                     </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2 col-span-2">
-                <Label htmlFor="description">Description</Label>
-                <Textarea id="description" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="A brief description of the item." />
-              </div>
               <div className="space-y-2">
                 <Label htmlFor="rentalRate">Rental Rate (₹)</Label>
                 <Input id="rentalRate" type="number" value={rentalRate} onChange={(e) => setRentalRate(e.target.value)} placeholder="e.g., 1200" required/>
+              </div>
+               <div className="space-y-2 col-span-2">
+                <Label htmlFor="description">Description</Label>
+                <Textarea id="description" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="A brief description of the item." />
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div className='space-y-2'>
@@ -213,7 +230,7 @@ export function AddItemDialog({ onItemAdded, item, trigger }: AddItemDialogProps
                     </PopoverContent>
                 </Popover>
               </div>
-              <div className="space-y-2 col-span-2">
+              <div className="space-y-2">
                 <Label htmlFor="tempRange">Temperature Range</Label>
                 <Input id="tempRange" value={tempRange} onChange={(e) => setTempRange(e.target.value)} placeholder="e.g., 2-8°C" />
               </div>

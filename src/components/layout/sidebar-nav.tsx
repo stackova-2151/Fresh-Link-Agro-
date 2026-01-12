@@ -17,7 +17,8 @@ import {
   Truck,
   Warehouse,
   LifeBuoy,
-  FileText
+  FileText,
+  Users
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -36,6 +37,11 @@ const menuItems = [
     href: '/chambers',
     label: 'Chambers',
     icon: Warehouse,
+  },
+  {
+    href: '/customers',
+    label: 'Customers',
+    icon: Users,
   },
   {
     href: '/gate-pass',

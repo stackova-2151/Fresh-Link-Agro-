@@ -36,6 +36,7 @@ export type RentalItem = {
   expiryDate: Date;
   temperatureRange: string;
   vendorId: string; // To link to a vendor
+  customerId: string; // To link to a customer
   boxDimensions?: {
     length: number;
     width: number;
