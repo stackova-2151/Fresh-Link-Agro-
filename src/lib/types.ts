@@ -23,24 +23,24 @@ export type Client = {
 };
 
 export type RentalItem = {
-  id: string;
-  name: string;
-  category: string;
-  description: string;
-  rentalRate: number;
-  rentalCycles: ('daily' | 'weekly' | 'monthly')[];
-  quantityAvailable: number;
-  condition: 'New' | 'Good' | 'Used';
-  images: (string | StaticImageData)[];
-  unit: 'kg' | 'units' | 'liters' | 'weights';
-  expiryDate: Date;
-  temperatureRange: string;
-  vendorId: string; // To link to a vendor
-  clientId: string; // To link to a client
-  boxDimensions?: {
-    length: number;
-    width: number;
-    height: number;
+  id:string;
+  name:string;
+  category:string;
+  description:string;
+  rentalRate:number;
+  rentalCycles:('daily' | 'weekly' | 'monthly')[];
+  quantityAvailable:number;
+  condition:'New' | 'Good' | 'Used';
+  images:(string | StaticImageData)[];
+  unit:'kg' | 'units' | 'liters' | 'weights';
+  expiryDate:Date;
+  temperatureRange:string;
+  vendorId:string; // To link to a vendor
+  clientId:string; // To link to a client
+  boxDimensions?:{
+    length:number;
+    width:number;
+    height:number;
   };
 };
 

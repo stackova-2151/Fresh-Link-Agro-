@@ -44,6 +44,10 @@ export function AddItemDialog({ onItemAdded, item, trigger }: AddItemDialogProps
   const [tempRange, setTempRange] = useState('');
   const [vendorId, setVendorId] = useState('');
   const [clientId, setClientId] = useState('');
+  const [boxLength, setBoxLength] = useState('');
+  const [boxWidth, setBoxWidth] = useState('');
+  const [boxHeight, setBoxHeight] = useState('');
+
 
   useEffect(() => {
     if (item && open) {
@@ -58,6 +62,9 @@ export function AddItemDialog({ onItemAdded, item, trigger }: AddItemDialogProps
         setTempRange(item.temperatureRange);
         setVendorId(item.vendorId);
         setClientId(item.clientId);
+        setBoxLength(item.boxDimensions?.length.toString() || '');
+        setBoxWidth(item.boxDimensions?.width.toString() || '');
+        setBoxHeight(item.boxDimensions?.height.toString() || '');
     }
   }, [item, open]);
 
@@ -73,6 +80,9 @@ export function AddItemDialog({ onItemAdded, item, trigger }: AddItemDialogProps
     setTempRange('');
     setVendorId('');
     setClientId('');
+    setBoxLength('');
+    setBoxWidth('');
+    setBoxHeight('');
   }
 
   const handleOpenChange = (isOpen: boolean) => {
@@ -105,6 +115,11 @@ export function AddItemDialog({ onItemAdded, item, trigger }: AddItemDialogProps
       rentalCycles: ['daily', 'weekly'], // Default value
       vendorId,
       clientId,
+      boxDimensions: {
+        length: parseFloat(boxLength) || 0,
+        width: parseFloat(boxWidth) || 0,
+        height: parseFloat(boxHeight) || 0,
+      }
     };
 
     onItemAdded(newItem);
@@ -125,7 +140,7 @@ export function AddItemDialog({ onItemAdded, item, trigger }: AddItemDialogProps
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       {dialogTrigger}
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent className="sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle className="font-headline">{item ? 'Edit Item' : 'Add New Item'}</DialogTitle>
           <DialogDescription>
@@ -233,6 +248,14 @@ export function AddItemDialog({ onItemAdded, item, trigger }: AddItemDialogProps
               <div className="space-y-2">
                 <Label htmlFor="tempRange">Temperature Range</Label>
                 <Input id="tempRange" value={tempRange} onChange={(e) => setTempRange(e.target.value)} placeholder="e.g., 2-8°C" />
+              </div>
+              <div className="col-span-2 space-y-2">
+                <Label>Box Dimensions (cm)</Label>
+                <div className="grid grid-cols-3 gap-2">
+                    <Input id="boxLength" value={boxLength} onChange={e => setBoxLength(e.target.value)} placeholder="Length" type="number" />
+                    <Input id="boxWidth" value={boxWidth} onChange={e => setBoxWidth(e.target.value)} placeholder="Width" type="number" />
+                    <Input id="boxHeight" value={boxHeight} onChange={e => setBoxHeight(e.target.value)} placeholder="Height" type="number" />
+                </div>
               </div>
             </div>
             <DialogFooter>
