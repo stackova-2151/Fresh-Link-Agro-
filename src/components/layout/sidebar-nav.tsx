@@ -57,6 +57,11 @@ const menuItems = [
     href: '/reports',
     label: 'Reports',
     icon: FileText
+  },
+  {
+    href: '/invoices',
+    label: 'Invoices',
+    icon: FileText,
   }
 ];
 
@@ -77,7 +82,7 @@ export function SidebarNav() {
             <SidebarMenuItem key={item.href}>
               <SidebarMenuButton
                 asChild
-                isActive={pathname === item.href}
+                isActive={pathname.startsWith(item.href)}
                 tooltip={{ children: item.label, side: 'right' }}
               >
                 <Link href={item.href}>

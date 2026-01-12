@@ -104,14 +104,15 @@ export type GatePass = {
 export type Invoice = {
   id: string;
   invoiceNumber: string;
-  contractId: string;
   clientId: string;
   date: Date;
   dueDate: Date;
   items: {
+    itemId: string;
     name: string;
     quantity: number;
     rate: number;
+    amount: number;
   }[];
   subtotal: number;
   tax: number;

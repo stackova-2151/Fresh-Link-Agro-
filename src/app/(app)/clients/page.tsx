@@ -2,12 +2,13 @@
 'use client'
 
 import { useState } from "react";
+import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
 import { clients as initialClients } from "@/lib/data";
 import { Client } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { PlusCircle, MoreHorizontal, Edit, Trash2, FileUp, FileDown } from "lucide-react";
+import { PlusCircle, MoreHorizontal, Edit, Trash2, FileUp, FileDown, FileText } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
@@ -94,7 +95,11 @@ export default function ClientsPage() {
                                                     onClientAdded={handleClientAdded} 
                                                     trigger={<DropdownMenuItem onSelect={(e) => e.preventDefault()}><Edit className="mr-2 h-4 w-4"/>Edit</DropdownMenuItem>} 
                                                 />
-                                                <DropdownMenuItem>Generate Invoice</DropdownMenuItem>
+                                                <DropdownMenuItem asChild>
+                                                    <Link href={`/invoices/${client.id}/create`}>
+                                                        <FileText className="mr-2 h-4 w-4"/>Generate Invoice
+                                                    </Link>
+                                                </DropdownMenuItem>
                                                 <DropdownMenuSeparator />
                                                 <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteClient(client.id)}>
                                                     <Trash2 className="mr-2 h-4 w-4" />Delete
