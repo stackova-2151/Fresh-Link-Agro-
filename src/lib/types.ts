@@ -50,8 +50,6 @@ export type Chamber = {
   address?: string;
   isActive: boolean;
   products: Pick<RentalItem, 'id' | 'name' | 'quantityAvailable' | 'unit'>[];
-  recentTemperatures?: number[];
-  currentTemperature?: number;
 };
 
 export type GatePass = {

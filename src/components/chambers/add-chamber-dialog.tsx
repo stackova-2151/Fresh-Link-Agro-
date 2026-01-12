@@ -45,7 +45,6 @@ export function AddChamberDialog({ onChamberAdded, chamber }: AddChamberDialogPr
       isActive: chamber?.isActive ?? true,
       products: chamber?.products || [],
       temperature: temperature,
-      currentTemperature: chamber?.currentTemperature || parseFloat(temperature.split('-')[0]) || 0,
     };
 
     onChamberAdded(newChamber);

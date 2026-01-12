@@ -14,7 +14,6 @@ import {
   BrainCircuit,
   LayoutDashboard,
   Settings,
-  Thermometer,
   Truck,
   Warehouse,
   LifeBuoy,
@@ -42,11 +41,6 @@ const menuItems = [
     href: '/gate-pass',
     label: 'Gate Pass',
     icon: Truck,
-  },
-  {
-    href: '/monitoring',
-    label: 'Monitoring',
-    icon: Thermometer,
   },
   {
     href: '/optimization',

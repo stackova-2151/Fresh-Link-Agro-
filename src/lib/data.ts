@@ -105,8 +105,6 @@ export const chambers: Chamber[] = [
         { id: 'item_007', name: 'Gourmet Cheese Platter', quantityAvailable: 5, unit: 'kg' },
         { id: 'item_008', name: 'Fresh Strawberries', quantityAvailable: 20, unit: 'kg' },
     ],
-    recentTemperatures: [4.1, 4.2, 4.0, 4.3, 4.2, 4.1, 4.4, 4.2],
-    currentTemperature: 4.2,
   },
   {
     id: 'chamber_02',
@@ -120,8 +118,6 @@ export const chambers: Chamber[] = [
         { id: 'item_009', name: 'Frozen Seafood Mix', quantityAvailable: 10, unit: 'kg' },
         { id: 'item_010', name: 'Artisanal Ice Cream', quantityAvailable: 15, unit: 'liters' },
     ],
-    recentTemperatures: [-18.2, -18.0, -18.1, -17.9, -18.3, -18.2, -18.1, -18.0],
-    currentTemperature: -18.1,
   },
   {
     id: 'chamber_03',
@@ -132,8 +128,6 @@ export const chambers: Chamber[] = [
     isActive: true,
     dailyRentRate: 400,
     products: [],
-    recentTemperatures: [3.2, 3.5, 3.4, 4.1, 3.2, 3.3, 3.5, 3.4],
-    currentTemperature: 3.4
   },
   {
     id: 'chamber_04',
@@ -144,8 +138,6 @@ export const chambers: Chamber[] = [
     isActive: false,
     dailyRentRate: 200,
     products: [],
-    recentTemperatures: [17, 18, 17.5, 19, 18, 17.2, 17.8, 18.1],
-    currentTemperature: 18.1
   },
 ];
 
