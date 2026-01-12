@@ -85,6 +85,7 @@ export type GatePass = {
   type: 'IN' | 'OUT';
   entryTime: Date;
   exitTime?: Date;
+  dockTime?: string;
   vehicleNumber: string;
   driverName: string;
   driverPhone: string;

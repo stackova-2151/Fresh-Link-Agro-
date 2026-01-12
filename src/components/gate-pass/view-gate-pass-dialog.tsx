@@ -50,6 +50,7 @@ export function ViewGatePassDialog({ gatePass, open, onOpenChange }: ViewGatePas
                 <DetailItem icon={<Phone className="h-4 w-4" />} label="Driver Phone" value={gatePass.driverPhone} />
                 <DetailItem icon={<Calendar className="h-4 w-4" />} label="Entry Date" value={new Date(gatePass.entryTime).toLocaleDateString()} />
                 <DetailItem icon={<Clock className="h-4 w-4" />} label="Entry Time" value={new Date(gatePass.entryTime).toLocaleTimeString()} />
+                {gatePass.dockTime && <DetailItem icon={<Clock className="h-4 w-4" />} label="Dock Time" value={gatePass.dockTime} />}
                 <DetailItem icon={<Thermometer className="h-4 w-4" />} label="Inbound Temp." value={`${gatePass.inboundTemperature}°C`} />
                 {gatePass.outboundTemperature && <DetailItem icon={<Thermometer className="h-4 w-4" />} label="Outbound Temp." value={`${gatePass.outboundTemperature}°C`} />}
                 {gatePass.dockNumber && <DetailItem icon={<Anchor className="h-4 w-4" />} label="Dock Number" value={gatePass.dockNumber} />}

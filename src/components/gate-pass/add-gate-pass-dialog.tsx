@@ -44,7 +44,8 @@ export function AddGatePassDialog({ onGatePassAdded }: AddGatePassDialogProps) {
       inboundTemperature: parseFloat(data.temperature as string),
       status: 'On-Premises',
       notes: data.notes as string,
-      dockNumber: data.dockNumber ? parseInt(data.dockNumber as string) as GatePass['dockNumber'] : undefined
+      dockNumber: data.dockNumber ? parseInt(data.dockNumber as string) as GatePass['dockNumber'] : undefined,
+      dockTime: data.dockTime as string,
     };
 
     onGatePassAdded(newGatePass);
@@ -116,6 +117,10 @@ export function AddGatePassDialog({ onGatePassAdded }: AddGatePassDialogProps) {
                           <SelectItem value="5">Dock 5</SelectItem>
                       </SelectContent>
                   </Select>
+              </div>
+               <div className="space-y-2">
+                <Label htmlFor="dockTime">Dock Time</Label>
+                <Input id="dockTime" name="dockTime" type="time" required />
               </div>
                <div className="space-y-2 col-span-1 md:col-span-2">
                 <Label>Items</Label>
