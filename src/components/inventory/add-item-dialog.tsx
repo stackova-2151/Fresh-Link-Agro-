@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -27,19 +27,53 @@ import { cn } from '@/lib/utils';
 interface AddItemDialogProps {
   onItemAdded: (item: RentalItem) => void;
   item?: RentalItem; // For edit mode
+  trigger?: React.ReactNode;
 }
 
-export function AddItemDialog({ onItemAdded, item }: AddItemDialogProps) {
+export function AddItemDialog({ onItemAdded, item, trigger }: AddItemDialogProps) {
   const [open, setOpen] = useState(false);
-  const [name, setName] = useState(item?.name || '');
-  const [category, setCategory] = useState(item?.category || 'Food');
-  const [description, setDescription] = useState(item?.description || '');
-  const [rentalRate, setRentalRate] = useState(item?.rentalRate.toString() || '');
-  const [quantity, setQuantity] = useState(item?.quantityAvailable.toString() || '');
-  const [unit, setUnit] = useState<RentalItem['unit']>(item?.unit || 'kg');
-  const [condition, setCondition] = useState<RentalItem['condition']>(item?.condition || 'New');
-  const [expiryDate, setExpiryDate] = useState<Date | undefined>(item?.expiryDate);
-  const [tempRange, setTempRange] = useState(item?.temperatureRange || '');
+  const [name, setName] = useState('');
+  const [category, setCategory] = useState('Food');
+  const [description, setDescription] = useState('');
+  const [rentalRate, setRentalRate] = useState('');
+  const [quantity, setQuantity] = useState('');
+  const [unit, setUnit] = useState<RentalItem['unit']>('kg');
+  const [condition, setCondition] = useState<RentalItem['condition']>('New');
+  const [expiryDate, setExpiryDate] = useState<Date | undefined>();
+  const [tempRange, setTempRange] = useState('');
+
+  useEffect(() => {
+    if (item && open) {
+        setName(item.name);
+        setCategory(item.category);
+        setDescription(item.description);
+        setRentalRate(item.rentalRate.toString());
+        setQuantity(item.quantityAvailable.toString());
+        setUnit(item.unit);
+        setCondition(item.condition);
+        setExpiryDate(item.expiryDate ? new Date(item.expiryDate) : undefined);
+        setTempRange(item.temperatureRange);
+    }
+  }, [item, open]);
+
+  const resetForm = () => {
+    setName('');
+    setCategory('Food');
+    setDescription('');
+    setRentalRate('');
+    setQuantity('');
+    setUnit('kg');
+    setCondition('New');
+    setExpiryDate(undefined);
+    setTempRange('');
+  }
+
+  const handleOpenChange = (isOpen: boolean) => {
+    if (isOpen && !item) {
+        resetForm();
+    }
+    setOpen(isOpen);
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -66,29 +100,22 @@ export function AddItemDialog({ onItemAdded, item }: AddItemDialogProps) {
 
     onItemAdded(newItem);
     setOpen(false);
-    
-    // Reset form if not in edit mode
-    if (!item) {
-      setName('');
-      setCategory('Food');
-      setDescription('');
-      setRentalRate('');
-      setQuantity('');
-      setUnit('kg');
-      setCondition('New');
-      setExpiryDate(undefined);
-      setTempRange('');
-    }
   };
 
+  const dialogTrigger = trigger ? (
+    <DialogTrigger asChild>{trigger}</DialogTrigger>
+  ) : (
+    <DialogTrigger asChild>
+      <Button>
+        <PlusCircle className="mr-2 h-4 w-4" />
+        Add Item
+      </Button>
+    </DialogTrigger>
+  );
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button>
-            <PlusCircle className="mr-2 h-4 w-4" />
-            {item ? 'Edit Item' : 'Add Item'}
-        </Button>
-      </DialogTrigger>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      {dialogTrigger}
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle className="font-headline">{item ? 'Edit Item' : 'Add New Item'}</DialogTitle>

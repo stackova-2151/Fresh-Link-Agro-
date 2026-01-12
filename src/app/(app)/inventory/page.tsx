@@ -27,8 +27,16 @@ import { AddItemDialog } from "@/components/inventory/add-item-dialog";
 export default function InventoryPage() {
     const [rentalItems, setRentalItems] = useState<RentalItem[]>(initialRentalItems);
 
-    const handleItemAdded = (newItem: RentalItem) => {
-        setRentalItems(prev => [newItem, ...prev]);
+    const handleItemAdded = (item: RentalItem) => {
+        setRentalItems(prev => {
+            const existingIndex = prev.findIndex(i => i.id === item.id);
+            if (existingIndex > -1) {
+                const updatedItems = [...prev];
+                updatedItems[existingIndex] = item;
+                return updatedItems;
+            }
+            return [item, ...prev];
+        });
     };
 
     return (
@@ -53,6 +61,7 @@ export default function InventoryPage() {
                                 <TableHead>Name</TableHead>
                                 <TableHead>Category</TableHead>
                                 <TableHead>Available Qty</TableHead>
+                                <TableHead>Rental Rate (₹)</TableHead>
                                 <TableHead>Condition</TableHead>
                                 <TableHead>Expiry Date</TableHead>
                                 <TableHead>Temp. Range</TableHead>
@@ -81,6 +90,7 @@ export default function InventoryPage() {
                                         <TableCell className="font-medium">{item.name}</TableCell>
                                         <TableCell>{item.category}</TableCell>
                                         <TableCell>{item.quantityAvailable} {item.unit}</TableCell>
+                                        <TableCell>₹{item.rentalRate.toFixed(2)}</TableCell>
                                         <TableCell>
                                             <Badge variant={item.condition === 'New' ? 'default' : 'secondary'}>{item.condition}</Badge>
                                         </TableCell>
@@ -99,11 +109,11 @@ export default function InventoryPage() {
                                                 </Button>
                                                 </DropdownMenuTrigger>
                                                 <DropdownMenuContent align="end">
-                                                <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                                <DropdownMenuItem>Edit</DropdownMenuItem>
-                                                <DropdownMenuItem>View History</DropdownMenuItem>
-                                                <DropdownMenuSeparator />
-                                                <DropdownMenuItem className="text-destructive">Delete</DropdownMenuItem>
+                                                    <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                                    <AddItemDialog onItemAdded={handleItemAdded} item={item} trigger={<DropdownMenuItem onSelect={(e) => e.preventDefault()}>Edit</DropdownMenuItem>} />
+                                                    <DropdownMenuItem>View History</DropdownMenuItem>
+                                                    <DropdownMenuSeparator />
+                                                    <DropdownMenuItem className="text-destructive">Delete</DropdownMenuItem>
                                                 </DropdownMenuContent>
                                             </DropdownMenu>
                                         </TableCell>
