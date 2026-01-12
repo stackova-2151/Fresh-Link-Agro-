@@ -39,8 +39,8 @@ const menuItems = [
     icon: Warehouse,
   },
   {
-    href: '/customers',
-    label: 'Customers',
+    href: '/clients',
+    label: 'Clients',
     icon: Users,
   },
   {

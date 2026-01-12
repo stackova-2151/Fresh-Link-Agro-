@@ -13,7 +13,7 @@ export type Vendor = {
   name: string;
 };
 
-export type Customer = {
+export type Client = {
   id: string;
   name: string;
   // Fields for monthly agreements, billing preferences, etc.
@@ -36,7 +36,7 @@ export type RentalItem = {
   expiryDate: Date;
   temperatureRange: string;
   vendorId: string; // To link to a vendor
-  customerId: string; // To link to a customer
+  clientId: string; // To link to a client
   boxDimensions?: {
     length: number;
     width: number;
@@ -82,7 +82,7 @@ export type GatePass = {
   vehicleNumber: string;
   driverName: string;
   driverPhone: string;
-  customerName: string; // Or customerId
+  clientName: string; // Or clientId
   items: {
     name: string;
     quantity: number;
@@ -99,7 +99,7 @@ export type Invoice = {
   id: string;
   invoiceNumber: string;
   contractId: string;
-  customerId: string;
+  clientId: string;
   date: Date;
   dueDate: Date;
   items: {

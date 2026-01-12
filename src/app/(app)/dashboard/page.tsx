@@ -2,8 +2,8 @@ import { StatCard } from "@/components/stat-card";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { rentalItems, gatePasses, chambers, users, vendors } from "@/lib/data";
-import { AlertCircle, Archive, ArrowDownRight, ArrowUpRight, CheckCircle2, Clock, Truck, Warehouse, Users, UserPlus } from "lucide-react";
+import { rentalItems, gatePasses, chambers, users, vendors, clients } from "@/lib/data";
+import { AlertCircle, Archive, ArrowDownRight, ArrowUpRight, CheckCircle2, Clock, Truck, Warehouse, Users, UserPlus, DollarSign } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
@@ -53,8 +53,8 @@ export default function DashboardPage() {
                     icon={<AlertCircle className="h-4 w-4 text-muted-foreground" />}
                 />
                  <StatCard 
-                    title="Total Customers"
-                    value={"5"} // Replace with dynamic data
+                    title="Total Clients"
+                    value={clients.length.toString()}
                     description="Active clients"
                     icon={<Users className="h-4 w-4 text-muted-foreground" />}
                 />
@@ -71,7 +71,7 @@ export default function DashboardPage() {
                             <TableHeader>
                                 <TableRow>
                                     <TableHead>Vehicle No.</TableHead>
-                                    <TableHead>Customer/Vendor</TableHead>
+                                    <TableHead>Client/Vendor</TableHead>
                                     <TableHead className="text-center">Type</TableHead>
                                     <TableHead>Time</TableHead>
                                     <TableHead className="text-right">Status</TableHead>
@@ -81,7 +81,7 @@ export default function DashboardPage() {
                                 {gatePasses.slice(0, 5).map(pass => (
                                     <TableRow key={pass.id}>
                                         <TableCell className="font-medium">{pass.vehicleNumber}</TableCell>
-                                        <TableCell>{pass.customerName}</TableCell>
+                                        <TableCell>{pass.clientName}</TableCell>
                                         <TableCell className="text-center">
                                             {pass.type === 'IN' ? <ArrowDownRight className="h-5 w-5 mx-auto text-green-500" /> : <ArrowUpRight className="h-5 w-5 mx-auto text-red-500" />}
                                         </TableCell>

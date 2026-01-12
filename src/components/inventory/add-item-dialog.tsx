@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { RentalItem, Vendor, Customer } from '@/lib/types';
+import { RentalItem, Vendor, Client } from '@/lib/types';
 import { Calendar as CalendarIcon, PlusCircle } from 'lucide-react';
 import { Textarea } from '../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
@@ -23,7 +23,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Calendar } from '../ui/calendar';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { vendors, customers } from '@/lib/data'; // Assuming vendors are available in data
+import { vendors, clients } from '@/lib/data'; // Assuming vendors are available in data
 
 interface AddItemDialogProps {
   onItemAdded: (item: RentalItem) => void;
@@ -43,7 +43,7 @@ export function AddItemDialog({ onItemAdded, item, trigger }: AddItemDialogProps
   const [expiryDate, setExpiryDate] = useState<Date | undefined>();
   const [tempRange, setTempRange] = useState('');
   const [vendorId, setVendorId] = useState('');
-  const [customerId, setCustomerId] = useState('');
+  const [clientId, setClientId] = useState('');
 
   useEffect(() => {
     if (item && open) {
@@ -57,7 +57,7 @@ export function AddItemDialog({ onItemAdded, item, trigger }: AddItemDialogProps
         setExpiryDate(item.expiryDate ? new Date(item.expiryDate) : undefined);
         setTempRange(item.temperatureRange);
         setVendorId(item.vendorId);
-        setCustomerId(item.customerId);
+        setClientId(item.clientId);
     }
   }, [item, open]);
 
@@ -72,7 +72,7 @@ export function AddItemDialog({ onItemAdded, item, trigger }: AddItemDialogProps
     setExpiryDate(undefined);
     setTempRange('');
     setVendorId('');
-    setCustomerId('');
+    setClientId('');
   }
 
   const handleOpenChange = (isOpen: boolean) => {
@@ -84,9 +84,9 @@ export function AddItemDialog({ onItemAdded, item, trigger }: AddItemDialogProps
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!expiryDate || !vendorId || !customerId) {
+    if (!expiryDate || !vendorId || !clientId) {
         // Ideally show a toast or error message
-        console.error("Expiry date, vendor, and customer are required");
+        console.error("Expiry date, vendor, and client are required");
         return;
     }
 
@@ -104,7 +104,7 @@ export function AddItemDialog({ onItemAdded, item, trigger }: AddItemDialogProps
       images: [],
       rentalCycles: ['daily', 'weekly'], // Default value
       vendorId,
-      customerId,
+      clientId,
     };
 
     onItemAdded(newItem);
@@ -139,14 +139,14 @@ export function AddItemDialog({ onItemAdded, item, trigger }: AddItemDialogProps
                 <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g., Gourmet Cheese Platter" required />
               </div>
                <div className="space-y-2">
-                 <Label htmlFor="customer">Customer</Label>
-                <Select value={customerId} onValueChange={setCustomerId} required>
-                    <SelectTrigger id="customer">
-                        <SelectValue placeholder="Select a customer" />
+                 <Label htmlFor="client">Client</Label>
+                <Select value={clientId} onValueChange={setClientId} required>
+                    <SelectTrigger id="client">
+                        <SelectValue placeholder="Select a client" />
                     </SelectTrigger>
                     <SelectContent>
-                        {customers.map((customer: Customer) => (
-                            <SelectItem key={customer.id} value={customer.id}>{customer.name}</SelectItem>
+                        {clients.map((client: Client) => (
+                            <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
                         ))}
                     </SelectContent>
                 </Select>

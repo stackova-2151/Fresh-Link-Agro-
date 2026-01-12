@@ -79,7 +79,7 @@ export default function GatePassPage() {
 
   const filteredGatePasses = gatePasses.filter(gp => 
     gp.vehicleNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    gp.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    gp.clientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
     gp.gatePassNumber.toLowerCase().includes(searchTerm.toLowerCase())
   ).sort((a,b) => b.entryTime.getTime() - a.entryTime.getTime());
 
@@ -137,7 +137,7 @@ export default function GatePassPage() {
                 </div>
                 <div className="flex gap-2">
                 <Input
-                    placeholder="Search by vehicle, customer, or pass #..."
+                    placeholder="Search by vehicle, client, or pass #..."
                     className="w-full md:w-[300px]"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
@@ -150,7 +150,7 @@ export default function GatePassPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Gate Pass #</TableHead>
-                <TableHead>Customer/Vendor</TableHead>
+                <TableHead>Client/Vendor</TableHead>
                 <TableHead>Vehicle No.</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead>Time</TableHead>
@@ -163,7 +163,7 @@ export default function GatePassPage() {
               {filteredGatePasses.map((gatePass) => (
                 <TableRow key={gatePass.id}>
                   <TableCell className="font-medium">{gatePass.gatePassNumber}</TableCell>
-                  <TableCell>{gatePass.customerName}</TableCell>
+                  <TableCell>{gatePass.clientName}</TableCell>
                   <TableCell>{gatePass.vehicleNumber}</TableCell>
                   <TableCell>
                     <Badge variant={gatePass.type === 'IN' ? 'default' : 'destructive'} className={gatePass.type === 'IN' ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>

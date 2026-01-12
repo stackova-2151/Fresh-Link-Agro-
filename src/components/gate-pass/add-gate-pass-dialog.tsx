@@ -39,7 +39,7 @@ export function AddGatePassDialog({ onGatePassAdded }: AddGatePassDialogProps) {
       vehicleNumber: data.vehicleNumber as string,
       driverName: data.driverName as string,
       driverPhone: data.driverPhone as string,
-      customerName: data.customerName as string,
+      clientName: data.clientName as string,
       items: [{ name: data.items as string, quantity: parseFloat(data.quantity as string), unit: data.unit as string }],
       inboundTemperature: parseFloat(data.temperature as string),
       status: 'On-Premises',
@@ -83,8 +83,8 @@ export function AddGatePassDialog({ onGatePassAdded }: AddGatePassDialogProps) {
                 </RadioGroup>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="customerName">Customer/Vendor Name</Label>
-                <Input id="customerName" name="customerName" placeholder="e.g., Prestige Catering" required />
+                <Label htmlFor="clientName">Client/Vendor Name</Label>
+                <Input id="clientName" name="clientName" placeholder="e.g., Prestige Catering" required />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="vehicleNumber">Vehicle Number</Label>

@@ -1,4 +1,4 @@
-import type { RentalItem, StockTransaction, Chamber, GatePass, User, Vendor, Customer } from '@/lib/types';
+import type { RentalItem, StockTransaction, Chamber, GatePass, User, Vendor, Client } from '@/lib/types';
 
 export const users: User[] = [
   { id: 'user_01', name: 'Alex', email: 'alex@example.com', role: 'Manager' },
@@ -11,7 +11,7 @@ export const vendors: Vendor[] = [
     { id: 'vendor_02', name: 'Fresh Produce Co.' }
 ];
 
-export const customers: Customer[] = [
+export const clients: Client[] = [
     { id: 'cust_01', name: 'Prestige Catering', billingCycle: 'monthly', rentAmount: 50000, pendingPayment: 10000 },
     { id: 'cust_02', name: 'Royal Orchid Hotels', billingCycle: '15-day', rentAmount: 25000, pendingPayment: 0 },
     { id: 'cust_03', name: 'Daily Fresh', billingCycle: 'monthly', rentAmount: 30000, pendingPayment: 5000 },
@@ -32,7 +32,7 @@ export const rentalItems: RentalItem[] = [
     expiryDate: new Date('2024-12-31'),
     temperatureRange: '2-8°C',
     vendorId: 'vendor_01',
-    customerId: 'cust_01'
+    clientId: 'cust_01'
   },
   {
     id: 'item_008',
@@ -48,7 +48,7 @@ export const rentalItems: RentalItem[] = [
     expiryDate: new Date('2024-11-30'),
     temperatureRange: '0-4°C',
     vendorId: 'vendor_02',
-    customerId: 'cust_02'
+    clientId: 'cust_02'
   },
   {
     id: 'item_009',
@@ -64,7 +64,7 @@ export const rentalItems: RentalItem[] = [
     expiryDate: new Date('2025-06-30'),
     temperatureRange: '-18°C',
     vendorId: 'vendor_01',
-    customerId: 'cust_01'
+    clientId: 'cust_01'
   },
   {
     id: 'item_010',
@@ -80,7 +80,7 @@ export const rentalItems: RentalItem[] = [
     expiryDate: new Date('2025-02-28'),
     temperatureRange: '-20°C',
     vendorId: 'vendor_02',
-    customerId: 'cust_03'
+    clientId: 'cust_03'
   },
 ];
 
@@ -165,7 +165,7 @@ export const gatePasses: GatePass[] = [
     vehicleNumber: 'MH12 AB1234',
     driverName: 'Ramesh Patel',
     driverPhone: '9876543210',
-    customerName: 'Prestige Catering',
+    clientName: 'Prestige Catering',
     items: [{ name: 'Vegetable Mix', quantity: 200, unit: 'kg' }],
     inboundTemperature: 4.5,
     status: 'On-Premises',
@@ -181,7 +181,7 @@ export const gatePasses: GatePass[] = [
     vehicleNumber: 'KA05 CD5678',
     driverName: 'Suresh Kumar',
     driverPhone: '9876543211',
-    customerName: 'Royal Orchid Hotels',
+    clientName: 'Royal Orchid Hotels',
     items: [{ name: 'Gourmet Cheese Platter', quantity: 10, unit: 'kg' }],
     inboundTemperature: 5.1,
     outboundTemperature: 5.2,
@@ -196,7 +196,7 @@ export const gatePasses: GatePass[] = [
     vehicleNumber: 'TN07 EF9012',
     driverName: 'Maria D-Souza',
     driverPhone: '9876543212',
-    customerName: 'Daily Fresh',
+    clientName: 'Daily Fresh',
     items: [{ name: 'Fresh Strawberries', quantity: 50, unit: 'kg' }],
     inboundTemperature: 3.9,
     status: 'On-Premises',
@@ -210,7 +210,7 @@ export const gatePasses: GatePass[] = [
     vehicleNumber: 'DL10 GH3456',
     driverName: 'Vikram Singh',
     driverPhone: '9876543213',
-    customerName: 'Iceberg Inc.',
+    clientName: 'Iceberg Inc.',
     items: [{ name: 'Frozen Seafood Mix', quantity: 150, unit: 'kg' }],
     inboundTemperature: -17.8,
     status: 'On-Premises',

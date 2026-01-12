@@ -44,7 +44,7 @@ export function ViewGatePassDialog({ gatePass, open, onOpenChange }: ViewGatePas
         </DialogHeader>
         <div className="space-y-4 py-4">
             <div className="grid grid-cols-2 gap-4">
-                <DetailItem icon={<User className="h-4 w-4" />} label="Customer/Vendor" value={gatePass.customerName} />
+                <DetailItem icon={<User className="h-4 w-4" />} label="Client/Vendor" value={gatePass.clientName} />
                 <DetailItem icon={<Truck className="h-4 w-4" />} label="Vehicle No." value={gatePass.vehicleNumber} />
                 <DetailItem icon={<User className="h-4 w-4" />} label="Driver Name" value={gatePass.driverName} />
                 <DetailItem icon={<Phone className="h-4 w-4" />} label="Driver Phone" value={gatePass.driverPhone} />
