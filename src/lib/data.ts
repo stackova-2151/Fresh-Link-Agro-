@@ -13,7 +13,7 @@ export const vendors: Vendor[] = [
 
 export const clients: Client[] = [
     { id: 'cust_01', name: 'Prestige Catering', billingCycle: 'monthly', rentAmount: 50000, pendingPayment: 10000 },
-    { id: 'cust_02', name: 'Royal Orchid Hotels', billingCycle: '15-day', rentAmount: 25000, pendingPayment: 0 },
+    { id: 'cust_02', name: 'Royal Orchid Hotels', billingCycle: 'weekly', rentAmount: 25000, pendingPayment: 0 },
     { id: 'cust_03', name: 'Daily Fresh', billingCycle: 'monthly', rentAmount: 30000, pendingPayment: 5000 },
 ];
 
@@ -162,6 +162,7 @@ export const gatePasses: GatePass[] = [
     driverName: 'Ramesh Patel',
     driverPhone: '9876543210',
     clientName: 'Prestige Catering',
+    vendorId: 'vendor_01',
     items: [{ name: 'Vegetable Mix', quantity: 200, unit: 'kg' }],
     inboundTemperature: 4.5,
     status: 'On-Premises',
@@ -178,6 +179,7 @@ export const gatePasses: GatePass[] = [
     driverName: 'Suresh Kumar',
     driverPhone: '9876543211',
     clientName: 'Royal Orchid Hotels',
+    vendorId: 'vendor_02',
     items: [{ name: 'Gourmet Cheese Platter', quantity: 10, unit: 'kg' }],
     inboundTemperature: 5.1,
     outboundTemperature: 5.2,
@@ -193,6 +195,7 @@ export const gatePasses: GatePass[] = [
     driverName: 'Maria D-Souza',
     driverPhone: '9876543212',
     clientName: 'Daily Fresh',
+    vendorId: 'vendor_01',
     items: [{ name: 'Fresh Strawberries', quantity: 50, unit: 'kg' }],
     inboundTemperature: 3.9,
     status: 'On-Premises',
@@ -207,6 +210,7 @@ export const gatePasses: GatePass[] = [
     driverName: 'Vikram Singh',
     driverPhone: '9876543213',
     clientName: 'Iceberg Inc.',
+    vendorId: 'vendor_02',
     items: [{ name: 'Frozen Seafood Mix', quantity: 150, unit: 'kg' }],
     inboundTemperature: -17.8,
     status: 'On-Premises',

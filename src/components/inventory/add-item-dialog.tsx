@@ -277,8 +277,7 @@ export function AddItemDialog({ onItemAdded, item, trigger }: AddItemDialogProps
                 </Select>
                 {selectedChamber && (
                     <div className="text-sm text-muted-foreground pt-1">
-                        Capacity: {selectedChamber.occupied} / {selectedChamber.capacity} kg used. 
-                        ({selectedChamber.capacity - selectedChamber.occupied} kg available)
+                        Capacity: {selectedChamber.products.reduce((acc, p) => acc + p.quantityAvailable, 0)} kg used.
                     </div>
                 )}
               </div>

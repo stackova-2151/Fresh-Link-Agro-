@@ -16,8 +16,7 @@ export type Vendor = {
 export type Client = {
   id: string;
   name: string;
-  // Fields for monthly agreements, billing preferences, etc.
-  billingCycle: '15-day' | 'monthly';
+  billingCycle: 'weekly' | 'monthly';
   rentAmount: number;
   pendingPayment: number;
 };
@@ -87,6 +86,7 @@ export type GatePass = {
   driverName: string;
   driverPhone: string;
   clientName: string; // Or clientId
+  vendorId?: string;
   items: {
     name: string;
     quantity: number;

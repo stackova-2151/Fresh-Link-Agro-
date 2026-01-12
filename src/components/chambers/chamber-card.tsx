@@ -15,7 +15,7 @@ type ChamberCardProps = {
 };
 
 export function ChamberCard({ chamber, onEdit, onDelete, onChamberUpdated }: ChamberCardProps) {
-    const occupancyPercentage = 0; // chamber.capacity > 0 ? (chamber.occupied / chamber.capacity) * 100 : 0;
+    const occupancyPercentage = 0;
     const capacity = chamber.boxDimensions ? (chamber.boxDimensions.length * chamber.boxDimensions.width * chamber.boxDimensions.height / 1000000).toFixed(2) : 0;
     const occupied = 0;
 
@@ -77,7 +77,7 @@ export function ChamberCard({ chamber, onEdit, onDelete, onChamberUpdated }: Cha
                         <span>{chamber.products.length} Items</span>
                     </div>
                 </div>
-                 {chamber.boxDimensions && <div className="flex items-center gap-2 text-sm">
+                 {chamber.boxDimensions && (chamber.boxDimensions.length > 0 || chamber.boxDimensions.width > 0 || chamber.boxDimensions.height > 0) && <div className="flex items-center gap-2 text-sm">
                     <Scaling className="h-4 w-4 text-muted-foreground" />
                     <span>{chamber.boxDimensions.length}x{chamber.boxDimensions.width}x{chamber.boxDimensions.height} cm</span>
                 </div>}
