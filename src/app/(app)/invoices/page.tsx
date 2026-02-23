@@ -13,6 +13,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { useRouter } from 'next/navigation';
+import { CreateInvoiceDialog } from '@/components/invoices/create-invoice-dialog';
 
 export default function InvoicesPage() {
     const [invoices, setInvoices] = useState<Invoice[]>(initialInvoices);
@@ -28,7 +29,9 @@ export default function InvoicesPage() {
 
     return (
         <div className="space-y-6">
-            <PageHeader title="Invoices" description="View and manage all your invoices." />
+            <PageHeader title="Invoices" description="View and manage all your invoices.">
+                <CreateInvoiceDialog />
+            </PageHeader>
             <Card>
                 <CardHeader>
                     <CardTitle>Invoice History</CardTitle>
@@ -98,7 +101,7 @@ export default function InvoicesPage() {
                             <FileText className="h-12 w-12 mb-4" />
                             <h3 className="text-xl font-semibold">No Invoices Found</h3>
                             <p className="max-w-md">
-                               Invoices you generate will appear here. You can generate a new invoice from the Clients page.
+                               Invoices you generate will appear here. You can generate a new invoice from the Clients page or by clicking "Add Invoice" above.
                             </p>
                         </div>
                     )}
