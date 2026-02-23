@@ -47,9 +47,16 @@ export default function GatePassPage() {
   const [selectedGatePass, setSelectedGatePass] = useState<GatePass | null>(null);
   const [showViewDialog, setShowViewDialog] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [isMounted, setIsMounted] = useState(false);
   const router = useRouter();
 
-  const { todayIn, todayOut, onPremises } = useMemo(() => {
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  const stats = useMemo(() => {
+    if (!isMounted) return { todayIn: 0, todayOut: 0, onPremises: 0 };
+    
     const today = new Date().toDateString();
     const todayPasses = gatePasses.filter(gp => 
       new Date(gp.entryTime).toDateString() === today
@@ -64,9 +71,11 @@ export default function GatePassPage() {
         todayOut: outCount,
         onPremises: onPremisesCount
     };
-  }, [gatePasses]);
+  }, [gatePasses, isMounted]);
 
   const chartData = useMemo(() => {
+    if (!isMounted) return [];
+    
     const hours = Array.from({ length: 12 }, (_, i) => i + 8); // 8 AM to 7 PM
     return hours.map(hour => {
         const inCount = gatePasses.filter(p => p.type === 'IN' && new Date(p.entryTime).getHours() === hour).length;
@@ -77,7 +86,7 @@ export default function GatePassPage() {
             OUT: outCount,
         };
     });
-  }, [gatePasses]);
+  }, [gatePasses, isMounted]);
 
   const filteredGatePasses = gatePasses.filter(gp => 
     gp.vehicleNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -105,9 +114,9 @@ export default function GatePassPage() {
       </PageHeader>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatCard title="Vehicles In Today" value={todayIn.toString()} description="+2 from yesterday" icon={<ArrowDownRight className="h-4 w-4 text-green-600" />} />
-        <StatCard title="Vehicles Out Today" value={todayOut.toString()} description="-1 from yesterday" icon={<ArrowUpRight className="h-4 w-4 text-red-600" />} />
-        <StatCard title="On Premises" value={onPremises.toString()} description="3 in docking area" icon={<Truck className="h-4 w-4 text-blue-600" />} />
+        <StatCard title="Vehicles In Today" value={stats.todayIn.toString()} description="+2 from yesterday" icon={<ArrowDownRight className="h-4 w-4 text-green-600" />} />
+        <StatCard title="Vehicles Out Today" value={stats.todayOut.toString()} description="-1 from yesterday" icon={<ArrowUpRight className="h-4 w-4 text-red-600" />} />
+        <StatCard title="On Premises" value={stats.onPremises.toString()} description="3 in docking area" icon={<Truck className="h-4 w-4 text-blue-600" />} />
         <StatCard title="Critical Alerts" value="2" description="Temperature deviations" icon={<AlertCircle className="h-4 w-4 text-orange-600" />} />
       </div>
 
@@ -117,16 +126,20 @@ export default function GatePassPage() {
           <CardDescription>IN vs OUT movements by hour</CardDescription>
         </CardHeader>
         <CardContent>
-            <ChartContainer config={{}} className="h-[250px] w-full">
-                <BarChart data={chartData} accessibilityLayer>
-                    <CartesianGrid vertical={false} />
-                    <XAxis dataKey="hour" tickLine={false} tickMargin={10} axisLine={false} />
-                    <YAxis tickLine={false} axisLine={false} />
-                    <Tooltip content={<ChartTooltipContent />} />
-                    <Bar dataKey="IN" fill="var(--color-chart-1)" radius={4} />
-                    <Bar dataKey="OUT" fill="var(--color-chart-2)" radius={4} />
-                </BarChart>
-            </ChartContainer>
+            {isMounted ? (
+                <ChartContainer config={{}} className="h-[250px] w-full">
+                    <BarChart data={chartData} accessibilityLayer>
+                        <CartesianGrid vertical={false} />
+                        <XAxis dataKey="hour" tickLine={false} tickMargin={10} axisLine={false} />
+                        <YAxis tickLine={false} axisLine={false} />
+                        <Tooltip content={<ChartTooltipContent />} />
+                        <Bar dataKey="IN" fill="var(--color-chart-1)" radius={4} />
+                        <Bar dataKey="OUT" fill="var(--color-chart-2)" radius={4} />
+                    </BarChart>
+                </ChartContainer>
+            ) : (
+                <div className="h-[250px] w-full bg-muted animate-pulse rounded-md" />
+            )}
         </CardContent>
       </Card>
 

@@ -9,9 +9,25 @@ import { clients, rentalItems } from '@/lib/data';
 import { Separator } from '@/components/ui/separator';
 import { Download, Send, QrCode } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { format, differenceInDays } from 'date-fns';
 import Image from 'next/image';
+
+interface InvoiceDetails {
+  invoiceNumber: string;
+  invoiceDate: Date;
+  dueDate: Date;
+  items: {
+    name: string;
+    quantity: number;
+    unit: string;
+    rate: number;
+    amount: number;
+  }[];
+  subtotal: number;
+  tax: number;
+  total: number;
+}
 
 export default function CreateInvoicePage() {
   const params = useParams();
@@ -20,14 +36,17 @@ export default function CreateInvoicePage() {
   const client = clients.find(c => c.id === clientId);
   const clientItems = rentalItems.filter(item => item.clientId === clientId);
   
-  const invoiceDetails = useMemo(() => {
+  const [invoiceDetails, setInvoiceDetails] = useState<InvoiceDetails | null>(null);
+
+  useEffect(() => {
+    // Generate invoice details on the client to avoid hydration mismatch
     const invoiceNumber = `INV-${new Date().getFullYear()}-${Math.floor(Math.random() * 9000) + 1000}`;
     const invoiceDate = new Date();
     const dueDate = new Date();
     dueDate.setDate(invoiceDate.getDate() + 30);
 
     const items = clientItems.map(item => {
-      const daysStored = differenceInDays(invoiceDate, item.storageDate) || 1; // Ensure at least 1 day is charged
+      const daysStored = differenceInDays(invoiceDate, item.storageDate) || 1;
       const amount = item.quantityAvailable * item.rentalRate * daysStored;
       return {
         name: `${item.name} (${daysStored} days)`,
@@ -39,20 +58,23 @@ export default function CreateInvoicePage() {
     });
 
     const subtotal = items.reduce((acc, item) => acc + item.amount, 0);
-    const taxRate = 0.18; // 18% GST
+    const taxRate = 0.18;
     const tax = subtotal * taxRate;
     const total = subtotal + tax;
     
-    return { invoiceNumber, invoiceDate, dueDate, items, subtotal, tax, total };
-  }, [clientItems]);
+    setInvoiceDetails({ invoiceNumber, invoiceDate, dueDate, items, subtotal, tax, total });
+  }, [clientId]); // Recalculate if clientId changes, though usually static here
 
 
   if (!client) {
     return <div>Client not found</div>;
   }
 
+  if (!invoiceDetails) {
+    return <div className="flex items-center justify-center h-96">Preparing invoice...</div>;
+  }
+
   const totalAmountDue = invoiceDetails.total + client.pendingPayment;
-  // Generate a mock UPI QR code URL
   const upiUrl = `upi://pay?pa=foodsafe@bank&pn=FoodSafe%20Storage&am=${totalAmountDue.toFixed(2)}&cu=INR&tn=Invoice%20${invoiceDetails.invoiceNumber}`;
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(upiUrl)}`;
 
@@ -115,7 +137,6 @@ export default function CreateInvoicePage() {
             <div className="w-full space-y-4">
                 <Separator />
                 <div className="flex flex-col md:flex-row justify-between items-start gap-8">
-                    {/* Payment QR Code Section */}
                     <div className="flex flex-col items-center p-4 border rounded-lg bg-slate-50">
                         <p className="text-sm font-bold mb-2 flex items-center gap-2">
                             <QrCode className="h-4 w-4" /> Scan to Pay Directly
@@ -134,7 +155,6 @@ export default function CreateInvoicePage() {
                         </p>
                     </div>
 
-                    {/* Totals Section */}
                     <div className="w-full max-w-sm space-y-2">
                         <div className="flex justify-between">
                             <span>Subtotal</span>
