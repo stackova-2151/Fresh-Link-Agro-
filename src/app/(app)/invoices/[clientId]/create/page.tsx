@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useParams } from 'next/navigation';
@@ -8,10 +7,11 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { clients, rentalItems } from '@/lib/data';
 import { Separator } from '@/components/ui/separator';
-import { Download, Send } from 'lucide-react';
+import { Download, Send, QrCode } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useMemo } from 'react';
 import { format, differenceInDays } from 'date-fns';
+import Image from 'next/image';
 
 export default function CreateInvoicePage() {
   const params = useParams();
@@ -50,6 +50,11 @@ export default function CreateInvoicePage() {
   if (!client) {
     return <div>Client not found</div>;
   }
+
+  const totalAmountDue = invoiceDetails.total + client.pendingPayment;
+  // Generate a mock UPI QR code URL
+  const upiUrl = `upi://pay?pa=foodsafe@bank&pn=FoodSafe%20Storage&am=${totalAmountDue.toFixed(2)}&cu=INR&tn=Invoice%20${invoiceDetails.invoiceNumber}`;
+  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(upiUrl)}`;
 
   return (
     <div className="space-y-6">
@@ -109,7 +114,27 @@ export default function CreateInvoicePage() {
         <CardFooter className="p-6">
             <div className="w-full space-y-4">
                 <Separator />
-                <div className="flex justify-end">
+                <div className="flex flex-col md:flex-row justify-between items-start gap-8">
+                    {/* Payment QR Code Section */}
+                    <div className="flex flex-col items-center p-4 border rounded-lg bg-slate-50">
+                        <p className="text-sm font-bold mb-2 flex items-center gap-2">
+                            <QrCode className="h-4 w-4" /> Scan to Pay Directly
+                        </p>
+                        <div className="bg-white p-2 rounded border">
+                            <Image 
+                                src={qrCodeUrl} 
+                                alt="Payment QR Code" 
+                                width={120} 
+                                height={120}
+                                className="object-contain"
+                            />
+                        </div>
+                        <p className="text-[10px] mt-2 text-muted-foreground text-center">
+                            Scan using any UPI App (PhonePe, Google Pay, etc.)
+                        </p>
+                    </div>
+
+                    {/* Totals Section */}
                     <div className="w-full max-w-sm space-y-2">
                         <div className="flex justify-between">
                             <span>Subtotal</span>
@@ -130,7 +155,7 @@ export default function CreateInvoicePage() {
                         </div>
                         <div className="flex justify-between font-bold text-xl text-primary">
                             <span>Amount Due</span>
-                            <span>₹{(invoiceDetails.total + client.pendingPayment).toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+                            <span>₹{totalAmountDue.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
                         </div>
                     </div>
                 </div>
