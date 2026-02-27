@@ -24,27 +24,35 @@ export type Client = {
 };
 
 export type RentalItem = {
-  id:string;
-  name:string;
-  category:string;
-  description:string;
-  rentalRate:number;
-  rentalCycles:('daily' | 'weekly' | 'monthly')[];
-  quantityAvailable:number;
-  condition:'New' | 'Good' | 'Used';
-  images:(string | StaticImageData)[];
-  unit:'kg' | 'units' | 'liters' | 'weights';
-  expiryDate:Date;
+  id: string;
+  inwardNumber: string;
+  name: string;
+  brand: string;
+  batchNumber: string;
+  category: string;
+  description: string;
+  rentalRate: number;
+  rentalCycles: ('daily' | 'weekly' | 'monthly')[];
+  inwardQuantity: number;
+  outwardQuantity: number;
+  quantityAvailable: number; // Balance Qty
+  unit: 'kg' | 'units' | 'liters' | 'weights' | 'bags';
+  inwardWeight: number;
+  outwardWeight: number;
+  balanceWeight: number;
+  expiryDate: Date;
   storageDate: Date;
-  temperatureRange:string;
-  vendorId:string; // To link to a vendor
-  clientId:string; // To link to a client
-  chamberId?:string; // To link to a chamber
-  boxDimensions?:{
-    length:number;
-    width:number;
-    height:number;
+  temperatureRange: string;
+  vendorId: string;
+  clientId: string;
+  chamberId?: string;
+  boxDimensions?: {
+    length: number;
+    width: number;
+    height: number;
   };
+  images: (string | StaticImageData)[];
+  condition: 'New' | 'Good' | 'Used';
 };
 
 export type Platform = 'WedMeGood' | 'Urban Company' | 'Internal';
@@ -59,7 +67,7 @@ export type StockTransaction = {
   user: User;
   notes: string;
   platform: Platform;
-  unit: 'kg' | 'units' | 'liters';
+  unit: 'kg' | 'units' | 'liters' | 'bags';
 };
 
 export type Chamber = {
@@ -89,7 +97,7 @@ export type GatePass = {
   vehicleNumber: string;
   driverName: string;
   driverPhone: string;
-  clientName: string; // Or clientId
+  clientName: string;
   vendorId?: string;
   items: {
     name: string;

@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -23,74 +22,73 @@ import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Calendar } from '../ui/calendar';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { vendors, clients, chambers } from '@/lib/data'; // Assuming vendors are available in data
+import { vendors, clients, chambers } from '@/lib/data';
 
 interface AddItemDialogProps {
   onItemAdded: (item: RentalItem) => void;
-  item?: RentalItem; // For edit mode
+  item?: RentalItem;
   trigger?: React.ReactNode;
 }
 
 export function AddItemDialog({ onItemAdded, item, trigger }: AddItemDialogProps) {
   const [open, setOpen] = useState(false);
+  const [inwardNumber, setInwardNumber] = useState('');
   const [name, setName] = useState('');
-  const [category, setCategory] = useState('Food');
+  const [brand, setBrand] = useState('');
+  const [batchNumber, setBatchNumber] = useState('');
+  const [category, setCategory] = useState('Grains');
   const [description, setDescription] = useState('');
   const [rentalRate, setRentalRate] = useState('');
-  const [quantity, setQuantity] = useState('');
-  const [unit, setUnit] = useState<RentalItem['unit']>('kg');
-  const [condition, setCondition] = useState<RentalItem['condition']>('New');
-  const [expiryDate, setExpiryDate] = useState<Date | undefined>();
+  const [inwardQuantity, setInwardQuantity] = useState('');
+  const [outwardQuantity, setOutwardQuantity] = useState('0');
+  const [unit, setUnit] = useState<RentalItem['unit']>('bags');
+  const [inwardWeight, setInwardWeight] = useState('');
+  const [outwardWeight, setOutwardWeight] = useState('0');
   const [storageDate, setStorageDate] = useState<Date | undefined>();
-  const [tempRange, setTempRange] = useState('');
   const [vendorId, setVendorId] = useState('');
   const [clientId, setClientId] = useState('');
   const [chamberId, setChamberId] = useState('');
-  const [boxLength, setBoxLength] = useState('');
-  const [boxWidth, setBoxWidth] = useState('');
-  const [boxHeight, setBoxHeight] = useState('');
-
 
   useEffect(() => {
     if (item && open) {
+        setInwardNumber(item.inwardNumber);
         setName(item.name);
+        setBrand(item.brand);
+        setBatchNumber(item.batchNumber);
         setCategory(item.category);
         setDescription(item.description);
         setRentalRate(item.rentalRate.toString());
-        setQuantity(item.quantityAvailable.toString());
+        setInwardQuantity(item.inwardQuantity.toString());
+        setOutwardQuantity(item.outwardQuantity.toString());
         setUnit(item.unit);
-        setCondition(item.condition);
-        setExpiryDate(item.expiryDate ? new Date(item.expiryDate) : undefined);
+        setInwardWeight(item.inwardWeight.toString());
+        setOutwardWeight(item.outwardWeight.toString());
         setStorageDate(item.storageDate ? new Date(item.storageDate) : undefined);
-        setTempRange(item.temperatureRange);
         setVendorId(item.vendorId);
         setClientId(item.clientId);
         setChamberId(item.chamberId || '');
-        setBoxLength(item.boxDimensions?.length.toString() || '');
-        setBoxWidth(item.boxDimensions?.width.toString() || '');
-        setBoxHeight(item.boxDimensions?.height.toString() || '');
-    } else if (!item) {
+    } else if (!item && open) {
         setStorageDate(new Date());
     }
   }, [item, open]);
 
   const resetForm = () => {
+    setInwardNumber('');
     setName('');
-    setCategory('Food');
+    setBrand('');
+    setBatchNumber('');
+    setCategory('Grains');
     setDescription('');
     setRentalRate('');
-    setQuantity('');
-    setUnit('kg');
-    setCondition('New');
-    setExpiryDate(undefined);
+    setInwardQuantity('');
+    setOutwardQuantity('0');
+    setUnit('bags');
+    setInwardWeight('');
+    setOutwardWeight('0');
     setStorageDate(new Date());
-    setTempRange('');
     setVendorId('');
     setClientId('');
     setChamberId('');
-    setBoxLength('');
-    setBoxWidth('');
-    setBoxHeight('');
   }
 
   const handleOpenChange = (isOpen: boolean) => {
@@ -102,34 +100,38 @@ export function AddItemDialog({ onItemAdded, item, trigger }: AddItemDialogProps
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!expiryDate || !vendorId || !clientId || !storageDate) {
-        // Ideally show a toast or error message
-        console.error("Expiry date, storage date, vendor, and client are required");
-        return;
-    }
+    if (!vendorId || !clientId || !storageDate) return;
+
+    const inQty = parseInt(inwardQuantity) || 0;
+    const outQty = parseInt(outwardQuantity) || 0;
+    const inWt = parseFloat(inwardWeight) || 0;
+    const outWt = parseFloat(outwardWeight) || 0;
 
     const newItem: RentalItem = {
       id: item?.id || `item_${Date.now()}`,
+      inwardNumber,
       name,
+      brand,
+      batchNumber,
       category,
       description,
       rentalRate: parseFloat(rentalRate) || 0,
-      quantityAvailable: parseInt(quantity) || 0,
+      inwardQuantity: inQty,
+      outwardQuantity: outQty,
+      quantityAvailable: inQty - outQty,
       unit,
-      condition,
-      expiryDate,
+      inwardWeight: inWt,
+      outwardWeight: outWt,
+      balanceWeight: inWt - outWt,
+      condition: 'New',
+      expiryDate: new Date(new Date().getFullYear() + 1, 11, 31),
       storageDate,
-      temperatureRange: tempRange,
+      temperatureRange: 'Ambient',
       images: [],
-      rentalCycles: ['daily', 'weekly'], // Default value
+      rentalCycles: ['monthly'],
       vendorId,
       clientId,
       chamberId,
-      boxDimensions: {
-        length: parseFloat(boxLength) || 0,
-        width: parseFloat(boxWidth) || 0,
-        height: parseFloat(boxHeight) || 0,
-      }
     };
 
     onItemAdded(newItem);
@@ -142,98 +144,29 @@ export function AddItemDialog({ onItemAdded, item, trigger }: AddItemDialogProps
     <DialogTrigger asChild>
       <Button>
         <PlusCircle className="mr-2 h-4 w-4" />
-        Add Item
+        New Entry
       </Button>
     </DialogTrigger>
   );
 
-  const selectedChamber = chambers.find(c => c.id === chamberId);
-
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       {dialogTrigger}
-      <DialogContent className="sm:max-w-3xl">
+      <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="font-headline">{item ? 'Edit Item' : 'Add New Item'}</DialogTitle>
+          <DialogTitle className="font-headline">{item ? 'Edit Stock Entry' : 'New Stock Inward'}</DialogTitle>
           <DialogDescription>
-            {item ? 'Update the details for this item.' : 'Fill in the details for the new rental item.'}
+            Enter details from the inward receipt to update stock records.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
               <div className="space-y-2">
-                <Label htmlFor="name">Item Name</Label>
-                <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g., Gourmet Cheese Platter" required />
-              </div>
-               <div className="space-y-2">
-                 <Label htmlFor="client">Client</Label>
-                <Select value={clientId} onValueChange={setClientId} required>
-                    <SelectTrigger id="client">
-                        <SelectValue placeholder="Select a client" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {clients.map((client: Client) => (
-                            <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
+                <Label htmlFor="inwardNumber">Inward No (Inv. No)</Label>
+                <Input id="inwardNumber" value={inwardNumber} onChange={(e) => setInwardNumber(e.target.value)} placeholder="e.g., 06840" required />
               </div>
               <div className="space-y-2">
-                 <Label htmlFor="vendor">Vendor</Label>
-                <Select value={vendorId} onValueChange={setVendorId} required>
-                    <SelectTrigger id="vendor">
-                        <SelectValue placeholder="Select a vendor" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {vendors.map((vendor: Vendor) => (
-                            <SelectItem key={vendor.id} value={vendor.id}>{vendor.name}</SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="rentalRate">Daily Rental Rate (₹)</Label>
-                <Input id="rentalRate" type="number" value={rentalRate} onChange={(e) => setRentalRate(e.target.value)} placeholder="e.g., 12" required/>
-              </div>
-               <div className="space-y-2 col-span-2">
-                <Label htmlFor="description">Description</Label>
-                <Textarea id="description" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="A brief description of the item." />
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div className='space-y-2'>
-                    <Label htmlFor="quantity">Quantity</Label>
-                    <Input id="quantity" type="number" value={quantity} onChange={(e) => setQuantity(e.target.value)} placeholder="e.g., 15" required />
-                </div>
-                <div className='space-y-2'>
-                    <Label htmlFor="unit">Unit</Label>
-                    <Select value={unit} onValueChange={(value) => setUnit(value as RentalItem['unit'])}>
-                        <SelectTrigger id="unit">
-                            <SelectValue placeholder="Select unit" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="kg">kg</SelectItem>
-                            <SelectItem value="units">units</SelectItem>
-                            <SelectItem value="liters">liters</SelectItem>
-                            <SelectItem value="weights">weights</SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="condition">Condition</Label>
-                <Select value={condition} onValueChange={(value) => setCondition(value as RentalItem['condition'])}>
-                    <SelectTrigger id="condition">
-                        <SelectValue placeholder="Select condition" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="New">New</SelectItem>
-                        <SelectItem value="Good">Good</SelectItem>
-                        <SelectItem value="Used">Used</SelectItem>
-                    </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="storageDate">Storage Date</Label>
+                <Label htmlFor="storageDate">Inward Date</Label>
                  <Popover>
                     <PopoverTrigger asChild>
                     <Button
@@ -258,43 +191,54 @@ export function AddItemDialog({ onItemAdded, item, trigger }: AddItemDialogProps
                 </Popover>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="expiryDate">Expiry Date</Label>
-                 <Popover>
-                    <PopoverTrigger asChild>
-                    <Button
-                        variant={"outline"}
-                        className={cn(
-                        "w-full justify-start text-left font-normal",
-                        !expiryDate && "text-muted-foreground"
-                        )}
-                    >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {expiryDate ? format(expiryDate, "PPP") : <span>Pick a date</span>}
-                    </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
-                    <Calendar
-                        mode="single"
-                        selected={expiryDate}
-                        onSelect={setExpiryDate}
-                        initialFocus
-                    />
-                    </PopoverContent>
-                </Popover>
+                <Label htmlFor="name">Item Description</Label>
+                <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g., JWARI" required />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="tempRange">Temperature Range</Label>
-                <Input id="tempRange" value={tempRange} onChange={(e) => setTempRange(e.target.value)} placeholder="e.g., 2-8°C" />
+                <Label htmlFor="brand">Brand</Label>
+                <Input id="brand" value={brand} onChange={(e) => setBrand(e.target.value)} placeholder="e.g., MANIK" required />
               </div>
-              <div className="col-span-2 space-y-2">
-                <Label>Box Dimensions (cm)</Label>
-                <div className="grid grid-cols-3 gap-2">
-                    <Input id="boxLength" value={boxLength} onChange={e => setBoxLength(e.target.value)} placeholder="Length" type="number" />
-                    <Input id="boxWidth" value={boxWidth} onChange={e => setBoxWidth(e.target.value)} placeholder="Width" type="number" />
-                    <Input id="boxHeight" value={boxHeight} onChange={e => setBoxHeight(e.target.value)} placeholder="Height" type="number" />
+              <div className="space-y-2">
+                <Label htmlFor="batchNumber">Batch #</Label>
+                <Input id="batchNumber" value={batchNumber} onChange={(e) => setBatchNumber(e.target.value)} placeholder="e.g., JKT110" required />
+              </div>
+               <div className="space-y-2">
+                 <Label htmlFor="client">Customer</Label>
+                <Select value={clientId} onValueChange={setClientId} required>
+                    <SelectTrigger id="client">
+                        <SelectValue placeholder="Select a customer" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {clients.map((client: Client) => (
+                            <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-2">
+                <div className='space-y-2'>
+                    <Label htmlFor="inwardQuantity">Inward Qty</Label>
+                    <Input id="inwardQuantity" type="number" value={inwardQuantity} onChange={(e) => setInwardQuantity(e.target.value)} required />
+                </div>
+                <div className='space-y-2'>
+                    <Label htmlFor="outwardQuantity">Outward Qty</Label>
+                    <Input id="outwardQuantity" type="number" value={outwardQuantity} onChange={(e) => setOutwardQuantity(e.target.value)} />
                 </div>
               </div>
-              <div className="col-span-2 space-y-2">
+
+              <div className="grid grid-cols-2 gap-2">
+                <div className='space-y-2'>
+                    <Label htmlFor="inwardWeight">Inward Weight</Label>
+                    <Input id="inwardWeight" type="number" step="0.01" value={inwardWeight} onChange={(e) => setInwardWeight(e.target.value)} required />
+                </div>
+                <div className='space-y-2'>
+                    <Label htmlFor="outwardWeight">Outward Weight</Label>
+                    <Input id="outwardWeight" type="number" step="0.01" value={outwardWeight} onChange={(e) => setOutwardWeight(e.target.value)} />
+                </div>
+              </div>
+
+              <div className="space-y-2">
                  <Label htmlFor="chamber">Chamber</Label>
                 <Select value={chamberId} onValueChange={setChamberId}>
                     <SelectTrigger id="chamber">
@@ -306,16 +250,30 @@ export function AddItemDialog({ onItemAdded, item, trigger }: AddItemDialogProps
                         ))}
                     </SelectContent>
                 </Select>
-                {selectedChamber && (
-                    <div className="text-sm text-muted-foreground pt-1">
-                        Capacity: {selectedChamber.products.reduce((acc, p) => acc + p.quantityAvailable, 0)} kg used.
-                    </div>
-                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="rentalRate">Daily Rate (₹)</Label>
+                <Input id="rentalRate" type="number" step="0.01" value={rentalRate} onChange={(e) => setRentalRate(e.target.value)} placeholder="e.g., 1.50" required/>
+              </div>
+
+              <div className="space-y-2 col-span-2">
+                 <Label htmlFor="vendor">Vendor/Source</Label>
+                <Select value={vendorId} onValueChange={setVendorId} required>
+                    <SelectTrigger id="vendor">
+                        <SelectValue placeholder="Select a vendor" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {vendors.map((vendor: Vendor) => (
+                            <SelectItem key={vendor.id} value={vendor.id}>{vendor.name}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
               </div>
             </div>
             <DialogFooter>
                 <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>
-                <Button type="submit">{item ? 'Update Item' : 'Add Item'}</Button>
+                <Button type="submit">{item ? 'Update Entry' : 'Create Entry'}</Button>
             </DialogFooter>
         </form>
       </DialogContent>
