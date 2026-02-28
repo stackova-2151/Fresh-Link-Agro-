@@ -71,6 +71,29 @@ export type OutwardEntry = {
   vehicleNumber: string;
 };
 
+export type DeliveryOrder = {
+  id: string;
+  orderNumber: string; // Out No
+  date: Date;
+  clientId: string;
+  address: string;
+  remark?: string;
+  driverName: string;
+  vehicleNumber: string;
+  gatePassNumber: string;
+  items: {
+    srNo: number;
+    itemName: string;
+    inwardNumber: string;
+    brand: string;
+    quantity: number;
+    unit: string;
+    weight: number;
+    balanceQty: number;
+    balanceWeight: number;
+  }[];
+};
+
 export type Platform = 'WedMeGood' | 'Urban Company' | 'Internal';
 
 export type StockTransaction = {

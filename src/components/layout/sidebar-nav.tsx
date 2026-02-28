@@ -20,7 +20,8 @@ import {
   FileText,
   Users,
   LogOut,
-  ArrowUpRight
+  ArrowUpRight,
+  ClipboardList
 } from 'lucide-react';
 import Link from 'next/link';
 import { useUser } from '@/context/user-context';
@@ -42,6 +43,12 @@ const allMenuItems = [
     href: '/outward',
     label: 'Outward Register',
     icon: ArrowUpRight,
+    roles: ['Admin', 'Storekeeper'],
+  },
+  {
+    href: '/delivery-orders',
+    label: 'Delivery Orders',
+    icon: ClipboardList,
     roles: ['Admin', 'Storekeeper'],
   },
   {
