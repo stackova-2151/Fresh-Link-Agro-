@@ -57,6 +57,20 @@ export type RentalItem = {
   condition: 'New' | 'Good' | 'Used';
 };
 
+export type OutwardEntry = {
+  id: string;
+  outwardNumber: string;
+  outwardDate: Date;
+  clientId: string;
+  inwardNumber: string; // Reference
+  itemName: string;
+  brand: string;
+  quantity: number;
+  weight: number;
+  driverName: string;
+  vehicleNumber: string;
+};
+
 export type Platform = 'WedMeGood' | 'Urban Company' | 'Internal';
 
 export type StockTransaction = {

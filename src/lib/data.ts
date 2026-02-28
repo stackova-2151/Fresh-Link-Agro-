@@ -1,4 +1,4 @@
-import type { RentalItem, StockTransaction, Chamber, GatePass, User, Vendor, Client, Invoice } from '@/lib/types';
+import type { RentalItem, StockTransaction, Chamber, GatePass, User, Vendor, Client, Invoice, OutwardEntry } from '@/lib/types';
 
 export const users: User[] = [
   { id: 'user_01', name: 'Alex', email: 'alex@example.com', role: 'Admin' },
@@ -48,34 +48,6 @@ export const rentalItems: RentalItem[] = [
     condition: 'New'
   },
   {
-    id: 'item_sheetal_02',
-    inwardNumber: '08213',
-    name: 'CHOCO TRAPHAL',
-    brand: 'DECOR',
-    batchNumber: 'BATCH-B2',
-    category: 'Confectionery',
-    description: 'Keep frozen',
-    rentalRate: 3.0,
-    rentalCycles: ['monthly'],
-    inwardQuantity: 20,
-    outwardQuantity: 0,
-    quantityAvailable: 20,
-    unit: 'boxes',
-    inwardWeight: 240.00,
-    outwardWeight: 0.00,
-    balanceWeight: 240.00,
-    expiryDate: new Date('2026-12-31'),
-    storageDate: new Date('2026-01-09'),
-    temperatureRange: '-18°C',
-    vendorId: 'vendor_03',
-    clientId: 'cust_03',
-    chamberId: 'chamber_01',
-    driverName: 'BIRAPPA',
-    vehicleNumber: 'MH12 DT2119',
-    images: [],
-    condition: 'New'
-  },
-  {
     id: 'item_01',
     inwardNumber: '06840',
     name: 'JWARI',
@@ -103,6 +75,74 @@ export const rentalItems: RentalItem[] = [
   }
 ];
 
+export const outwardEntries: OutwardEntry[] = [
+  {
+    id: 'out_01',
+    outwardNumber: '24421',
+    outwardDate: new Date('2026-01-02'),
+    clientId: 'cust_03',
+    inwardNumber: '08152',
+    itemName: 'WHIIP CREAM',
+    brand: 'PEARL',
+    quantity: 20,
+    weight: 240.00,
+    driverName: 'AKSHAY',
+    vehicleNumber: 'MH12TN5281'
+  },
+  {
+    id: 'out_02',
+    outwardNumber: '24638',
+    outwardDate: new Date('2026-01-14'),
+    clientId: 'cust_03',
+    inwardNumber: '07994',
+    itemName: 'WHIIP CREAM',
+    brand: 'PEARL',
+    quantity: 3,
+    weight: 36.00,
+    driverName: 'AKSHAY',
+    vehicleNumber: 'MH12TN5281'
+  },
+  {
+    id: 'out_03',
+    outwardNumber: '24709',
+    outwardDate: new Date('2026-01-19'),
+    clientId: 'cust_03',
+    inwardNumber: '08213',
+    itemName: 'WHIIP CREAM',
+    brand: 'DECOR',
+    quantity: 40,
+    weight: 480.00,
+    driverName: 'JITESH',
+    vehicleNumber: 'MH12 YQ7941'
+  },
+  {
+    id: 'out_04',
+    outwardNumber: '24790',
+    outwardDate: new Date('2026-01-23'),
+    clientId: 'cust_03',
+    inwardNumber: '08213',
+    itemName: 'WHIIP CREAM',
+    brand: 'DECOR',
+    quantity: 20,
+    weight: 240.00,
+    driverName: 'AKSHAY',
+    vehicleNumber: 'MH12TN5281'
+  },
+  {
+    id: 'out_05',
+    outwardNumber: '24861',
+    outwardDate: new Date('2026-01-28'),
+    clientId: 'cust_03',
+    inwardNumber: '08213',
+    itemName: 'WHIIP CREAM',
+    brand: 'DECOR',
+    quantity: 30,
+    weight: 360.00,
+    driverName: 'AKSHAY',
+    vehicleNumber: 'MH12TN5281'
+  }
+];
+
 export const transactions: StockTransaction[] = [];
 
 export const chambers: Chamber[] = [
@@ -114,7 +154,6 @@ export const chambers: Chamber[] = [
     dailyRentRate: 800,
     products: [
         { id: 'item_sheetal_01', name: 'WHIIP CREAM', quantityAvailable: 100, unit: 'boxes' },
-        { id: 'item_sheetal_02', name: 'CHOCO TRAPHAL', quantityAvailable: 20, unit: 'boxes' },
     ],
     boxDimensions: { length: 800, width: 600, height: 300 }
   }
@@ -131,7 +170,6 @@ export const invoices: Invoice[] = [
         dueDate: new Date('2026-02-15'),
         items: [
             { itemId: 'item_sheetal_01', name: 'Storage: WHIIP CREAM', quantity: 100, rate: 2.5, amount: 7500 },
-            { itemId: 'item_sheetal_02', name: 'Storage: CHOCO TRAPHAL', quantity: 20, rate: 3.0, amount: 1800 }
         ],
         subtotal: 9300,
         tax: 1674,

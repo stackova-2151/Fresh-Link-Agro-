@@ -1,4 +1,3 @@
-
 'use client';
 
 import {
@@ -19,11 +18,12 @@ import {
   Warehouse,
   LifeBuoy,
   FileText,
-  Users
+  Users,
+  LogOut,
+  ArrowUpRight
 } from 'lucide-react';
 import Link from 'next/link';
 import { useUser } from '@/context/user-context';
-import { User } from '@/lib/types';
 
 const allMenuItems = [
   {
@@ -34,8 +34,14 @@ const allMenuItems = [
   },
   {
     href: '/inventory',
-    label: 'Inventory',
+    label: 'Inward Register',
     icon: Archive,
+    roles: ['Admin', 'Storekeeper'],
+  },
+  {
+    href: '/outward',
+    label: 'Outward Register',
+    icon: ArrowUpRight,
     roles: ['Admin', 'Storekeeper'],
   },
   {
