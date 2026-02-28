@@ -36,7 +36,7 @@ export type RentalItem = {
   inwardQuantity: number;
   outwardQuantity: number;
   quantityAvailable: number; // Balance Qty
-  unit: 'kg' | 'units' | 'liters' | 'weights' | 'bags';
+  unit: 'kg' | 'units' | 'liters' | 'weights' | 'bags' | 'boxes';
   inwardWeight: number;
   outwardWeight: number;
   balanceWeight: number;
@@ -46,6 +46,8 @@ export type RentalItem = {
   vendorId: string;
   clientId: string;
   chamberId?: string;
+  driverName?: string;
+  vehicleNumber?: string;
   boxDimensions?: {
     length: number;
     width: number;

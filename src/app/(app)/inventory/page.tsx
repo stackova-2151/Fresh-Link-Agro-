@@ -5,9 +5,9 @@ import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
 import { rentalItems as initialRentalItems, clients } from "@/lib/data";
-import { PlusCircle, Search, ChevronDown, MoreHorizontal, FileDown } from "lucide-react";
+import { PlusCircle, Search, ChevronDown, MoreHorizontal, FileDown, Printer } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
@@ -55,15 +55,30 @@ export default function InventoryPage() {
             item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
             item.brand.toLowerCase().includes(searchTerm.toLowerCase()) ||
             item.batchNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            item.inwardNumber.toLowerCase().includes(searchTerm.toLowerCase())
+            item.inwardNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            item.vehicleNumber?.toLowerCase().includes(searchTerm.toLowerCase())
         );
     }, [rentalItems, searchTerm]);
 
     const itemsByClient = useMemo(() => {
-        return clients.map(client => ({
-            ...client,
-            items: filteredItems.filter(item => item.clientId === client.id)
-        })).filter(client => client.items.length > 0);
+        return clients.map(client => {
+            const clientItems = filteredItems.filter(item => item.clientId === client.id);
+            const summary = clientItems.reduce((acc, item) => {
+                acc.totalInQty += item.inwardQuantity;
+                acc.totalInWt += item.inwardWeight;
+                acc.totalOutQty += item.outwardQuantity;
+                acc.totalOutWt += item.outwardWeight;
+                acc.totalBalQty += item.quantityAvailable;
+                acc.totalBalWt += item.balanceWeight;
+                return acc;
+            }, { totalInQty: 0, totalInWt: 0, totalOutQty: 0, totalOutWt: 0, totalBalQty: 0, totalBalWt: 0 });
+
+            return {
+                ...client,
+                items: clientItems,
+                summary
+            };
+        }).filter(client => client.items.length > 0);
     }, [filteredItems]);
 
     const toggleCollapsible = (id: string) => {
@@ -72,20 +87,21 @@ export default function InventoryPage() {
 
     return (
         <div className="space-y-6">
-            <PageHeader title="Stock Report" description="Chamberwise customer stock report and management.">
+            <PageHeader title="Inward Register" description="Detailed log of all inward stock entries as per cold storage standards.">
                 <div className="flex gap-2">
-                    <Button variant="outline"><FileDown className="mr-2 h-4 w-4" /> Export Report</Button>
+                    <Button variant="outline"><Printer className="mr-2 h-4 w-4" /> Print Register</Button>
+                    <Button variant="outline"><FileDown className="mr-2 h-4 w-4" /> Export CSV</Button>
                     <AddItemDialog onItemAdded={handleItemAdded} />
                 </div>
             </PageHeader>
             <Card>
                 <CardHeader>
-                    <CardTitle>Customer Stock Report</CardTitle>
-                    <CardDescription>Consolidated view of all items stored across chambers.</CardDescription>
+                    <CardTitle>Register Search</CardTitle>
+                    <CardDescription>Search by Inward No, Customer, Item, Brand or Vehicle Number.</CardDescription>
                     <div className="relative pt-2">
                         <Search className="absolute left-2.5 top-4.5 h-4 w-4 text-muted-foreground" />
                         <Input 
-                            placeholder="Search by Item, Brand, Batch or Inward No..." 
+                            placeholder="Type to search entries..." 
                             className="pl-8" 
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
@@ -99,34 +115,33 @@ export default function InventoryPage() {
                             key={clientData.id} 
                             open={openCollapsibles.includes(clientData.id)}
                             onOpenChange={() => toggleCollapsible(clientData.id)}
+                            className="border rounded-lg overflow-hidden"
                         >
                             <CollapsibleTrigger className="w-full">
-                                <div className="flex items-center justify-between p-3 bg-muted rounded-md hover:bg-muted/80 transition-colors">
-                                    <h3 className="font-semibold text-lg">{clientData.name}</h3>
-                                    <div className="flex items-center gap-4">
-                                        <Badge variant="outline" className="bg-background">{clientData.items.length} Entries</Badge>
-                                        <ChevronDown className={cn("h-5 w-5 transition-transform duration-200", openCollapsibles.includes(clientData.id) && "rotate-180")} />
+                                <div className="flex items-center justify-between p-4 bg-slate-50 hover:bg-slate-100 transition-colors">
+                                    <div className="flex items-center gap-3">
+                                        <Badge className="bg-primary">{clientData.name}</Badge>
+                                        <span className="text-sm text-muted-foreground">{clientData.items.length} register entries</span>
                                     </div>
+                                    <ChevronDown className={cn("h-5 w-5 transition-transform duration-200", openCollapsibles.includes(clientData.id) && "rotate-180")} />
                                 </div>
                             </CollapsibleTrigger>
                             <CollapsibleContent>
-                                <div className="pt-4 overflow-x-auto">
+                                <div className="overflow-x-auto">
                                 <Table>
                                     <TableHeader>
-                                        <TableRow className="bg-slate-50">
-                                            <TableHead className="font-bold">Inv. No</TableHead>
-                                            <TableHead className="font-bold">Inw. Date</TableHead>
-                                            <TableHead className="font-bold">Item Description</TableHead>
-                                            <TableHead className="font-bold">Brand</TableHead>
-                                            <TableHead className="font-bold">Batch #</TableHead>
-                                            <TableHead className="text-right font-bold">Inw. Qty</TableHead>
-                                            <TableHead className="text-right font-bold">Out Qty</TableHead>
-                                            <TableHead className="text-right font-bold">Bal. Qty</TableHead>
-                                            <TableHead className="text-right font-bold">Inw. Wt</TableHead>
-                                            <TableHead className="text-right font-bold">Out Wt</TableHead>
-                                            <TableHead className="text-right font-bold">Bal. Wt</TableHead>
-                                            <TableHead className="text-right font-bold">Bal. Day</TableHead>
-                                            <TableHead className="text-right font-bold">Actions</TableHead>
+                                        <TableRow className="bg-slate-100/50">
+                                            <TableHead className="w-[80px]">Inw.No</TableHead>
+                                            <TableHead>Inw.Date</TableHead>
+                                            <TableHead>Item Description</TableHead>
+                                            <TableHead>Brand</TableHead>
+                                            <TableHead>Batch #</TableHead>
+                                            <TableHead className="text-right">Inw.Qty</TableHead>
+                                            <TableHead className="text-right">Inw.Weight</TableHead>
+                                            <TableHead>Driver Name</TableHead>
+                                            <TableHead>Vehicle No.</TableHead>
+                                            <TableHead className="text-right">Bal.Days</TableHead>
+                                            <TableHead className="text-right">Actions</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -134,33 +149,30 @@ export default function InventoryPage() {
                                             const daysStored = now ? differenceInDays(now, item.storageDate) : 0;
 
                                             return (
-                                                <TableRow key={item.id} className="hover:bg-slate-50/50">
+                                                <TableRow key={item.id} className="group">
                                                     <TableCell className="font-mono text-xs">{item.inwardNumber}</TableCell>
                                                     <TableCell className="whitespace-nowrap">{new Date(item.storageDate).toLocaleDateString()}</TableCell>
                                                     <TableCell className="font-medium">{item.name}</TableCell>
-                                                    <TableCell>{item.brand}</TableCell>
+                                                    <TableCell><Badge variant="outline">{item.brand}</Badge></TableCell>
                                                     <TableCell className="font-mono text-xs">{item.batchNumber}</TableCell>
-                                                    <TableCell className="text-right">{item.inwardQuantity}</TableCell>
-                                                    <TableCell className="text-right text-muted-foreground">{item.outwardQuantity}</TableCell>
-                                                    <TableCell className="text-right font-bold">{item.quantityAvailable}</TableCell>
+                                                    <TableCell className="text-right">{item.inwardQuantity} {item.unit}</TableCell>
                                                     <TableCell className="text-right">{item.inwardWeight.toFixed(2)}</TableCell>
-                                                    <TableCell className="text-right text-muted-foreground">{item.outwardWeight.toFixed(2)}</TableCell>
-                                                    <TableCell className="text-right font-bold">{item.balanceWeight.toFixed(2)}</TableCell>
+                                                    <TableCell className="text-muted-foreground">{item.driverName || 'N/A'}</TableCell>
+                                                    <TableCell className="font-mono text-xs">{item.vehicleNumber || 'N/A'}</TableCell>
                                                     <TableCell className="text-right font-semibold text-primary">{daysStored}</TableCell>
                                                     <TableCell className="text-right">
                                                         <DropdownMenu>
                                                             <DropdownMenuTrigger asChild>
                                                             <Button variant="ghost" className="h-8 w-8 p-0">
-                                                                <span className="sr-only">Open menu</span>
                                                                 <MoreHorizontal className="h-4 w-4" />
                                                             </Button>
                                                             </DropdownMenuTrigger>
                                                             <DropdownMenuContent align="end">
-                                                                <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                                                <AddItemDialog onItemAdded={handleItemAdded} item={item} trigger={<DropdownMenuItem onSelect={(e) => e.preventDefault()}>Edit Entry</DropdownMenuItem>} />
-                                                                <DropdownMenuItem>View Transactions</DropdownMenuItem>
+                                                                <DropdownMenuLabel>Register Actions</DropdownMenuLabel>
+                                                                <AddItemDialog onItemAdded={handleItemAdded} item={item} trigger={<DropdownMenuItem onSelect={(e) => e.preventDefault()}>Edit Register Entry</DropdownMenuItem>} />
+                                                                <DropdownMenuItem>Generate Gate Pass</DropdownMenuItem>
                                                                 <DropdownMenuSeparator />
-                                                                <DropdownMenuItem className="text-destructive">Delete</DropdownMenuItem>
+                                                                <DropdownMenuItem className="text-destructive">Delete Entry</DropdownMenuItem>
                                                             </DropdownMenuContent>
                                                         </DropdownMenu>
                                                     </TableCell>
@@ -168,7 +180,41 @@ export default function InventoryPage() {
                                             )
                                         })}
                                     </TableBody>
+                                    <TableFooter className="bg-slate-50 font-headline">
+                                        <TableRow>
+                                            <TableCell colSpan={5} className="text-right font-bold py-4">CUSTOMER SUMMARY FOR {clientData.name}:</TableCell>
+                                            <TableCell className="text-right text-sm">
+                                                <div className="font-bold">Total Inward: {clientData.summary.totalInQty}</div>
+                                                <div className="text-xs text-muted-foreground">Total Outward: {clientData.summary.totalOutQty}</div>
+                                                <div className="text-primary mt-1">Total Balance: {clientData.summary.totalBalQty}</div>
+                                            </TableCell>
+                                            <TableCell className="text-right text-sm">
+                                                <div className="font-bold">{clientData.summary.totalInWt.toFixed(2)} kg</div>
+                                                <div className="text-xs text-muted-foreground">{clientData.summary.totalOutWt.toFixed(2)} kg</div>
+                                                <div className="text-primary mt-1">{clientData.summary.totalBalWt.toFixed(2)} kg</div>
+                                            </TableCell>
+                                            <TableCell colSpan={4} />
+                                        </TableRow>
+                                    </TableFooter>
                                 </Table>
+                                </div>
+                                <div className="p-6 bg-slate-50/30 grid grid-cols-2 md:grid-cols-4 gap-4 border-t">
+                                    <div className="space-y-1">
+                                        <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider">Opening Stock</p>
+                                        <p className="text-lg font-headline">38 / 456.00</p>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider">Total Inward</p>
+                                        <p className="text-lg font-headline text-green-600">{clientData.summary.totalInQty} / {clientData.summary.totalInWt.toFixed(2)}</p>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider">Total Outward</p>
+                                        <p className="text-lg font-headline text-red-600">{clientData.summary.totalOutQty} / {clientData.summary.totalOutWt.toFixed(2)}</p>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider">Total Balance</p>
+                                        <p className="text-lg font-headline text-primary font-bold">{clientData.summary.totalBalQty} / {clientData.summary.totalBalWt.toFixed(2)}</p>
+                                    </div>
                                 </div>
                             </CollapsibleContent>
                         </Collapsible>

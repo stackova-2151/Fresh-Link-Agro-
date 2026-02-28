@@ -15,7 +15,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RentalItem, Vendor, Client, Chamber } from '@/lib/types';
-import { Calendar as CalendarIcon, PlusCircle } from 'lucide-react';
+import { Calendar as CalendarIcon, PlusCircle, Truck, User } from 'lucide-react';
 import { Textarea } from '../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
@@ -36,18 +36,20 @@ export function AddItemDialog({ onItemAdded, item, trigger }: AddItemDialogProps
   const [name, setName] = useState('');
   const [brand, setBrand] = useState('');
   const [batchNumber, setBatchNumber] = useState('');
-  const [category, setCategory] = useState('Grains');
+  const [category, setCategory] = useState('Dairy');
   const [description, setDescription] = useState('');
   const [rentalRate, setRentalRate] = useState('');
   const [inwardQuantity, setInwardQuantity] = useState('');
-  const [outwardQuantity, setOutwardQuantity] = useState('0');
-  const [unit, setUnit] = useState<RentalItem['unit']>('bags');
+  const [outwardQuantity, setOutwardQuantity] =('0');
+  const [unit, setUnit] = useState<RentalItem['unit']>('boxes');
   const [inwardWeight, setInwardWeight] = useState('');
   const [outwardWeight, setOutwardWeight] = useState('0');
   const [storageDate, setStorageDate] = useState<Date | undefined>();
   const [vendorId, setVendorId] = useState('');
   const [clientId, setClientId] = useState('');
   const [chamberId, setChamberId] = useState('');
+  const [driverName, setDriverName] = useState('');
+  const [vehicleNumber, setVehicleNumber] = useState('');
 
   useEffect(() => {
     if (item && open) {
@@ -67,6 +69,8 @@ export function AddItemDialog({ onItemAdded, item, trigger }: AddItemDialogProps
         setVendorId(item.vendorId);
         setClientId(item.clientId);
         setChamberId(item.chamberId || '');
+        setDriverName(item.driverName || '');
+        setVehicleNumber(item.vehicleNumber || '');
     } else if (!item && open) {
         setStorageDate(new Date());
     }
@@ -77,18 +81,20 @@ export function AddItemDialog({ onItemAdded, item, trigger }: AddItemDialogProps
     setName('');
     setBrand('');
     setBatchNumber('');
-    setCategory('Grains');
+    setCategory('Dairy');
     setDescription('');
     setRentalRate('');
     setInwardQuantity('');
     setOutwardQuantity('0');
-    setUnit('bags');
+    setUnit('boxes');
     setInwardWeight('');
     setOutwardWeight('0');
     setStorageDate(new Date());
     setVendorId('');
     setClientId('');
     setChamberId('');
+    setDriverName('');
+    setVehicleNumber('');
   }
 
   const handleOpenChange = (isOpen: boolean) => {
@@ -126,12 +132,14 @@ export function AddItemDialog({ onItemAdded, item, trigger }: AddItemDialogProps
       condition: 'New',
       expiryDate: new Date(new Date().getFullYear() + 1, 11, 31),
       storageDate,
-      temperatureRange: 'Ambient',
+      temperatureRange: 'Frozen',
       images: [],
       rentalCycles: ['monthly'],
       vendorId,
       clientId,
       chamberId,
+      driverName,
+      vehicleNumber,
     };
 
     onItemAdded(newItem);
@@ -156,14 +164,14 @@ export function AddItemDialog({ onItemAdded, item, trigger }: AddItemDialogProps
         <DialogHeader>
           <DialogTitle className="font-headline">{item ? 'Edit Stock Entry' : 'New Stock Inward'}</DialogTitle>
           <DialogDescription>
-            Enter details from the inward receipt to update stock records.
+            Enter details from the inward register for professional cold storage tracking.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
               <div className="space-y-2">
-                <Label htmlFor="inwardNumber">Inward No (Inv. No)</Label>
-                <Input id="inwardNumber" value={inwardNumber} onChange={(e) => setInwardNumber(e.target.value)} placeholder="e.g., 06840" required />
+                <Label htmlFor="inwardNumber">Inward No (Inw.No)</Label>
+                <Input id="inwardNumber" value={inwardNumber} onChange={(e) => setInwardNumber(e.target.value)} placeholder="e.g., 08213" required />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="storageDate">Inward Date</Label>
@@ -190,20 +198,9 @@ export function AddItemDialog({ onItemAdded, item, trigger }: AddItemDialogProps
                     </PopoverContent>
                 </Popover>
               </div>
+              
               <div className="space-y-2">
-                <Label htmlFor="name">Item Description</Label>
-                <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g., JWARI" required />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="brand">Brand</Label>
-                <Input id="brand" value={brand} onChange={(e) => setBrand(e.target.value)} placeholder="e.g., MANIK" required />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="batchNumber">Batch #</Label>
-                <Input id="batchNumber" value={batchNumber} onChange={(e) => setBatchNumber(e.target.value)} placeholder="e.g., JKT110" required />
-              </div>
-               <div className="space-y-2">
-                 <Label htmlFor="client">Customer</Label>
+                 <Label htmlFor="client">Customer Name</Label>
                 <Select value={clientId} onValueChange={setClientId} required>
                     <SelectTrigger id="client">
                         <SelectValue placeholder="Select a customer" />
@@ -215,31 +212,72 @@ export function AddItemDialog({ onItemAdded, item, trigger }: AddItemDialogProps
                     </SelectContent>
                 </Select>
               </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="name">Item Description</Label>
+                <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g., WHIIP CREAM" required />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="brand">Brand</Label>
+                <Input id="brand" value={brand} onChange={(e) => setBrand(e.target.value)} placeholder="e.g., DECOR" required />
+              </div>
               
+              <div className="space-y-2">
+                <Label htmlFor="batchNumber">Batch #</Label>
+                <Input id="batchNumber" value={batchNumber} onChange={(e) => setBatchNumber(e.target.value)} placeholder="e.g., JKT110" />
+              </div>
+
               <div className="grid grid-cols-2 gap-2">
                 <div className='space-y-2'>
-                    <Label htmlFor="inwardQuantity">Inward Qty</Label>
+                    <Label htmlFor="inwardQuantity">Inw. Qty</Label>
                     <Input id="inwardQuantity" type="number" value={inwardQuantity} onChange={(e) => setInwardQuantity(e.target.value)} required />
                 </div>
                 <div className='space-y-2'>
-                    <Label htmlFor="outwardQuantity">Outward Qty</Label>
-                    <Input id="outwardQuantity" type="number" value={outwardQuantity} onChange={(e) => setOutwardQuantity(e.target.value)} />
+                    <Label htmlFor="unit">Unit</Label>
+                    <Select value={unit} onValueChange={(v: any) => setUnit(v)}>
+                        <SelectTrigger id="unit">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="boxes">Boxes</SelectItem>
+                            <SelectItem value="bags">Bags</SelectItem>
+                            <SelectItem value="kg">KG</SelectItem>
+                            <SelectItem value="units">Units</SelectItem>
+                        </SelectContent>
+                    </Select>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-2">
                 <div className='space-y-2'>
-                    <Label htmlFor="inwardWeight">Inward Weight</Label>
+                    <Label htmlFor="inwardWeight">Inw. Weight (kg)</Label>
                     <Input id="inwardWeight" type="number" step="0.01" value={inwardWeight} onChange={(e) => setInwardWeight(e.target.value)} required />
                 </div>
                 <div className='space-y-2'>
-                    <Label htmlFor="outwardWeight">Outward Weight</Label>
-                    <Input id="outwardWeight" type="number" step="0.01" value={outwardWeight} onChange={(e) => setOutwardWeight(e.target.value)} />
+                    <Label htmlFor="rentalRate">Daily Rate (₹)</Label>
+                    <Input id="rentalRate" type="number" step="0.01" value={rentalRate} onChange={(e) => setRentalRate(e.target.value)} placeholder="e.g., 1.50" required/>
                 </div>
               </div>
 
               <div className="space-y-2">
-                 <Label htmlFor="chamber">Chamber</Label>
+                 <Label htmlFor="driverName">Driver Name</Label>
+                 <div className="relative">
+                    <User className="absolute left-2 top-3 h-4 w-4 text-muted-foreground" />
+                    <Input id="driverName" value={driverName} onChange={(e) => setDriverName(e.target.value)} className="pl-8" placeholder="e.g., BIRAPPA" />
+                 </div>
+              </div>
+
+              <div className="space-y-2">
+                 <Label htmlFor="vehicleNumber">Vehicle Number</Label>
+                 <div className="relative">
+                    <Truck className="absolute left-2 top-3 h-4 w-4 text-muted-foreground" />
+                    <Input id="vehicleNumber" value={vehicleNumber} onChange={(e) => setVehicleNumber(e.target.value)} className="pl-8" placeholder="e.g., MH12 DT2119" />
+                 </div>
+              </div>
+
+              <div className="space-y-2 col-span-2">
+                 <Label htmlFor="chamber">Storage Chamber</Label>
                 <Select value={chamberId} onValueChange={setChamberId}>
                     <SelectTrigger id="chamber">
                         <SelectValue placeholder="Select a chamber" />
@@ -251,29 +289,10 @@ export function AddItemDialog({ onItemAdded, item, trigger }: AddItemDialogProps
                     </SelectContent>
                 </Select>
               </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="rentalRate">Daily Rate (₹)</Label>
-                <Input id="rentalRate" type="number" step="0.01" value={rentalRate} onChange={(e) => setRentalRate(e.target.value)} placeholder="e.g., 1.50" required/>
-              </div>
-
-              <div className="space-y-2 col-span-2">
-                 <Label htmlFor="vendor">Vendor/Source</Label>
-                <Select value={vendorId} onValueChange={setVendorId} required>
-                    <SelectTrigger id="vendor">
-                        <SelectValue placeholder="Select a vendor" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {vendors.map((vendor: Vendor) => (
-                            <SelectItem key={vendor.id} value={vendor.id}>{vendor.name}</SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-              </div>
             </div>
             <DialogFooter>
                 <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>
-                <Button type="submit">{item ? 'Update Entry' : 'Create Entry'}</Button>
+                <Button type="submit">{item ? 'Update Entry' : 'Create Register Entry'}</Button>
             </DialogFooter>
         </form>
       </DialogContent>
