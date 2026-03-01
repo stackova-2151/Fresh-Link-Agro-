@@ -145,6 +145,30 @@ export const outwardEntries: OutwardEntry[] = [
 
 export const deliveryOrders: DeliveryOrder[] = [
   {
+    id: 'do_03',
+    orderNumber: '24421',
+    date: new Date('2026-01-02'),
+    clientId: 'cust_03',
+    address: 'PUNE',
+    remark: '',
+    driverName: 'AKSHAY',
+    vehicleNumber: 'MH12 TN5281',
+    gatePassNumber: '01787',
+    items: [
+      {
+        srNo: 1,
+        itemName: 'WHIIP CREAM',
+        inwardNumber: '08152',
+        brand: 'PEARL',
+        quantity: 20,
+        unit: 'BOX',
+        weight: 240.00,
+        balanceQty: 10,
+        balanceWeight: 120.00
+      }
+    ]
+  },
+  {
     id: 'do_02',
     orderNumber: '24638',
     date: new Date('2026-01-14'),
