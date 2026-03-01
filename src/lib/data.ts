@@ -116,34 +116,80 @@ export const outwardEntries: OutwardEntry[] = [
     vehicleNumber: 'MH12 YQ7941'
   },
   {
-    id: 'out_04',
-    outwardNumber: '24790',
-    outwardDate: new Date('2026-01-23'),
+    id: 'out_06',
+    outwardNumber: '24638',
+    outwardDate: new Date('2026-01-14'),
     clientId: 'cust_03',
-    inwardNumber: '08213',
+    inwardNumber: '08152',
     itemName: 'WHIIP CREAM',
-    brand: 'DECOR',
-    quantity: 20,
-    weight: 240.00,
+    brand: 'PEARL',
+    quantity: 10,
+    weight: 120.00,
     driverName: 'AKSHAY',
-    vehicleNumber: 'MH12TN5281'
+    vehicleNumber: 'MH12 TN5281'
   },
   {
-    id: 'out_05',
-    outwardNumber: '24861',
-    outwardDate: new Date('2026-01-28'),
+    id: 'out_07',
+    outwardNumber: '24638',
+    outwardDate: new Date('2026-01-14'),
     clientId: 'cust_03',
     inwardNumber: '08213',
     itemName: 'WHIIP CREAM',
     brand: 'DECOR',
-    quantity: 30,
-    weight: 360.00,
+    quantity: 10,
+    weight: 120.00,
     driverName: 'AKSHAY',
-    vehicleNumber: 'MH12TN5281'
+    vehicleNumber: 'MH12 TN5281'
   }
 ];
 
 export const deliveryOrders: DeliveryOrder[] = [
+  {
+    id: 'do_02',
+    orderNumber: '24638',
+    date: new Date('2026-01-14'),
+    clientId: 'cust_03',
+    address: 'PUNE',
+    remark: '',
+    driverName: 'AKSHAY',
+    vehicleNumber: 'MH12 TN5281',
+    gatePassNumber: '01946',
+    items: [
+      {
+        srNo: 1,
+        itemName: 'WHIIP CREAM',
+        inwardNumber: '07994',
+        brand: 'PEARL',
+        quantity: 3,
+        unit: 'BOX',
+        weight: 36.00,
+        balanceQty: 0,
+        balanceWeight: 0
+      },
+      {
+        srNo: 2,
+        itemName: 'WHIIP CREAM',
+        inwardNumber: '08152',
+        brand: 'PEARL',
+        quantity: 10,
+        unit: 'BOX',
+        weight: 120.00,
+        balanceQty: 0,
+        balanceWeight: 0
+      },
+      {
+        srNo: 3,
+        itemName: 'WHIIP CREAM',
+        inwardNumber: '08213',
+        brand: 'DECOR',
+        quantity: 10,
+        unit: 'BOX',
+        weight: 120.00,
+        balanceQty: 90,
+        balanceWeight: 1080.00
+      }
+    ]
+  },
   {
     id: 'do_01',
     orderNumber: '24709',

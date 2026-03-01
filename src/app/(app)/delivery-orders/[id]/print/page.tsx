@@ -35,7 +35,7 @@ export default function PrintDeliveryOrderPage() {
                 {/* Header */}
                 <div className="flex justify-between items-start border-b-2 border-slate-800 pb-4 mb-6">
                     <div className="space-y-1">
-                        <h1 className="text-2xl font-bold font-headline text-slate-800">FRESH LINK AGRO COLD STORAGE PVT. LTD.</h1>
+                        <h1 className="text-2xl font-bold font-headline text-slate-800 uppercase leading-tight">FRESH LINK AGRO COLD STORAGE PVT. LTD.</h1>
                         <p className="text-[10px] text-muted-foreground leading-tight">
                             Address : Gat No.319,Gaud Dara Road,Khed Shivapur,Tal.Haveli,Dist.Pune - 412205<br />
                             MOBILE NO : 9699833995 / 8530818811 / 9423568775
@@ -70,22 +70,22 @@ export default function PrintDeliveryOrderPage() {
                         </div>
                         <div className="flex gap-2">
                             <span className="font-bold w-28 shrink-0">Driver Name :</span>
-                            <span className="border-b border-slate-300 flex-1">{order.driverName}</span>
+                            <span className="border-b border-slate-300 flex-1 uppercase">{order.driverName}</span>
                         </div>
                     </div>
                     
                     <div className="col-span-5 space-y-2 pl-4">
                         <div className="flex gap-2">
                             <span className="font-bold w-24 shrink-0">Out No :</span>
-                            <span className="border-b border-slate-300 flex-1 font-mono font-bold">{order.orderNumber}</span>
+                            <span className="border-b border-slate-300 flex-1 font-mono font-bold text-sm">{order.orderNumber}</span>
                         </div>
                         <div className="flex gap-2">
                             <span className="font-bold w-24 shrink-0">Date :</span>
-                            <span className="border-b border-slate-300 flex-1">{format(order.date, 'dd.01.2026')}</span>
+                            <span className="border-b border-slate-300 flex-1">{format(order.date, 'dd.MM.yyyy')}</span>
                         </div>
                         <div className="flex gap-2">
                             <span className="font-bold w-24 shrink-0">Veh.No. :</span>
-                            <span className="border-b border-slate-300 flex-1 font-mono">{order.vehicleNumber}</span>
+                            <span className="border-b border-slate-300 flex-1 font-mono uppercase">{order.vehicleNumber}</span>
                         </div>
                         <div className="flex gap-2">
                             <span className="font-bold w-24 shrink-0">Gate Pass No :</span>
@@ -105,7 +105,7 @@ export default function PrintDeliveryOrderPage() {
                                 <th className="border-r border-slate-800 p-2 w-[60px]">Qty</th>
                                 <th className="border-r border-slate-800 p-2 w-[60px]">Unit</th>
                                 <th className="border-r border-slate-800 p-2 w-[100px]">Weight</th>
-                                <th className="p-0 w-[120px]">
+                                <th className="p-0 w-[140px]">
                                     <div className="border-b border-slate-800 p-1 text-center font-bold">Balance</div>
                                     <div className="flex">
                                         <span className="w-1/2 border-r border-slate-800 p-1 text-center">Qty</span>
@@ -118,21 +118,21 @@ export default function PrintDeliveryOrderPage() {
                             {order.items.map((item, idx) => (
                                 <tr key={idx} className="border-b border-slate-300 last:border-b-0 h-10">
                                     <td className="border-r border-slate-800 p-2 text-center">{item.srNo.toString().padStart(2, '0')}</td>
-                                    <td className="border-r border-slate-800 p-2">{item.itemName} [ Inw No: {item.inwardNumber} ]</td>
+                                    <td className="border-r border-slate-800 p-2 uppercase font-medium">{item.itemName} [ Inw No: {item.inwardNumber} ]</td>
                                     <td className="border-r border-slate-800 p-2 text-center font-bold uppercase">{item.brand}</td>
                                     <td className="border-r border-slate-800 p-2 text-center font-bold">{item.quantity}</td>
                                     <td className="border-r border-slate-800 p-2 text-center uppercase">{item.unit}</td>
                                     <td className="border-r border-slate-800 p-2 text-right font-bold">{item.weight.toFixed(2)}</td>
                                     <td className="p-0 text-center">
                                         <div className="flex h-full min-h-[40px]">
-                                            <span className="w-1/2 border-r border-slate-800 p-2 flex items-center justify-center font-bold">{item.balanceQty}</span>
-                                            <span className="w-1/2 p-2 flex items-center justify-center font-bold">{item.balanceWeight.toFixed(2)}</span>
+                                            <span className="w-1/2 border-r border-slate-800 p-2 flex items-center justify-center font-bold">{item.balanceQty || ''}</span>
+                                            <span className="w-1/2 p-2 flex items-center justify-center font-bold">{item.balanceWeight ? item.balanceWeight.toFixed(2) : ''}</span>
                                         </div>
                                     </td>
                                 </tr>
                             ))}
                             {/* Empty rows to match style */}
-                            {[...Array(3)].map((_, i) => (
+                            {[...Array(Math.max(0, 5 - order.items.length))].map((_, i) => (
                                 <tr key={`empty-${i}`} className="border-b border-slate-200 h-10">
                                     <td className="border-r border-slate-800" />
                                     <td className="border-r border-slate-800" />
@@ -140,7 +140,7 @@ export default function PrintDeliveryOrderPage() {
                                     <td className="border-r border-slate-800" />
                                     <td className="border-r border-slate-800" />
                                     <td className="border-r border-slate-800" />
-                                    <td />
+                                    <td className="p-0"><div className="flex h-full min-h-[40px]"><span className="w-1/2 border-r border-slate-800"/><span className="w-1/2"/></div></td>
                                 </tr>
                             ))}
                             <tr className="border-t-2 border-slate-800 bg-slate-50 font-bold h-10">
