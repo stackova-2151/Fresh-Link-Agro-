@@ -94,6 +94,29 @@ export type DeliveryOrder = {
   }[];
 };
 
+export type GoodsReceiptNote = {
+  id: string;
+  grnNumber: string;
+  inwardNumber: string;
+  date: Date;
+  clientId: string;
+  address: string;
+  remark?: string;
+  driverName: string;
+  vehicleNumber: string;
+  gatePassNumber: string;
+  items: {
+    srNo: number;
+    itemName: string;
+    brand: string;
+    batchNumber: string;
+    unit: string;
+    weightPerQty: number;
+    quantity: number;
+    weight: number;
+  }[];
+};
+
 export type Platform = 'WedMeGood' | 'Urban Company' | 'Internal';
 
 export type StockTransaction = {

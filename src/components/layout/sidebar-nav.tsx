@@ -21,7 +21,8 @@ import {
   Users,
   LogOut,
   ArrowUpRight,
-  ClipboardList
+  ClipboardList,
+  Receipt
 } from 'lucide-react';
 import Link from 'next/link';
 import { useUser } from '@/context/user-context';
@@ -49,6 +50,12 @@ const allMenuItems = [
     href: '/delivery-orders',
     label: 'Delivery Orders',
     icon: ClipboardList,
+    roles: ['Admin', 'Storekeeper'],
+  },
+  {
+    href: '/goods-receipt-notes',
+    label: 'Receipt Notes',
+    icon: Receipt,
     roles: ['Admin', 'Storekeeper'],
   },
   {

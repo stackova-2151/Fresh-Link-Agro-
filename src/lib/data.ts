@@ -1,4 +1,4 @@
-import type { RentalItem, StockTransaction, Chamber, GatePass, User, Vendor, Client, Invoice, OutwardEntry, DeliveryOrder } from '@/lib/types';
+import type { RentalItem, StockTransaction, Chamber, GatePass, User, Vendor, Client, Invoice, OutwardEntry, DeliveryOrder, GoodsReceiptNote } from '@/lib/types';
 
 export const users: User[] = [
   { id: 'user_01', name: 'Alex', email: 'alex@example.com', role: 'Admin' },
@@ -235,6 +235,43 @@ export const deliveryOrders: DeliveryOrder[] = [
         weight: 480.00,
         balanceQty: 50,
         balanceWeight: 600.00
+      }
+    ]
+  }
+];
+
+export const goodsReceiptNotes: GoodsReceiptNote[] = [
+  {
+    id: 'grn_01',
+    grnNumber: 'GRN-08213',
+    inwardNumber: '08213',
+    date: new Date('2026-01-09'),
+    clientId: 'cust_03',
+    address: 'PUNE',
+    remark: '',
+    driverName: 'BIRAPPA',
+    vehicleNumber: 'MH12 DT2119',
+    gatePassNumber: '08038',
+    items: [
+      {
+        srNo: 1,
+        itemName: 'WHIIP CREAM',
+        brand: 'DECOR',
+        batchNumber: '',
+        unit: 'BOX',
+        weightPerQty: 12,
+        quantity: 100,
+        weight: 1200.00
+      },
+      {
+        srNo: 2,
+        itemName: 'CHOCO TRAPHAL',
+        brand: '',
+        batchNumber: '',
+        unit: 'BOX',
+        weightPerQty: 12,
+        quantity: 20,
+        weight: 240.00
       }
     ]
   }
