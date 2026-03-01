@@ -235,8 +235,9 @@ export const rentalItems: RentalItem[] = [
 ];
 
 export const outwardEntries: OutwardEntry[] = [
+  // SHEETAL ENTERPRISES ENTRIES
   {
-    id: 'out_01',
+    id: 'out_sheetal_01',
     outwardNumber: '24421',
     outwardDate: new Date('2026-01-02'),
     clientId: 'cust_03',
@@ -249,7 +250,7 @@ export const outwardEntries: OutwardEntry[] = [
     vehicleNumber: 'MH12TN5281'
   },
   {
-    id: 'out_02',
+    id: 'out_sheetal_02',
     outwardNumber: '24638',
     outwardDate: new Date('2026-01-14'),
     clientId: 'cust_03',
@@ -260,6 +261,176 @@ export const outwardEntries: OutwardEntry[] = [
     weight: 36.00,
     driverName: 'AKSHAY',
     vehicleNumber: 'MH12TN5281'
+  },
+  // JK TRADING COMPANY ENTRIES (From Register Image)
+  {
+    id: 'out_jk_24461_1',
+    outwardNumber: '24461',
+    outwardDate: new Date('2026-01-04'),
+    clientId: 'cust_01',
+    inwardNumber: '07102',
+    itemName: 'JWARI',
+    brand: 'KISAN HIRVA',
+    quantity: 70,
+    weight: 2100.00,
+    driverName: 'CHORGHE',
+    vehicleNumber: 'MH12UM4494'
+  },
+  {
+    id: 'out_jk_24461_2',
+    outwardNumber: '24461',
+    outwardDate: new Date('2026-01-04'),
+    clientId: 'cust_01',
+    inwardNumber: '07218',
+    itemName: 'JWARI',
+    brand: 'KISAN HIRVA',
+    quantity: 51,
+    weight: 1530.00,
+    driverName: 'CHORGHE',
+    vehicleNumber: 'MH12UM4494'
+  },
+  {
+    id: 'out_jk_24529_1',
+    outwardNumber: '24529',
+    outwardDate: new Date('2026-01-07'),
+    clientId: 'cust_01',
+    inwardNumber: '07160',
+    itemName: 'JWARI',
+    brand: 'LAL KISAN',
+    quantity: 167,
+    weight: 5010.00,
+    driverName: 'CHORGHE',
+    vehicleNumber: 'MH12UM4494'
+  },
+  {
+    id: 'out_jk_24529_2',
+    outwardNumber: '24529',
+    outwardDate: new Date('2026-01-07'),
+    clientId: 'cust_01',
+    inwardNumber: '07120',
+    itemName: 'JWARI',
+    brand: 'LAL KISAN',
+    quantity: 50,
+    weight: 1500.00,
+    driverName: 'CHORGHE',
+    vehicleNumber: 'MH12UM4494'
+  },
+  {
+    id: 'out_jk_24530_1',
+    outwardNumber: '24530',
+    outwardDate: new Date('2026-01-07'),
+    clientId: 'cust_01',
+    inwardNumber: '07120',
+    itemName: 'JWARI',
+    brand: 'LAL OM',
+    quantity: 56,
+    weight: 1680.00,
+    driverName: 'CHORGHE',
+    vehicleNumber: 'MH12 AQ4494'
+  },
+  {
+    id: 'out_jk_24530_2',
+    outwardNumber: '24530',
+    outwardDate: new Date('2026-01-07'),
+    clientId: 'cust_01',
+    inwardNumber: '07110',
+    itemName: 'JWARI',
+    brand: 'LAL OM',
+    quantity: 44,
+    weight: 1320.00,
+    driverName: 'CHORGHE',
+    vehicleNumber: 'MH12 AQ4494'
+  },
+  {
+    id: 'out_jk_24555',
+    outwardNumber: '24555',
+    outwardDate: new Date('2026-01-09'),
+    clientId: 'cust_01',
+    inwardNumber: '06872',
+    itemName: 'JWARI',
+    brand: 'RAJHANS',
+    quantity: 101,
+    weight: 3030.00,
+    driverName: 'CHORGHE',
+    vehicleNumber: 'MH12 UM4494'
+  },
+  {
+    id: 'out_jk_24588',
+    outwardNumber: '24588',
+    outwardDate: new Date('2026-01-11'),
+    clientId: 'cust_01',
+    inwardNumber: '07110',
+    itemName: 'JWARI',
+    brand: 'DUBBLE',
+    quantity: 50,
+    weight: 1500.00,
+    driverName: 'CHORGHE',
+    vehicleNumber: 'MH12 UM4494'
+  },
+  {
+    id: 'out_jk_24630',
+    outwardNumber: '24630',
+    outwardDate: new Date('2026-01-13'),
+    clientId: 'cust_01',
+    inwardNumber: '07200',
+    itemName: 'JWARI',
+    brand: '5 STAR',
+    quantity: 127,
+    weight: 3810.00,
+    driverName: 'CHORGHE',
+    vehicleNumber: 'MH12 EF5808'
+  },
+  {
+    id: 'out_jk_24693',
+    outwardNumber: '24693',
+    outwardDate: new Date('2026-01-18'),
+    clientId: 'cust_01',
+    inwardNumber: '07242',
+    itemName: 'BAJARI',
+    brand: 'HIGH CHOICE',
+    quantity: 100,
+    weight: 3000.00,
+    driverName: 'CHORGHE',
+    vehicleNumber: 'MH12 UM4494'
+  },
+  {
+    id: 'out_jk_24718',
+    outwardNumber: '24718',
+    outwardDate: new Date('2026-01-19'),
+    clientId: 'cust_01',
+    inwardNumber: '07242',
+    itemName: 'BAJARI',
+    brand: 'HIGH CHOICE',
+    quantity: 50,
+    weight: 1500.00,
+    driverName: 'CHORGHE',
+    vehicleNumber: 'MH12 UM4494'
+  },
+  {
+    id: 'out_jk_24918_1',
+    outwardNumber: '24918',
+    outwardDate: new Date('2026-01-30'),
+    clientId: 'cust_01',
+    inwardNumber: '06863',
+    itemName: 'JWARI',
+    brand: 'RAJHANS LAL',
+    quantity: 50,
+    weight: 1500.00,
+    driverName: 'CHORGHE',
+    vehicleNumber: 'MH12 XK4494'
+  },
+  {
+    id: 'out_jk_24918_2',
+    outwardNumber: '24918',
+    outwardDate: new Date('2026-01-30'),
+    clientId: 'cust_01',
+    inwardNumber: '07242',
+    itemName: 'BAJARI',
+    brand: 'RAJHANS LAL',
+    quantity: 70,
+    weight: 2100.00,
+    driverName: 'CHORGHE',
+    vehicleNumber: 'MH12 XK4494'
   }
 ];
 
