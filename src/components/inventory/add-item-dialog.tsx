@@ -40,7 +40,7 @@ export function AddItemDialog({ onItemAdded, item, trigger }: AddItemDialogProps
   const [description, setDescription] = useState('');
   const [rentalRate, setRentalRate] = useState('');
   const [inwardQuantity, setInwardQuantity] = useState('');
-  const [outwardQuantity, setOutwardQuantity] =('0');
+  const [outwardQuantity, setOutwardQuantity] = useState('0');
   const [unit, setUnit] = useState<RentalItem['unit']>('boxes');
   const [inwardWeight, setInwardWeight] = useState('');
   const [outwardWeight, setOutwardWeight] = useState('0');
@@ -106,7 +106,7 @@ export function AddItemDialog({ onItemAdded, item, trigger }: AddItemDialogProps
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!vendorId || !clientId || !storageDate) return;
+    if (!clientId || !storageDate) return;
 
     const inQty = parseInt(inwardQuantity) || 0;
     const outQty = parseInt(outwardQuantity) || 0;
@@ -135,7 +135,7 @@ export function AddItemDialog({ onItemAdded, item, trigger }: AddItemDialogProps
       temperatureRange: 'Frozen',
       images: [],
       rentalCycles: ['monthly'],
-      vendorId,
+      vendorId: vendorId || 'vendor_03',
       clientId,
       chamberId,
       driverName,
