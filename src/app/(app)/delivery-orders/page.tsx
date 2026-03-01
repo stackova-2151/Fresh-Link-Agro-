@@ -5,8 +5,8 @@ import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { deliveryOrders, clients } from "@/lib/data";
-import { ClipboardList, Printer, Eye, MoreHorizontal, PlusCircle } from "lucide-react";
+import { deliveryOrders as initialOrders, clients } from "@/lib/data";
+import { ClipboardList, Printer, Eye, MoreHorizontal } from "lucide-react";
 import { format } from "date-fns";
 import { useRouter } from 'next/navigation';
 import {
@@ -16,21 +16,25 @@ import {
     DropdownMenuLabel,
     DropdownMenuTrigger,
   } from "@/components/ui/dropdown-menu";
+import { AddDeliveryOrderDialog } from '@/components/delivery-orders/add-delivery-order-dialog';
+import { DeliveryOrder } from '@/lib/types';
 
 export default function DeliveryOrdersPage() {
-    const [orders] = useState(deliveryOrders);
+    const [orders, setOrders] = useState<DeliveryOrder[]>(initialOrders);
     const router = useRouter();
 
     const getClientName = (clientId: string) => {
         return clients.find(c => c.id === clientId)?.name || 'Unknown Client';
     };
 
+    const handleAddOrder = (newOrder: DeliveryOrder) => {
+        setOrders(prev => [newOrder, ...prev]);
+    };
+
     return (
         <div className="space-y-6">
             <PageHeader title="Delivery Orders" description="Manage and print official delivery orders for stock release.">
-                <Button>
-                    <PlusCircle className="mr-2 h-4 w-4" /> New Delivery Order
-                </Button>
+                <AddDeliveryOrderDialog onOrderAdded={handleAddOrder} />
             </PageHeader>
 
             <Card>
@@ -55,7 +59,7 @@ export default function DeliveryOrdersPage() {
                             {orders.map((order) => (
                                 <TableRow key={order.id}>
                                     <TableCell className="font-mono font-bold">{order.orderNumber}</TableCell>
-                                    <TableCell>{format(order.date, 'dd.MM.yyyy')}</TableCell>
+                                    <TableCell>{format(new Date(order.date), 'dd.MM.yyyy')}</TableCell>
                                     <TableCell className="font-medium">{getClientName(order.clientId)}</TableCell>
                                     <TableCell>{order.driverName}</TableCell>
                                     <TableCell className="font-mono">{order.vehicleNumber}</TableCell>

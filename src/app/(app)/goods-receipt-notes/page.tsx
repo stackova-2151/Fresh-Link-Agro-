@@ -5,8 +5,8 @@ import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { goodsReceiptNotes, clients } from "@/lib/data";
-import { Receipt, Printer, Eye, MoreHorizontal, PlusCircle } from "lucide-react";
+import { goodsReceiptNotes as initialNotes, clients } from "@/lib/data";
+import { Printer, Eye, MoreHorizontal } from "lucide-react";
 import { format } from "date-fns";
 import { useRouter } from 'next/navigation';
 import {
@@ -16,21 +16,25 @@ import {
     DropdownMenuLabel,
     DropdownMenuTrigger,
   } from "@/components/ui/dropdown-menu";
+import { AddGRNDialog } from '@/components/goods-receipt-notes/add-grn-dialog';
+import { GoodsReceiptNote } from '@/lib/types';
 
 export default function GoodsReceiptNotesPage() {
-    const [notes] = useState(goodsReceiptNotes);
+    const [notes, setNotes] = useState<GoodsReceiptNote[]>(initialNotes);
     const router = useRouter();
 
     const getClientName = (clientId: string) => {
         return clients.find(c => c.id === clientId)?.name || 'Unknown Client';
     };
 
+    const handleAddGRN = (newNote: GoodsReceiptNote) => {
+        setNotes(prev => [newNote, ...prev]);
+    };
+
     return (
         <div className="space-y-6">
             <PageHeader title="Goods Receipt Notes" description="View and manage official GRNs for inward stock.">
-                <Button>
-                    <PlusCircle className="mr-2 h-4 w-4" /> New GRN
-                </Button>
+                <AddGRNDialog onGRNAdded={handleAddGRN} />
             </PageHeader>
 
             <Card>
@@ -55,7 +59,7 @@ export default function GoodsReceiptNotesPage() {
                             {notes.map((note) => (
                                 <TableRow key={note.id}>
                                     <TableCell className="font-mono font-bold">{note.inwardNumber}</TableCell>
-                                    <TableCell>{format(note.date, 'dd.MM.yyyy')}</TableCell>
+                                    <TableCell>{format(new Date(note.date), 'dd.MM.yyyy')}</TableCell>
                                     <TableCell className="font-medium">{getClientName(note.clientId)}</TableCell>
                                     <TableCell>{note.driverName}</TableCell>
                                     <TableCell className="font-mono">{note.vehicleNumber}</TableCell>
