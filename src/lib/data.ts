@@ -20,22 +20,102 @@ export const clients: Client[] = [
 
 export const rentalItems: RentalItem[] = [
   {
-    id: 'item_sheetal_01',
+    id: 'item_sheetal_07362',
+    inwardNumber: '07362',
+    name: 'WHIIP CREAM',
+    brand: 'DECOR',
+    batchNumber: '',
+    category: 'Dairy',
+    description: 'Cold storage',
+    rentalRate: 1.5,
+    rentalCycles: ['monthly'],
+    inwardQuantity: 5,
+    outwardQuantity: 0,
+    quantityAvailable: 5,
+    unit: 'boxes',
+    inwardWeight: 60.00,
+    outwardWeight: 0.00,
+    balanceWeight: 60.00,
+    expiryDate: new Date('2026-12-31'),
+    storageDate: new Date('2025-07-07'),
+    temperatureRange: '-18°C',
+    vendorId: 'vendor_03',
+    clientId: 'cust_03',
+    chamberId: 'chamber_01',
+    driverName: 'UNKNOWN',
+    vehicleNumber: 'UNKNOWN',
+    images: [],
+    condition: 'New'
+  },
+  {
+    id: 'item_sheetal_07994',
+    inwardNumber: '07994',
+    name: 'WHIIP CREAM',
+    brand: 'PEARL',
+    batchNumber: '',
+    category: 'Dairy',
+    description: 'Cold storage',
+    rentalRate: 1.5,
+    rentalCycles: ['monthly'],
+    inwardQuantity: 3,
+    outwardQuantity: 3,
+    quantityAvailable: 0,
+    unit: 'boxes',
+    inwardWeight: 36.00,
+    outwardWeight: 36.00,
+    balanceWeight: 0.00,
+    expiryDate: new Date('2026-12-31'),
+    storageDate: new Date('2025-11-23'),
+    temperatureRange: '-18°C',
+    vendorId: 'vendor_03',
+    clientId: 'cust_03',
+    chamberId: 'chamber_01',
+    images: [],
+    condition: 'New'
+  },
+  {
+    id: 'item_sheetal_08152',
+    inwardNumber: '08152',
+    name: 'WHIIP CREAM',
+    brand: 'PEARL',
+    batchNumber: '',
+    category: 'Dairy',
+    description: 'Cold storage',
+    rentalRate: 1.5,
+    rentalCycles: ['monthly'],
+    inwardQuantity: 30,
+    outwardQuantity: 30,
+    quantityAvailable: 0,
+    unit: 'boxes',
+    inwardWeight: 360.00,
+    outwardWeight: 360.00,
+    balanceWeight: 0.00,
+    expiryDate: new Date('2026-12-31'),
+    storageDate: new Date('2025-12-26'),
+    temperatureRange: '-18°C',
+    vendorId: 'vendor_03',
+    clientId: 'cust_03',
+    chamberId: 'chamber_01',
+    images: [],
+    condition: 'New'
+  },
+  {
+    id: 'item_sheetal_08213',
     inwardNumber: '08213',
     name: 'WHIIP CREAM',
     brand: 'DECOR',
     batchNumber: 'BATCH-A1',
     category: 'Dairy',
-    description: 'Cold storage required',
-    rentalRate: 2.5,
+    description: 'Cold storage',
+    rentalRate: 1.5,
     rentalCycles: ['monthly'],
     inwardQuantity: 100,
-    outwardQuantity: 0,
-    quantityAvailable: 100,
+    outwardQuantity: 100,
+    quantityAvailable: 0,
     unit: 'boxes',
     inwardWeight: 1200.00,
-    outwardWeight: 0.00,
-    balanceWeight: 1200.00,
+    outwardWeight: 1200.00,
+    balanceWeight: 0.00,
     expiryDate: new Date('2026-12-31'),
     storageDate: new Date('2026-01-09'),
     temperatureRange: '-18°C',
@@ -47,7 +127,33 @@ export const rentalItems: RentalItem[] = [
     images: [],
     condition: 'New'
   },
-  // JK TRADING COMPANY ITEMS from Invoice 02151
+  {
+    id: 'item_sheetal_08213_choco',
+    inwardNumber: '08213',
+    name: 'CHOCO TRAPHAL',
+    brand: 'DECOR',
+    batchNumber: '',
+    category: 'Dairy',
+    description: 'Cold storage',
+    rentalRate: 1.5,
+    rentalCycles: ['monthly'],
+    inwardQuantity: 20,
+    outwardQuantity: 0,
+    quantityAvailable: 20,
+    unit: 'boxes',
+    inwardWeight: 240.00,
+    outwardWeight: 0.00,
+    balanceWeight: 240.00,
+    expiryDate: new Date('2026-12-31'),
+    storageDate: new Date('2026-01-09'),
+    temperatureRange: '-18°C',
+    vendorId: 'vendor_03',
+    clientId: 'cust_03',
+    chamberId: 'chamber_01',
+    images: [],
+    condition: 'New'
+  },
+  // JK TRADING COMPANY ITEMS
   {
     id: 'jk_06840',
     inwardNumber: '06840',
@@ -125,32 +231,6 @@ export const rentalItems: RentalItem[] = [
     chamberId: 'chamber_01',
     images: [],
     condition: 'New'
-  },
-  {
-    id: 'jk_07106',
-    inwardNumber: '07106',
-    name: 'WHEAT',
-    brand: 'LOCAL',
-    batchNumber: 'W-01',
-    category: 'Grains',
-    description: 'Storage Item',
-    rentalRate: 0.45,
-    rentalCycles: ['monthly'],
-    inwardQuantity: 20,
-    outwardQuantity: 0,
-    quantityAvailable: 20,
-    unit: 'bags',
-    inwardWeight: 600.00,
-    outwardWeight: 0,
-    balanceWeight: 600.00,
-    expiryDate: new Date('2026-12-31'),
-    storageDate: new Date('2025-05-21'),
-    temperatureRange: 'Ambient',
-    vendorId: 'vendor_01',
-    clientId: 'cust_01',
-    chamberId: 'chamber_01',
-    images: [],
-    condition: 'New'
   }
 ];
 
@@ -180,25 +260,12 @@ export const outwardEntries: OutwardEntry[] = [
     weight: 36.00,
     driverName: 'AKSHAY',
     vehicleNumber: 'MH12TN5281'
-  },
-  {
-    id: 'out_jk_01',
-    outwardNumber: 'JK-OUT-01',
-    outwardDate: new Date('2026-01-30'),
-    clientId: 'cust_01',
-    inwardNumber: '06863',
-    itemName: 'JWARI',
-    brand: 'MANIK',
-    quantity: 50,
-    weight: 1500.00,
-    driverName: 'UNKNOWN',
-    vehicleNumber: 'UNKNOWN'
   }
 ];
 
 export const deliveryOrders: DeliveryOrder[] = [
   {
-    id: 'do_03',
+    id: 'do_24421',
     orderNumber: '24421',
     date: new Date('2026-01-02'),
     clientId: 'cust_03',
@@ -222,7 +289,7 @@ export const deliveryOrders: DeliveryOrder[] = [
     ]
   },
   {
-    id: 'do_02',
+    id: 'do_24638',
     orderNumber: '24638',
     date: new Date('2026-01-14'),
     clientId: 'cust_03',
@@ -294,6 +361,26 @@ export const gatePasses: GatePass[] = [];
 
 export const invoices: Invoice[] = [
     {
+        id: 'inv_02163',
+        invoiceNumber: '02163',
+        clientId: 'cust_03',
+        date: new Date('2026-02-05'),
+        dueDate: new Date('2026-02-20'),
+        items: [
+            { itemId: 'item_sheetal_07362', name: 'WHIIP CREAM (DECOR)', quantity: 5, rate: 1500, amount: 90 },
+            { itemId: 'item_sheetal_07994', name: 'WHIIP CREAM (PEARL)', quantity: 3, rate: 1500, amount: 54 },
+            { itemId: 'item_sheetal_08152', name: 'WHIIP CREAM (PEARL)', quantity: 30, rate: 1500, amount: 540 },
+            { itemId: 'item_sheetal_08213', name: 'WHIIP CREAM (DECOR)', quantity: 100, rate: 1500, amount: 1800 },
+            { itemId: 'item_sheetal_08213_choco', name: 'CHOCO TRAPHAL (DECOR)', quantity: 20, rate: 1500, amount: 360 },
+        ],
+        subtotal: 3576.56, // Taxable amount
+        tax: 643.78, // 321.89 + 321.89
+        total: 4220,
+        paidAmount: 0,
+        balance: 4220,
+        status: 'Pending'
+    },
+    {
         id: 'inv_jk_02151',
         invoiceNumber: '02151',
         clientId: 'cust_01',
@@ -310,22 +397,6 @@ export const invoices: Invoice[] = [
         total: 4571.91,
         paidAmount: 0,
         balance: 4571.91,
-        status: 'Pending'
-    },
-    {
-        id: 'inv_01',
-        invoiceNumber: 'INV-2026-001',
-        clientId: 'cust_03',
-        date: new Date('2026-01-31'),
-        dueDate: new Date('2026-02-15'),
-        items: [
-            { itemId: 'item_sheetal_01', name: 'Storage: WHIIP CREAM', quantity: 100, rate: 2.5, amount: 7500 },
-        ],
-        subtotal: 9300,
-        tax: 1674,
-        total: 10974,
-        paidAmount: 0,
-        balance: 10974,
         status: 'Pending'
     }
 ];
