@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
-import { rentalItems as initialRentalItems, clients } from "@/lib/data";
+import { rentalItems as initialRentalItems, clients, chambers } from "@/lib/data";
 import { PlusCircle, Search, ChevronDown, MoreHorizontal, FileDown, Printer } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -85,39 +85,43 @@ export default function InventoryPage() {
         setOpenCollapsibles(prev => prev.includes(id) ? prev.filter(pId => pId !== id) : [...prev, id]);
     }
 
+    const getChamberName = (id?: string) => {
+        return chambers.find(c => c.id === id)?.name || 'N/A';
+    };
+
     return (
         <div className="space-y-6">
-            <PageHeader title="Inward Register" description="Detailed log of all inward stock entries as per cold storage standards.">
-                <div className="flex gap-2">
-                    <Button variant="outline"><Printer className="mr-2 h-4 w-4" /> Print Register</Button>
+            <PageHeader title="Stock Report (Chamberwise)" description="Detailed inventory tracking with real-time inward, outward and balance reconciliation.">
+                <div className="flex gap-2 print:hidden">
+                    <Button variant="outline" onClick={() => window.print()}><Printer className="mr-2 h-4 w-4" /> Print Register</Button>
                     <Button variant="outline"><FileDown className="mr-2 h-4 w-4" /> Export CSV</Button>
                     <AddItemDialog onItemAdded={handleItemAdded} />
                 </div>
             </PageHeader>
-            <Card>
-                <CardHeader>
-                    <CardTitle>Register Search</CardTitle>
-                    <CardDescription>Search by Inward No, Customer, Item, Brand or Vehicle Number.</CardDescription>
-                    <div className="relative pt-2">
+            <Card className="print:shadow-none print:border-none">
+                <CardHeader className="print:pb-0 print:text-center">
+                    <CardTitle className="font-headline text-xl">FRESH LINK AGRO COLD STORAGE PVT. LTD.</CardTitle>
+                    <CardDescription className="font-bold text-slate-800">CUSTOMER STOCK REPORT CHAMBERWISE AS ON DATE {now?.toLocaleDateString()}</CardDescription>
+                    <div className="relative pt-2 print:hidden">
                         <Search className="absolute left-2.5 top-4.5 h-4 w-4 text-muted-foreground" />
                         <Input 
-                            placeholder="Type to search entries..." 
+                            placeholder="Search by Inw No, Brand, or Item..." 
                             className="pl-8" 
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
                     </div>
                 </CardHeader>
-                <CardContent>
-                    <div className="space-y-4">
+                <CardContent className="print:p-0">
+                    <div className="space-y-8">
                     {itemsByClient.map(clientData => (
                         <Collapsible 
                             key={clientData.id} 
                             open={openCollapsibles.includes(clientData.id)}
                             onOpenChange={() => toggleCollapsible(clientData.id)}
-                            className="border rounded-lg overflow-hidden"
+                            className="border rounded-lg overflow-hidden print:border-none"
                         >
-                            <CollapsibleTrigger className="w-full">
+                            <CollapsibleTrigger className="w-full print:hidden">
                                 <div className="flex items-center justify-between p-4 bg-slate-50 hover:bg-slate-100 transition-colors">
                                     <div className="flex items-center gap-3">
                                         <Badge className="bg-primary">{clientData.name}</Badge>
@@ -126,22 +130,28 @@ export default function InventoryPage() {
                                     <ChevronDown className={cn("h-5 w-5 transition-transform duration-200", openCollapsibles.includes(clientData.id) && "rotate-180")} />
                                 </div>
                             </CollapsibleTrigger>
-                            <CollapsibleContent>
+                            <CollapsibleContent className="data-[state=open]:block">
+                                <div className="p-4 bg-slate-50/50 hidden print:block border-b font-bold uppercase text-sm">
+                                    Customer: {clientData.name}
+                                </div>
                                 <div className="overflow-x-auto">
-                                <Table>
+                                <Table className="print:text-[10px]">
                                     <TableHeader>
                                         <TableRow className="bg-slate-100/50">
-                                            <TableHead className="w-[80px]">Inw.No</TableHead>
-                                            <TableHead>Inw.Date</TableHead>
-                                            <TableHead>Item Description</TableHead>
-                                            <TableHead>Brand</TableHead>
-                                            <TableHead>Batch #</TableHead>
-                                            <TableHead className="text-right">Inw.Qty</TableHead>
-                                            <TableHead className="text-right">Inw.Weight</TableHead>
-                                            <TableHead>Driver Name</TableHead>
-                                            <TableHead>Vehicle No.</TableHead>
-                                            <TableHead className="text-right">Bal.Days</TableHead>
-                                            <TableHead className="text-right">Actions</TableHead>
+                                            <TableHead className="w-[80px] border">Inw.No</TableHead>
+                                            <TableHead className="border">Inw.Date</TableHead>
+                                            <TableHead className="border">Chamber</TableHead>
+                                            <TableHead className="border">Item Description</TableHead>
+                                            <TableHead className="border">Brand</TableHead>
+                                            <TableHead className="border">Batch #</TableHead>
+                                            <TableHead className="text-right border">Inw.Qty</TableHead>
+                                            <TableHead className="text-right border">Out.Qty</TableHead>
+                                            <TableHead className="text-right border">Bal.Qty</TableHead>
+                                            <TableHead className="text-right border">Inw.Weight</TableHead>
+                                            <TableHead className="text-right border">Out.Weight</TableHead>
+                                            <TableHead className="text-right border">Bal.Weight</TableHead>
+                                            <TableHead className="text-right border">Bal.Day</TableHead>
+                                            <TableHead className="text-right border print:hidden">Actions</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -149,18 +159,21 @@ export default function InventoryPage() {
                                             const daysStored = now ? differenceInDays(now, item.storageDate) : 0;
 
                                             return (
-                                                <TableRow key={item.id} className="group">
-                                                    <TableCell className="font-mono text-xs">{item.inwardNumber}</TableCell>
-                                                    <TableCell className="whitespace-nowrap">{new Date(item.storageDate).toLocaleDateString()}</TableCell>
-                                                    <TableCell className="font-medium">{item.name}</TableCell>
-                                                    <TableCell><Badge variant="outline">{item.brand}</Badge></TableCell>
-                                                    <TableCell className="font-mono text-xs">{item.batchNumber}</TableCell>
-                                                    <TableCell className="text-right">{item.inwardQuantity} {item.unit}</TableCell>
-                                                    <TableCell className="text-right">{item.inwardWeight.toFixed(2)}</TableCell>
-                                                    <TableCell className="text-muted-foreground">{item.driverName || 'N/A'}</TableCell>
-                                                    <TableCell className="font-mono text-xs">{item.vehicleNumber || 'N/A'}</TableCell>
-                                                    <TableCell className="text-right font-semibold text-primary">{daysStored}</TableCell>
-                                                    <TableCell className="text-right">
+                                                <TableRow key={item.id} className="hover:bg-transparent">
+                                                    <TableCell className="font-mono text-[10px] border">{item.inwardNumber}</TableCell>
+                                                    <TableCell className="whitespace-nowrap border">{new Date(item.storageDate).toLocaleDateString()}</TableCell>
+                                                    <TableCell className="border">{getChamberName(item.chamberId)}</TableCell>
+                                                    <TableCell className="font-medium border">{item.name}</TableCell>
+                                                    <TableCell className="border font-bold">{item.brand}</TableCell>
+                                                    <TableCell className="font-mono text-[10px] border">{item.batchNumber || '-'}</TableCell>
+                                                    <TableCell className="text-right border">{item.inwardQuantity}</TableCell>
+                                                    <TableCell className="text-right border">{item.outwardQuantity || '0'}</TableCell>
+                                                    <TableCell className="text-right font-bold border">{item.quantityAvailable}</TableCell>
+                                                    <TableCell className="text-right border">{item.inwardWeight.toFixed(2)}</TableCell>
+                                                    <TableCell className="text-right border">{item.outwardWeight.toFixed(2)}</TableCell>
+                                                    <TableCell className="text-right font-bold border">{item.balanceWeight.toFixed(2)}</TableCell>
+                                                    <TableCell className="text-right font-semibold text-primary border">{daysStored}</TableCell>
+                                                    <TableCell className="text-right border print:hidden">
                                                         <DropdownMenu>
                                                             <DropdownMenuTrigger asChild>
                                                             <Button variant="ghost" className="h-8 w-8 p-0">
@@ -182,39 +195,18 @@ export default function InventoryPage() {
                                     </TableBody>
                                     <TableFooter className="bg-slate-50 font-headline">
                                         <TableRow>
-                                            <TableCell colSpan={5} className="text-right font-bold py-4">CUSTOMER SUMMARY FOR {clientData.name}:</TableCell>
-                                            <TableCell className="text-right text-sm">
-                                                <div className="font-bold">Total Inward: {clientData.summary.totalInQty}</div>
-                                                <div className="text-xs text-muted-foreground">Total Outward: {clientData.summary.totalOutQty}</div>
-                                                <div className="text-primary mt-1">Total Balance: {clientData.summary.totalBalQty}</div>
-                                            </TableCell>
-                                            <TableCell className="text-right text-sm">
-                                                <div className="font-bold">{clientData.summary.totalInWt.toFixed(2)} kg</div>
-                                                <div className="text-xs text-muted-foreground">{clientData.summary.totalOutWt.toFixed(2)} kg</div>
-                                                <div className="text-primary mt-1">{clientData.summary.totalBalWt.toFixed(2)} kg</div>
-                                            </TableCell>
-                                            <TableCell colSpan={4} />
+                                            <TableCell colSpan={6} className="text-right font-bold border py-4 uppercase">Total</TableCell>
+                                            <TableCell className="text-right font-bold border">{clientData.summary.totalInQty}</TableCell>
+                                            <TableCell className="text-right font-bold border">{clientData.summary.totalOutQty}</TableCell>
+                                            <TableCell className="text-right font-bold border text-primary">{clientData.summary.totalBalQty}</TableCell>
+                                            <TableCell className="text-right font-bold border">{clientData.summary.totalInWt.toFixed(2)}</TableCell>
+                                            <TableCell className="text-right font-bold border">{clientData.summary.totalOutWt.toFixed(2)}</TableCell>
+                                            <TableCell className="text-right font-bold border text-primary">{clientData.summary.totalBalWt.toFixed(2)}</TableCell>
+                                            <TableCell colSpan={2} className="border print:hidden" />
+                                            <TableCell className="border hidden print:table-cell" />
                                         </TableRow>
                                     </TableFooter>
                                 </Table>
-                                </div>
-                                <div className="p-6 bg-slate-50/30 grid grid-cols-2 md:grid-cols-4 gap-4 border-t">
-                                    <div className="space-y-1">
-                                        <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider">Opening Stock</p>
-                                        <p className="text-lg font-headline">38 / 456.00</p>
-                                    </div>
-                                    <div className="space-y-1">
-                                        <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider">Total Inward</p>
-                                        <p className="text-lg font-headline text-green-600">{clientData.summary.totalInQty} / {clientData.summary.totalInWt.toFixed(2)}</p>
-                                    </div>
-                                    <div className="space-y-1">
-                                        <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider">Total Outward</p>
-                                        <p className="text-lg font-headline text-red-600">{clientData.summary.totalOutQty} / {clientData.summary.totalOutWt.toFixed(2)}</p>
-                                    </div>
-                                    <div className="space-y-1">
-                                        <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider">Total Balance</p>
-                                        <p className="text-lg font-headline text-primary font-bold">{clientData.summary.totalBalQty} / {clientData.summary.totalBalWt.toFixed(2)}</p>
-                                    </div>
                                 </div>
                             </CollapsibleContent>
                         </Collapsible>
@@ -222,6 +214,17 @@ export default function InventoryPage() {
                     </div>
                 </CardContent>
             </Card>
+
+            <style jsx global>{`
+                @media print {
+                    body { background: white !important; }
+                    .print\\:hidden { display: none !important; }
+                    header, footer, nav, aside { display: none !important; }
+                    main { padding: 0 !important; margin: 0 !important; width: 100% !important; }
+                    .card { border: none !important; box-shadow: none !important; }
+                    @page { margin: 1cm; size: landscape; }
+                }
+            `}</style>
         </div>
     );
 }
