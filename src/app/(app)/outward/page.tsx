@@ -15,7 +15,7 @@ import { AddOutwardDialog } from "@/components/outward/add-outward-dialog";
 import { OutwardEntry } from "@/lib/types";
 
 export default function OutwardRegisterPage() {
-    const { user } = userUser();
+    const { user } = useUser();
     const [entries, setEntries] = useState<OutwardEntry[]>(initialOutwardEntries);
     const [searchTerm, setSearchTerm] = useState("");
 
@@ -146,9 +146,4 @@ export default function OutwardRegisterPage() {
             `}</style>
         </div>
     );
-}
-
-function userUser() {
-    const { useUser } = require('@/context/user-context');
-    return useUser();
 }

@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { PageHeader } from "@/components/page-header";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { goodsReceiptNotes as initialNotes, clients } from "@/lib/data";
@@ -84,6 +83,13 @@ export default function GoodsReceiptNotesPage() {
                                     </TableCell>
                                 </TableRow>
                             ))}
+                            {notes.length === 0 && (
+                                <TableRow>
+                                    <TableCell colSpan={7} className="text-center py-10 text-muted-foreground">
+                                        No goods receipt notes found.
+                                    </TableCell>
+                                </TableRow>
+                            )}
                         </TableBody>
                     </Table>
                 </CardContent>
