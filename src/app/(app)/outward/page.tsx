@@ -7,27 +7,34 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
 import { outwardEntries as initialOutwardEntries, clients } from "@/lib/data";
-import { Search, Printer, FileDown, PlusCircle } from "lucide-react";
+import { Search, Printer, FileDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useUser } from "@/context/user-context";
 import { format } from "date-fns";
+import { AddOutwardDialog } from "@/components/outward/add-outward-dialog";
+import { OutwardEntry } from "@/lib/types";
 
 export default function OutwardRegisterPage() {
-    const { user } = useUser();
+    const { user } = userUser();
+    const [entries, setEntries] = useState<OutwardEntry[]>(initialOutwardEntries);
     const [searchTerm, setSearchTerm] = useState("");
 
     const filteredEntries = useMemo(() => {
-        if (!searchTerm) return initialOutwardEntries;
-        return initialOutwardEntries.filter(entry => 
-            entry.outwardNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            entry.itemName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            entry.driverName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            entry.vehicleNumber.toLowerCase().includes(searchTerm.toLowerCase())
-        );
-    }, [searchTerm]);
+        let filtered = entries;
+        if (searchTerm) {
+            filtered = entries.filter(entry => 
+                entry.outwardNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                entry.itemName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                entry.driverName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                entry.vehicleNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                (clients.find(c => c.id === entry.clientId)?.name || '').toLowerCase().includes(searchTerm.toLowerCase())
+            );
+        }
+        return [...filtered].sort((a, b) => b.outwardDate.getTime() - a.outwardDate.getTime());
+    }, [entries, searchTerm]);
 
     const getClientName = (clientId: string) => {
-        return clients.find(c => c.id === clientId)?.name || 'SHEETAL';
+        return clients.find(c => c.id === clientId)?.name || 'Unknown';
     };
 
     const totalQty = filteredEntries.reduce((acc, curr) => acc + curr.quantity, 0);
@@ -35,6 +42,10 @@ export default function OutwardRegisterPage() {
 
     const handlePrint = () => {
         window.print();
+    };
+
+    const handleAddOutward = (newEntry: OutwardEntry) => {
+        setEntries(prev => [newEntry, ...prev]);
     };
 
     return (
@@ -49,9 +60,7 @@ export default function OutwardRegisterPage() {
                     <Button onClick={handlePrint} variant="outline">
                         <Printer className="mr-2 h-4 w-4" /> Print Register
                     </Button>
-                    <Button>
-                        <PlusCircle className="mr-2 h-4 w-4" /> New Outward
-                    </Button>
+                    <AddOutwardDialog onOutwardAdded={handleAddOutward} />
                 </div>
             </PageHeader>
 
@@ -61,7 +70,7 @@ export default function OutwardRegisterPage() {
                         <div>
                             <CardTitle className="font-headline text-xl">FRESH LINK AGRO COLD STORAGE PVT. LTD.</CardTitle>
                             <CardDescription className="font-bold text-slate-800">OUTWARD REGISTER</CardDescription>
-                            <p className="text-xs text-muted-foreground">FROM DATE : 01.01.2026 to 31.01.2026</p>
+                            <p className="text-xs text-muted-foreground">AS ON DATE : {format(new Date(), 'dd.MM.yyyy')}</p>
                         </div>
                         <div className="relative pt-2 w-72 print:hidden">
                             <Search className="absolute left-2.5 top-4.5 h-4 w-4 text-muted-foreground" />
@@ -101,10 +110,17 @@ export default function OutwardRegisterPage() {
                                     <TableCell className="border"><Badge variant="outline" className="rounded-none font-bold text-[9px]">{entry.brand}</Badge></TableCell>
                                     <TableCell className="border text-right">{entry.quantity}</TableCell>
                                     <TableCell className="border text-right">{entry.weight.toFixed(2)}</TableCell>
-                                    <TableCell className="border">{entry.driverName}</TableCell>
-                                    <TableCell className="border font-mono">{entry.vehicleNumber}</TableCell>
+                                    <TableCell className="border uppercase">{entry.driverName}</TableCell>
+                                    <TableCell className="border font-mono uppercase">{entry.vehicleNumber}</TableCell>
                                 </TableRow>
                             ))}
+                            {filteredEntries.length === 0 && (
+                                <TableRow>
+                                    <TableCell colSpan={10} className="text-center py-10 text-muted-foreground">
+                                        No outward entries found.
+                                    </TableCell>
+                                </TableRow>
+                            )}
                         </TableBody>
                         <TableFooter className="bg-slate-100/50">
                             <TableRow>
@@ -130,4 +146,9 @@ export default function OutwardRegisterPage() {
             `}</style>
         </div>
     );
+}
+
+function userUser() {
+    const { useUser } = require('@/context/user-context');
+    return useUser();
 }
