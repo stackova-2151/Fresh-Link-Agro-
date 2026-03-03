@@ -48,6 +48,8 @@ export function AddItemDialog({ onItemAdded, item, trigger }: AddItemDialogProps
   const [vendorId, setVendorId] = useState('');
   const [clientId, setClientId] = useState('');
   const [chamberId, setChamberId] = useState('');
+  const [block, setBlock] = useState('');
+  const [zone, setZone] = useState('');
   const [driverName, setDriverName] = useState('');
   const [vehicleNumber, setVehicleNumber] = useState('');
 
@@ -69,6 +71,8 @@ export function AddItemDialog({ onItemAdded, item, trigger }: AddItemDialogProps
         setVendorId(item.vendorId);
         setClientId(item.clientId);
         setChamberId(item.chamberId || '');
+        setBlock(item.block || '');
+        setZone(item.zone || '');
         setDriverName(item.driverName || '');
         setVehicleNumber(item.vehicleNumber || '');
     } else if (!item && open) {
@@ -93,6 +97,8 @@ export function AddItemDialog({ onItemAdded, item, trigger }: AddItemDialogProps
     setVendorId('');
     setClientId('');
     setChamberId('');
+    setBlock('');
+    setZone('');
     setDriverName('');
     setVehicleNumber('');
   }
@@ -138,6 +144,8 @@ export function AddItemDialog({ onItemAdded, item, trigger }: AddItemDialogProps
       vendorId: vendorId || 'vendor_03',
       clientId,
       chamberId,
+      block,
+      zone,
       driverName,
       vehicleNumber,
     };
@@ -276,9 +284,9 @@ export function AddItemDialog({ onItemAdded, item, trigger }: AddItemDialogProps
                  </div>
               </div>
 
-              <div className="space-y-2 col-span-2">
-                 <Label htmlFor="chamber">Storage Chamber</Label>
-                <Select value={chamberId} onValueChange={setChamberId}>
+              <div className="space-y-2 col-span-2 border-t pt-4">
+                 <Label htmlFor="chamber" className="text-primary font-bold">Storage Location Details</Label>
+                 <Select value={chamberId} onValueChange={setChamberId}>
                     <SelectTrigger id="chamber">
                         <SelectValue placeholder="Select a chamber" />
                     </SelectTrigger>
@@ -288,6 +296,16 @@ export function AddItemDialog({ onItemAdded, item, trigger }: AddItemDialogProps
                         ))}
                     </SelectContent>
                 </Select>
+                <div className="grid grid-cols-2 gap-4 mt-2">
+                    <div className="space-y-2">
+                        <Label htmlFor="block">Block</Label>
+                        <Input id="block" value={block} onChange={(e) => setBlock(e.target.value)} placeholder="e.g., Block-A" />
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="zone">Zone</Label>
+                        <Input id="zone" value={zone} onChange={(e) => setZone(e.target.value)} placeholder="e.g., Zone-1" />
+                    </div>
+                </div>
               </div>
             </div>
             <DialogFooter>

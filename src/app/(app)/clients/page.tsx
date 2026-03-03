@@ -1,4 +1,3 @@
-
 'use client'
 
 import { useState } from "react";
@@ -8,7 +7,7 @@ import { clients as initialClients } from "@/lib/data";
 import { Client } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { PlusCircle, MoreHorizontal, Edit, Trash2, FileUp, FileDown, FileText } from "lucide-react";
+import { PlusCircle, MoreHorizontal, Edit, Trash2, FileUp, FileDown, FileText, Mail, Phone, CreditCard, Landmark } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
@@ -21,6 +20,7 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { AddClientDialog } from "@/components/clients/add-client-dialog";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 export default function ClientsPage() {
     const [clients, setClients] = useState<Client[]>(initialClients);
@@ -53,32 +53,88 @@ export default function ClientsPage() {
             <Card>
                 <CardHeader>
                     <CardTitle>Client List</CardTitle>
-                    <CardDescription>A list of all your clients.</CardDescription>
+                    <CardDescription>Comprehensive directory of all registered clients with professional details.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead>Name</TableHead>
-                                <TableHead>Contact</TableHead>
+                                <TableHead>Client Details</TableHead>
+                                <TableHead>Statutory (GST/PAN)</TableHead>
+                                <TableHead>Bank Info</TableHead>
                                 <TableHead>Billing Cycle</TableHead>
                                 <TableHead>Monthly Rent (₹)</TableHead>
-                                <TableHead>Pending Payment (₹)</TableHead>
                                 <TableHead className="text-right">Actions</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {clients.map(client => (
-                                <TableRow key={client.id}>
-                                    <TableCell className="font-medium">{client.name}</TableCell>
+                                <TableRow key={client.id} className="align-top">
                                     <TableCell>
-                                        <div className="text-sm">{client.phone}</div>
-                                        <div className="text-xs text-muted-foreground">{client.address}</div>
+                                        <div className="font-bold text-base text-primary">{client.name}</div>
+                                        <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+                                            {client.email && (
+                                                <div className="flex items-center gap-1.5">
+                                                    <Mail className="h-3 w-3" /> {client.email}
+                                                </div>
+                                            )}
+                                            <div className="flex items-center gap-1.5">
+                                                <Phone className="h-3 w-3" /> {client.phone}
+                                                {client.optionalPhone && <span className="text-slate-400"> / {client.optionalPhone}</span>}
+                                            </div>
+                                            <div className="max-w-[200px] truncate">{client.address}</div>
+                                        </div>
                                     </TableCell>
-                                    <TableCell><Badge variant="secondary">{client.billingCycle}</Badge></TableCell>
-                                    <TableCell>₹{client.rentAmount.toLocaleString()}</TableCell>
-                                    <TableCell className={cn(client.pendingPayment > 0 ? "text-destructive" : "")}>
-                                        ₹{client.pendingPayment.toLocaleString()}
+                                    <TableCell>
+                                        <div className="space-y-1.5">
+                                            <div className="flex flex-col">
+                                                <span className="text-[10px] uppercase font-bold text-slate-400">GSTIN</span>
+                                                <code className="text-xs bg-slate-100 px-1 py-0.5 rounded">{client.gstNumber || 'NOT PROVIDED'}</code>
+                                            </div>
+                                            <div className="flex flex-col">
+                                                <span className="text-[10px] uppercase font-bold text-slate-400">PAN</span>
+                                                <code className="text-xs bg-slate-100 px-1 py-0.5 rounded">{client.panNumber || 'NOT PROVIDED'}</code>
+                                            </div>
+                                        </div>
+                                    </TableCell>
+                                    <TableCell>
+                                        {client.bankDetails?.bankName ? (
+                                            <TooltipProvider>
+                                                <Tooltip>
+                                                    <TooltipTrigger asChild>
+                                                        <div className="cursor-help space-y-1">
+                                                            <div className="flex items-center gap-1.5 text-xs font-semibold">
+                                                                <Landmark className="h-3 w-3" /> {client.bankDetails.bankName}
+                                                            </div>
+                                                            <div className="text-[10px] font-mono text-muted-foreground">
+                                                                {client.bankDetails.accountNo}
+                                                            </div>
+                                                        </div>
+                                                    </TooltipTrigger>
+                                                    <TooltipContent side="right" className="p-3">
+                                                        <div className="space-y-1 text-xs">
+                                                            <p><strong>Holder:</strong> {client.bankDetails.accountName}</p>
+                                                            <p><strong>Bank:</strong> {client.bankDetails.bankName}</p>
+                                                            <p><strong>A/C:</strong> {client.bankDetails.accountNo}</p>
+                                                            <p><strong>IFSC:</strong> {client.bankDetails.ifsc}</p>
+                                                        </div>
+                                                    </TooltipContent>
+                                                </Tooltip>
+                                            </TooltipProvider>
+                                        ) : (
+                                            <span className="text-xs text-muted-foreground italic">No bank info</span>
+                                        )}
+                                    </TableCell>
+                                    <TableCell>
+                                        <Badge variant="secondary" className="capitalize">{client.billingCycle}</Badge>
+                                    </TableCell>
+                                    <TableCell>
+                                        <div className="font-bold">₹{client.rentAmount.toLocaleString()}</div>
+                                        {client.pendingPayment > 0 && (
+                                            <div className="text-[10px] text-destructive font-bold">
+                                                Pending: ₹{client.pendingPayment.toLocaleString()}
+                                            </div>
+                                        )}
                                     </TableCell>
                                     <TableCell className="text-right">
                                         <DropdownMenu>
@@ -93,7 +149,7 @@ export default function ClientsPage() {
                                                 <AddClientDialog 
                                                     client={client} 
                                                     onClientAdded={handleClientAdded} 
-                                                    trigger={<DropdownMenuItem onSelect={(e) => e.preventDefault()}><Edit className="mr-2 h-4 w-4"/>Edit</DropdownMenuItem>} 
+                                                    trigger={<DropdownMenuItem onSelect={(e) => e.preventDefault()}><Edit className="mr-2 h-4 w-4"/>Edit Profile</DropdownMenuItem>} 
                                                 />
                                                 <DropdownMenuItem asChild>
                                                     <Link href={`/invoices/${client.id}/create`}>

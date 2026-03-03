@@ -16,8 +16,18 @@ export type Vendor = {
 export type Client = {
   id: string;
   name: string;
+  email?: string;
   phone?: string;
+  optionalPhone?: string;
   address?: string;
+  gstNumber?: string;
+  panNumber?: string;
+  bankDetails?: {
+    accountName: string;
+    bankName: string;
+    accountNo: string;
+    ifsc: string;
+  };
   billingCycle: 'weekly' | 'monthly';
   rentAmount: number;
   pendingPayment: number;
@@ -46,6 +56,8 @@ export type RentalItem = {
   vendorId: string;
   clientId: string;
   chamberId?: string;
+  block?: string;
+  zone?: string;
   driverName?: string;
   vehicleNumber?: string;
   boxDimensions?: {
