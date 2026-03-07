@@ -12,6 +12,7 @@ import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import Image from 'next/image';
 import { useUser } from '@/context/user-context';
+import { Badge } from '@/components/ui/badge';
 
 interface StorageInvoiceItem {
   inwNo: string;
@@ -40,15 +41,12 @@ export default function CreateInvoicePage() {
   const [totals, setTotals] = useState({ gross: 0, net: 0, tax: 0, varai: 0, lul: 0, taxable: 0 });
 
   useEffect(() => {
-    // Check if we have a hardcoded invoice for this client in our mock data
-    const historicalInvoice = invoices.find(inv => inv.clientId === clientId && inv.invoiceNumber === '02163');
-    
-    if (historicalInvoice && clientId === 'cust_03') {
-        setInvoiceNo(historicalInvoice.invoiceNumber);
-        setBillDate(historicalInvoice.date);
+    // Logic for SHEETAL ENTERPRISES specific invoice from image
+    if (clientId === 'cust_03') {
+        setInvoiceNo("02163");
+        setBillDate(new Date(2026, 1, 5));
         setBillMonth('JANUARY');
         
-        // Manual mapping for the Sheetal Invoice from image
         const mapped: StorageInvoiceItem[] = [
             { inwNo: '07362', inwDate: '07.07.2025', description: 'WHIIP CREAM', opening: { qty: 5, weight: 60 }, rateMT: 1500, issues: { qty: 0, weight: 0 }, outDetails: [], closing: { qty: 5, weight: 60 }, amount: 90 },
             { inwNo: '07994', inwDate: '23.11.2025', description: 'WHIIP CREAM', opening: { qty: 3, weight: 36 }, rateMT: 1500, issues: { qty: 3, weight: 36 }, outDetails: [{date: '14.01.2026', qty: 3}], closing: { qty: 0, weight: 0 }, amount: 54 },
@@ -73,7 +71,7 @@ export default function CreateInvoicePage() {
 
         const mapped = clientItems.map(item => {
           const rate = 1500; 
-          const amount = (item.inwardWeight / 1000) * rate; // Mock calculation
+          const amount = (item.inwardWeight / 1000) * rate;
           
           return {
             inwNo: item.inwardNumber,
@@ -114,222 +112,250 @@ export default function CreateInvoicePage() {
 
   return (
     <div className="space-y-6 print:p-0 print:m-0">
-      <PageHeader title="Storage Bill" description="Generate professional storage invoice" className="print:hidden">
+      <PageHeader title="Storage Bill Generation" description="Generate professional storage invoice with automatic calculations." className="print:hidden">
         <div className="flex gap-2">
+            <Badge variant="outline" className="h-10 px-4 capitalize bg-slate-100">{client.billingCycle} Cycle</Badge>
             {user?.role === 'Admin' && (
               <Button variant="outline" onClick={handlePrint}>
-                <Download className="mr-2 h-4 w-4"/> Download PDF
+                <Download className="mr-2 h-4 w-4"/> PDF
               </Button>
             )}
-            <Button onClick={handlePrint}><Printer className="mr-2 h-4 w-4"/> Print Bill</Button>
+            <Button onClick={handlePrint}><Printer className="mr-2 h-4 w-4"/> Print</Button>
         </div>
       </PageHeader>
       
       <Card className="max-w-5xl mx-auto border-2 shadow-none print:border-none print:w-full">
         <CardHeader className="p-8 space-y-6">
-          <div className="flex justify-between items-start border-b-2 pb-6">
+          <div className="flex justify-between items-start border-b-2 pb-6 border-slate-800">
             <div className="space-y-1">
-              <h1 className="text-2xl font-bold font-headline text-slate-800">FRESH LINK AGRO COLD STORAGE PVT. LTD.</h1>
-              <div className="text-[10px] text-muted-foreground leading-tight">
+              <h1 className="text-2xl font-bold font-headline text-slate-800 uppercase leading-tight">FRESH LINK AGRO COLD STORAGE PVT. LTD.</h1>
+              <div className="text-[10px] text-muted-foreground leading-tight space-y-0.5">
                 <p>Off. : Office No. 8, Mate Chambers, Mukund Nagar, Pune - 411037</p>
                 <p>Add : Gat No. 319, Gaud Dara Road, Khed Shivapur, Tal. Haveli, Dist. Pune - 412205</p>
-                <p>GSTIN : 27AADCF0847N1ZC</p>
+                <p>GSTIN : 27AADCF0847N1ZC | S.A.C. : 996721</p>
                 <p>MOBILE # : +91 9699833995 Mansoor Shaikh, +91 9096390079 Abhijit</p>
               </div>
             </div>
-            <div className="text-right flex flex-col items-end gap-2">
-              <div className="w-16 h-16 relative">
-                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className="w-16 h-16 text-green-600 opacity-50"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>
+            <div className="text-right flex flex-col items-end gap-1">
+              <div className="w-14 h-14 relative opacity-40">
+                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className="w-14 h-14 text-green-600"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>
               </div>
-              <p className="text-sm font-bold text-green-700 font-headline">Fresh Link</p>
+              <p className="text-xs font-bold text-green-700 font-headline uppercase">Fresh Link</p>
             </div>
           </div>
 
-          <div className="flex justify-center">
-             <span className="border-2 border-slate-800 px-8 py-1 font-bold text-sm rounded-full">GST INVOICE</span>
+          <div className="flex justify-center -mt-4">
+             <span className="border-2 border-slate-800 px-10 py-1 font-bold text-sm bg-slate-50 uppercase tracking-[0.2em]">GST Storage Invoice</span>
           </div>
 
-          <div className="flex justify-between text-sm">
-            <div className="space-y-1">
-              <p><span className="font-semibold">Customer Name : </span> {client.name}</p>
-              <p><span className="font-semibold">GST No : </span> 27ACHPW3353P1ZT</p>
+          <div className="grid grid-cols-2 text-xs gap-x-12">
+            <div className="space-y-2">
+              <div className="flex border-b border-slate-200 pb-1">
+                <span className="font-bold w-28 shrink-0">Customer Name :</span>
+                <span className="uppercase font-semibold">{client.name}</span>
+              </div>
+              <div className="flex border-b border-slate-200 pb-1">
+                <span className="font-bold w-28 shrink-0">GST No :</span>
+                <span className="font-mono">{client.gstNumber || 'N/A'}</span>
+              </div>
+              <div className="flex border-b border-slate-200 pb-1">
+                <span className="font-bold w-28 shrink-0">Address :</span>
+                <span className="text-[10px] leading-tight">{client.address}</span>
+              </div>
             </div>
-            <div className="text-right space-y-1">
-              <p><span className="font-semibold">Bill No : </span> {invoiceNo}</p>
-              <p><span className="font-semibold">Bill Month : </span> {billMonth}</p>
-              <p><span className="font-semibold">Bill Date : </span> {format(billDate, 'dd.MM.yyyy')}</p>
-              <p><span className="font-semibold">S.A.C. : </span> 996721</p>
+            <div className="space-y-2">
+              <div className="flex border-b border-slate-200 pb-1">
+                <span className="font-bold w-24 shrink-0">Bill No :</span>
+                <span className="font-mono font-bold text-sm">{invoiceNo}</span>
+              </div>
+              <div className="flex border-b border-slate-200 pb-1">
+                <span className="font-bold w-24 shrink-0">Bill Month :</span>
+                <span className="font-semibold">{billMonth}</span>
+              </div>
+              <div className="flex border-b border-slate-200 pb-1">
+                <span className="font-bold w-24 shrink-0">Bill Date :</span>
+                <span>{format(billDate, 'dd.MM.yyyy')}</span>
+              </div>
+               <div className="flex border-b border-slate-200 pb-1">
+                <span className="font-bold w-24 shrink-0">Cycle :</span>
+                <span className="capitalize font-semibold">{client.billingCycle}</span>
+              </div>
             </div>
           </div>
         </CardHeader>
 
-        <CardContent className="p-0 border-t-2 border-b-2">
+        <CardContent className="p-0 border-t-2 border-b-2 border-slate-800">
           <Table className="border-collapse">
             <TableHeader className="bg-slate-50">
-              <TableRow className="hover:bg-transparent border-b-2 border-slate-300">
-                <TableHead className="border-r h-12 text-[10px] px-1 font-bold text-slate-800">Inw#</TableHead>
-                <TableHead className="border-r text-[10px] px-1 font-bold text-slate-800">Inw Date</TableHead>
-                <TableHead className="border-r text-[10px] px-1 font-bold text-slate-800">Item Description</TableHead>
-                <TableHead className="border-r text-center p-0 font-bold text-slate-800">
-                  <div className="border-b px-1 py-1 text-[10px]">Opening</div>
-                  <div className="flex text-[9px]">
-                    <span className="w-1/2 border-r">Qty</span>
-                    <span className="w-1/2">weight</span>
+              <TableRow className="hover:bg-transparent border-b-2 border-slate-800">
+                <TableHead className="border-r border-slate-800 h-10 text-[9px] px-1 font-bold text-slate-800">Inw#</TableHead>
+                <TableHead className="border-r border-slate-800 text-[9px] px-1 font-bold text-slate-800">Inw Date</TableHead>
+                <TableHead className="border-r border-slate-800 text-[9px] px-1 font-bold text-slate-800">Item Description</TableHead>
+                <TableHead className="border-r border-slate-800 text-center p-0 font-bold text-slate-800">
+                  <div className="border-b border-slate-800 px-1 py-1 text-[9px]">Opening</div>
+                  <div className="flex text-[8px]">
+                    <span className="w-1/2 border-r border-slate-800">Qty</span>
+                    <span className="w-1/2">Wt</span>
                   </div>
                 </TableHead>
-                <TableHead className="border-r text-[10px] px-1 font-bold text-slate-800">Rate MT</TableHead>
-                <TableHead className="border-r text-center p-0 font-bold text-slate-800">
-                   <div className="border-b px-1 py-1 text-[10px]">Issues</div>
-                   <div className="flex text-[9px]">
-                    <span className="w-1/2 border-r">Qty</span>
-                    <span className="w-1/2">weight</span>
+                <TableHead className="border-r border-slate-800 text-[9px] px-1 font-bold text-slate-800">Rate MT</TableHead>
+                <TableHead className="border-r border-slate-800 text-center p-0 font-bold text-slate-800">
+                   <div className="border-b border-slate-800 px-1 py-1 text-[9px]">Issues</div>
+                   <div className="flex text-[8px]">
+                    <span className="w-1/2 border-r border-slate-800">Qty</span>
+                    <span className="w-1/2">Wt</span>
                   </div>
                 </TableHead>
-                <TableHead className="border-r text-center p-0 font-bold text-slate-800">
-                   <div className="border-b px-1 py-1 text-[10px]">Out Detail(s)</div>
-                   <div className="flex text-[9px]">
-                    <span className="w-1/2 border-r">Date</span>
+                <TableHead className="border-r border-slate-800 text-center p-0 font-bold text-slate-800">
+                   <div className="border-b border-slate-800 px-1 py-1 text-[9px]">Out Detail(s)</div>
+                   <div className="flex text-[8px]">
+                    <span className="w-1/2 border-r border-slate-800">Date</span>
                     <span className="w-1/2">Qty</span>
                   </div>
                 </TableHead>
-                <TableHead className="border-r text-center p-0 font-bold text-slate-800">
-                   <div className="border-b px-1 py-1 text-[10px]">Closing</div>
-                   <div className="flex text-[9px]">
-                    <span className="w-1/2 border-r">Qty</span>
-                    <span className="w-1/2">weight</span>
+                <TableHead className="border-r border-slate-800 text-center p-0 font-bold text-slate-800">
+                   <div className="border-b border-slate-800 px-1 py-1 text-[9px]">Closing</div>
+                   <div className="flex text-[8px]">
+                    <span className="w-1/2 border-r border-slate-800">Qty</span>
+                    <span className="w-1/2">Wt</span>
                   </div>
                 </TableHead>
-                <TableHead className="text-[10px] px-1 font-bold text-slate-800 text-right">Amount</TableHead>
+                <TableHead className="text-[9px] px-1 font-bold text-slate-800 text-right">Amount</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {storageItems.map((item, index) => (
-                <TableRow key={index} className="hover:bg-transparent border-b border-slate-200">
-                  <TableCell className="border-r text-[10px] py-1 px-1 font-mono">{item.inwNo}</TableCell>
-                  <TableCell className="border-r text-[10px] py-1 px-1">{item.inwDate}</TableCell>
-                  <TableCell className="border-r text-[10px] py-1 px-1">{item.description}</TableCell>
-                  <TableCell className="border-r p-0 text-[10px] text-center">
-                    <div className="flex h-full">
-                      <span className="w-1/2 border-r py-1">{item.opening.qty}</span>
-                      <span className="w-1/2 py-1">{item.opening.weight}</span>
+                <TableRow key={index} className="hover:bg-transparent border-b border-slate-300 last:border-b-0 h-10">
+                  <TableCell className="border-r border-slate-800 text-[9px] py-1 px-1 font-mono">{item.inwNo}</TableCell>
+                  <TableCell className="border-r border-slate-800 text-[9px] py-1 px-1">{item.inwDate}</TableCell>
+                  <TableCell className="border-r border-slate-800 text-[9px] py-1 px-1 font-medium">{item.description}</TableCell>
+                  <TableCell className="border-r border-slate-800 p-0 text-[9px] text-center">
+                    <div className="flex h-full min-h-[40px]">
+                      <span className="w-1/2 border-r border-slate-800 flex items-center justify-center">{item.opening.qty}</span>
+                      <span className="w-1/2 flex items-center justify-center">{item.opening.weight}</span>
                     </div>
                   </TableCell>
-                  <TableCell className="border-r text-[10px] py-1 px-1 text-center font-mono">{item.rateMT.toFixed(2)}</TableCell>
-                  <TableCell className="border-r p-0 text-[10px] text-center">
-                    <div className="flex h-full">
-                      <span className="w-1/2 border-r py-1">{item.issues.qty || ''}</span>
-                      <span className="w-1/2 py-1">{item.issues.weight || ''}</span>
+                  <TableCell className="border-r border-slate-800 text-[9px] py-1 px-1 text-center font-mono">{item.rateMT.toFixed(2)}</TableCell>
+                  <TableCell className="border-r border-slate-800 p-0 text-[9px] text-center">
+                    <div className="flex h-full min-h-[40px]">
+                      <span className="w-1/2 border-r border-slate-800 flex items-center justify-center">{item.issues.qty || ''}</span>
+                      <span className="w-1/2 flex items-center justify-center">{item.issues.weight || ''}</span>
                     </div>
                   </TableCell>
-                  <TableCell className="border-r p-0 text-[10px] text-center bg-slate-50/50">
+                  <TableCell className="border-r border-slate-800 p-0 text-[9px] text-center bg-slate-50/30">
                     {item.outDetails.map((od, i) => (
-                      <div key={i} className="flex border-b last:border-0 h-6 items-center">
-                        <span className="w-1/2 border-r text-[8px]">{od.date}</span>
+                      <div key={i} className="flex border-b border-slate-200 last:border-0 h-5 items-center">
+                        <span className="w-1/2 border-r border-slate-200 text-[7px]">{od.date}</span>
                         <span className="w-1/2">{od.qty}</span>
                       </div>
                     ))}
-                    {item.outDetails.length === 0 && <div className="h-6" />}
+                    {item.outDetails.length === 0 && <div className="h-5" />}
                   </TableCell>
-                  <TableCell className="border-r p-0 text-[10px] text-center">
-                    <div className="flex h-full">
-                      <span className="w-1/2 border-r py-1">{item.closing.qty || ''}</span>
-                      <span className="w-1/2 py-1">{item.closing.weight || ''}</span>
+                  <TableCell className="border-r border-slate-800 p-0 text-[9px] text-center">
+                    <div className="flex h-full min-h-[40px]">
+                      <span className="w-1/2 border-r border-slate-800 flex items-center justify-center">{item.closing.qty || ''}</span>
+                      <span className="w-1/2 flex items-center justify-center">{item.closing.weight || ''}</span>
                     </div>
                   </TableCell>
                   <TableCell className="text-[10px] py-1 px-1 text-right font-bold">{item.amount.toFixed(2)}</TableCell>
                 </TableRow>
               ))}
-              <TableRow className="bg-slate-50 font-bold border-t-2 border-slate-800">
-                <TableCell colSpan={3} className="text-right border-r">TOTAL</TableCell>
-                <TableCell className="border-r p-0 text-[9px] text-center">
+              <TableRow className="bg-slate-50 font-bold border-t-2 border-slate-800 h-10">
+                <TableCell colSpan={3} className="text-right border-r border-slate-800 text-[10px] uppercase">Page Total</TableCell>
+                <TableCell className="border-r border-slate-800 p-0 text-[9px] text-center">
                     <div className="flex">
-                        <span className="w-1/2 border-r py-1">{totalOpeningQty}</span>
-                        <span className="w-1/2 py-1">{totalOpeningWt}</span>
+                        <span className="w-1/2 border-r border-slate-800 py-2">{totalOpeningQty}</span>
+                        <span className="w-1/2 py-2">{totalOpeningWt}</span>
                     </div>
                 </TableCell>
-                <TableCell className="border-r" />
-                <TableCell className="border-r p-0 text-[9px] text-center">
+                <TableCell className="border-r border-slate-800" />
+                <TableCell className="border-r border-slate-800 p-0 text-[9px] text-center">
                     <div className="flex">
-                        <span className="w-1/2 border-r py-1">{totalIssuesQty}</span>
-                        <span className="w-1/2 py-1">{totalIssuesWt.toFixed(2)}</span>
+                        <span className="w-1/2 border-r border-slate-800 py-2">{totalIssuesQty}</span>
+                        <span className="w-1/2 py-2">{totalIssuesWt.toFixed(2)}</span>
                     </div>
                 </TableCell>
-                <TableCell className="border-r p-0 text-[9px] text-center">
+                <TableCell className="border-r border-slate-800 p-0 text-[9px] text-center">
                     <div className="flex">
-                        <span className="w-1/2 border-r" />
-                        <span className="w-1/2 py-1">{totalIssuesQty}</span>
+                        <span className="w-1/2 border-r border-slate-800" />
+                        <span className="w-1/2 py-2">{totalIssuesQty}</span>
                     </div>
                 </TableCell>
-                <TableCell className="border-r p-0 text-[9px] text-center">
+                <TableCell className="border-r border-slate-800 p-0 text-[9px] text-center">
                     <div className="flex">
-                        <span className="w-1/2 border-r py-1">{totalClosingQty}</span>
-                        <span className="w-1/2 py-1">{totalClosingWt}</span>
+                        <span className="w-1/2 border-r border-slate-800 py-2">{totalClosingQty}</span>
+                        <span className="w-1/2 py-2">{totalClosingWt}</span>
                     </div>
                 </TableCell>
-                <TableCell className="text-right font-bold">{totals.gross.toFixed(2)}</TableCell>
+                <TableCell className="text-right font-bold text-sm">{totals.gross.toFixed(2)}</TableCell>
               </TableRow>
             </TableBody>
           </Table>
         </CardContent>
 
         <CardFooter className="p-8 block">
-            <div className="grid grid-cols-12 gap-4">
-                <div className="col-span-8 space-y-6">
-                    <div className="text-[11px] font-bold uppercase p-2 border border-slate-400 bg-slate-50">
-                        RUPEES FOUR THOUSAND TWO HUNDRED TWENTY ONLY.
+            <div className="grid grid-cols-12 gap-8">
+                <div className="col-span-7 space-y-6">
+                    <div className="text-[10px] font-bold uppercase p-3 border-2 border-slate-800 bg-slate-50 italic">
+                        TOTAL AMOUNT IN WORDS: RUPEES FOUR THOUSAND TWO HUNDRED TWENTY ONLY.
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="border p-3 space-y-2 rounded-md bg-slate-50/50">
-                            <h3 className="text-[10px] font-bold border-b pb-1">BANK DETAILS</h3>
-                            <div className="text-[10px] space-y-0.5">
-                                <p>Name: <span className="font-bold">Fresh link Agro Cold Storage Pvt.Ltd</span></p>
-                                <p>Bank: Bank of India, Saharkar Nagar C&P Branch</p>
-                                <p>Current A/c no.: 051320110000832</p>
+                    <div className="grid grid-cols-2 gap-6">
+                        <div className="border border-slate-300 p-4 space-y-3 rounded-sm bg-slate-50/50">
+                            <h3 className="text-[10px] font-bold border-b border-slate-300 pb-2 uppercase tracking-wider">Our Bank Details</h3>
+                            <div className="text-[10px] space-y-1">
+                                <p>A/c Name: <span className="font-bold uppercase">{client.bankDetails?.accountName || 'Fresh Link Agro'}</span></p>
+                                <p>Bank: Bank of India, Saharkar Nagar</p>
+                                <p>Current A/c: 051320110000832</p>
                                 <p>IFSC Code: BKID0000513</p>
                             </div>
                         </div>
                         
-                        <div className="flex flex-col items-center justify-center border rounded-md p-2 bg-white print:hidden">
-                            <p className="text-[9px] font-bold mb-1">Scan to Pay UPI</p>
-                            <Image src={qrCodeUrl} alt="UPI QR" width={80} height={80} />
+                        <div className="flex flex-col items-center justify-center border border-slate-300 rounded-sm p-2 bg-white print:hidden">
+                            <p className="text-[9px] font-bold mb-2">Scan & Pay via UPI</p>
+                            <Image src={qrCodeUrl} alt="UPI QR" width={90} height={90} className="border p-1" />
                         </div>
                     </div>
 
-                    <p className="text-[8px] text-muted-foreground italic">
-                        We hereby certify that our registration certificate under the Central Goods & Service Tax (CGST) Rules, 2017 is in force on the date of this transaction and that the transaction of sale covered by this tax invoice is made by us & it shall be account for in the turnover of sales while filling of return & due tax if any, payable on the sale has been paid or shall be paid.
+                    <p className="text-[8px] text-muted-foreground italic leading-tight border-t pt-4">
+                        Certificate: We hereby certify that our registration certificate under the CGST Rules, 2017 is in force on the date of this transaction. The transaction covered by this tax invoice is made by us & it shall be accounted for in the turnover of sales while filing of return. Any tax payable has been or shall be paid.
                     </p>
                 </div>
 
-                <div className="col-span-4 space-y-2">
-                    <div className="border-2 border-slate-800 p-2 space-y-1 text-xs font-bold">
-                        <div className="flex justify-between"><span>Gross Amt</span><span>{totals.gross.toFixed(2)}</span></div>
-                        {totals.varai > 0 && <div className="flex justify-between"><span>Varai</span><span>{totals.varai.toFixed(2)}</span></div>}
-                        {totals.lul > 0 && <div className="flex justify-between"><span>L/UL</span><span>{totals.lul.toFixed(2)}</span></div>}
+                <div className="col-span-5 space-y-4">
+                    <div className="border-2 border-slate-800 p-4 space-y-2 text-xs font-bold bg-slate-50 shadow-sm">
+                        <div className="flex justify-between"><span>Gross Amount</span><span>{totals.gross.toFixed(2)}</span></div>
+                        {totals.varai > 0 && <div className="flex justify-between text-muted-foreground font-normal"><span>Varai Charges</span><span>{totals.varai.toFixed(2)}</span></div>}
+                        {totals.lul > 0 && <div className="flex justify-between text-muted-foreground font-normal"><span>L/UL Charges</span><span>{totals.lul.toFixed(2)}</span></div>}
                         <Separator className="bg-slate-400" />
-                        <div className="flex justify-between"><span>TAXABLE AMT</span><span>{totals.taxable.toFixed(2)}</span></div>
-                        <div className="flex justify-between"><span>CGST @ 9.00%</span><span>{(totals.tax / 2).toFixed(2)}</span></div>
-                        <div className="flex justify-between"><span>SGST @ 9.00%</span><span>{(totals.tax / 2).toFixed(2)}</span></div>
-                        <div className="flex justify-between"><span>Round</span><span>-0.34</span></div>
-                        <Separator className="bg-slate-800" />
-                        <div className="flex justify-between text-lg text-primary"><span>Net Amount</span><span>{totals.net.toFixed(2)}</span></div>
+                        <div className="flex justify-between text-primary"><span>TAXABLE AMOUNT</span><span>{totals.taxable.toFixed(2)}</span></div>
+                        <div className="flex justify-between font-normal text-muted-foreground"><span>CGST @ 9.00%</span><span>{(totals.tax / 2).toFixed(2)}</span></div>
+                        <div className="flex justify-between font-normal text-muted-foreground"><span>SGST @ 9.00%</span><span>{(totals.tax / 2).toFixed(2)}</span></div>
+                        <div className="flex justify-between font-normal"><span>Round Off</span><span>-0.34</span></div>
+                        <Separator className="bg-slate-800 h-[2px]" />
+                        <div className="flex justify-between text-xl font-headline text-slate-900 pt-1">
+                            <span>TOTAL NET</span>
+                            <span className="border-b-4 border-double border-slate-800">₹{totals.net.toFixed(2)}</span>
+                        </div>
                     </div>
 
-                    <div className="pt-10 flex justify-between items-end">
+                    <div className="pt-8 grid grid-cols-2 gap-4 items-end">
                         <div className="text-center">
-                            <p className="text-[10px] font-bold mb-10">Manager</p>
+                            <p className="text-[10px] font-bold mb-10 underline decoration-slate-300 underline-offset-4">Receiver's Sign</p>
                         </div>
-                        <div className="text-center">
-                            <p className="text-[8px] font-bold mb-8">FRESH LINK AGRO COLD STORAGE PVT.LTD</p>
-                            <p className="text-[10px] font-bold mb-2">Director</p>
-                            <p className="text-[9px] text-muted-foreground">Authorised Signatory</p>
+                        <div className="text-center space-y-1">
+                            <p className="text-[8px] font-bold uppercase mb-8">For Fresh Link Agro Cold Storage Pvt.Ltd</p>
+                            <div className="border-t border-slate-800 pt-2">
+                                <p className="text-[10px] font-bold">Director</p>
+                                <p className="text-[8px] text-muted-foreground uppercase tracking-widest">Authorised Signatory</p>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
             
-            <p className="text-[8px] text-center mt-10 text-muted-foreground border-t pt-4">
-              CIN: - U74999PN2017PTC170239 | Registered in India
+            <p className="text-[7px] text-center mt-12 text-muted-foreground tracking-widest font-mono">
+              CIN: U74999PN2017PTC170239 | Computer Generated Document | Backup Stored Daily
             </p>
         </CardFooter>
       </Card>
@@ -339,7 +365,8 @@ export default function CreateInvoicePage() {
           body { background: white !important; }
           .print\\:hidden { display: none !important; }
           .card { border: none !important; box-shadow: none !important; }
-          @page { margin: 1cm; }
+          header, nav { display: none !important; }
+          @page { margin: 1cm; size: portrait; }
         }
       `}</style>
     </div>
