@@ -7,7 +7,7 @@ import { clients as initialClients } from "@/lib/data";
 import { Client } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { PlusCircle, MoreHorizontal, Edit, Trash2, FileUp, FileDown, FileText, Mail, Phone, CreditCard, Landmark } from "lucide-react";
+import { MoreHorizontal, Edit, Trash2, FileUp, FileDown, FileText, Mail, Phone, Landmark } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
@@ -18,7 +18,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { cn } from "@/lib/utils";
 import { AddClientDialog } from "@/components/clients/add-client-dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -37,10 +36,6 @@ export default function ClientsPage() {
         });
     };
 
-    const handleDeleteClient = (clientId: string) => {
-        setClients(prev => prev.filter(c => c.id !== clientId));
-    }
-    
     return (
         <div className="space-y-6">
             <PageHeader title="Clients" description="Manage your clients and their rental agreements.">
@@ -71,17 +66,10 @@ export default function ClientsPage() {
                             {clients.map(client => (
                                 <TableRow key={client.id} className="align-top">
                                     <TableCell>
-                                        <div className="font-bold text-base text-primary">{client.name}</div>
+                                        <div className="font-bold text-base text-primary uppercase">{client.name}</div>
                                         <div className="mt-2 space-y-1 text-xs text-muted-foreground">
-                                            {client.email && (
-                                                <div className="flex items-center gap-1.5">
-                                                    <Mail className="h-3 w-3" /> {client.email}
-                                                </div>
-                                            )}
-                                            <div className="flex items-center gap-1.5">
-                                                <Phone className="h-3 w-3" /> {client.phone}
-                                                {client.optionalPhone && <span className="text-slate-400"> / {client.optionalPhone}</span>}
-                                            </div>
+                                            {client.email && <div className="flex items-center gap-1.5"><Mail className="h-3 w-3" /> {client.email}</div>}
+                                            <div className="flex items-center gap-1.5"><Phone className="h-3 w-3" /> {client.phone}</div>
                                             <div className="max-w-[200px] truncate">{client.address}</div>
                                         </div>
                                     </TableCell>
@@ -99,67 +87,40 @@ export default function ClientsPage() {
                                     </TableCell>
                                     <TableCell>
                                         {client.bankDetails?.bankName ? (
-                                            <TooltipProvider>
-                                                <Tooltip>
-                                                    <TooltipTrigger asChild>
-                                                        <div className="cursor-help space-y-1">
-                                                            <div className="flex items-center gap-1.5 text-xs font-semibold">
-                                                                <Landmark className="h-3 w-3" /> {client.bankDetails.bankName}
-                                                            </div>
-                                                            <div className="text-[10px] font-mono text-muted-foreground">
-                                                                {client.bankDetails.accountNo}
-                                                            </div>
-                                                        </div>
-                                                    </TooltipTrigger>
-                                                    <TooltipContent side="right" className="p-3">
-                                                        <div className="space-y-1 text-xs">
-                                                            <p><strong>Holder:</strong> {client.bankDetails.accountName}</p>
-                                                            <p><strong>Bank:</strong> {client.bankDetails.bankName}</p>
-                                                            <p><strong>A/C:</strong> {client.bankDetails.accountNo}</p>
-                                                            <p><strong>IFSC:</strong> {client.bankDetails.ifsc}</p>
-                                                        </div>
-                                                    </TooltipContent>
-                                                </Tooltip>
-                                            </TooltipProvider>
-                                        ) : (
-                                            <span className="text-xs text-muted-foreground italic">No bank info</span>
-                                        )}
+                                            <div className="space-y-1">
+                                                <div className="flex items-center gap-1.5 text-xs font-semibold">
+                                                    <Landmark className="h-3 w-3" /> {client.bankDetails.bankName}
+                                                </div>
+                                                <div className="text-[10px] font-mono text-muted-foreground">
+                                                    {client.bankDetails.accountNo}
+                                                </div>
+                                            </div>
+                                        ) : <span className="text-xs text-muted-foreground italic">No bank info</span>}
                                     </TableCell>
                                     <TableCell>
                                         <Badge variant="secondary" className="capitalize">{client.billingCycle}</Badge>
                                     </TableCell>
                                     <TableCell>
                                         <div className="font-bold">₹{client.rentAmount.toLocaleString()}</div>
-                                        {client.pendingPayment > 0 && (
-                                            <div className="text-[10px] text-destructive font-bold">
-                                                Pending: ₹{client.pendingPayment.toLocaleString()}
-                                            </div>
-                                        )}
+                                        {client.pendingPayment > 0 && <div className="text-[10px] text-destructive font-bold">Pending: ₹{client.pendingPayment.toLocaleString()}</div>}
                                     </TableCell>
                                     <TableCell className="text-right">
                                         <DropdownMenu>
                                             <DropdownMenuTrigger asChild>
                                             <Button variant="ghost" className="h-8 w-8 p-0">
-                                                <span className="sr-only">Open menu</span>
                                                 <MoreHorizontal className="h-4 w-4" />
                                             </Button>
                                             </DropdownMenuTrigger>
                                             <DropdownMenuContent align="end">
                                                 <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                                <AddClientDialog 
-                                                    client={client} 
-                                                    onClientAdded={handleClientAdded} 
-                                                    trigger={<DropdownMenuItem onSelect={(e) => e.preventDefault()}><Edit className="mr-2 h-4 w-4"/>Edit Profile</DropdownMenuItem>} 
-                                                />
+                                                <AddClientDialog client={client} onClientAdded={handleClientAdded} trigger={<DropdownMenuItem onSelect={(e) => e.preventDefault()}><Edit className="mr-2 h-4 w-4"/>Edit Profile</DropdownMenuItem>} />
                                                 <DropdownMenuItem asChild>
                                                     <Link href={`/invoices/${client.id}/create`}>
                                                         <FileText className="mr-2 h-4 w-4"/>Generate Invoice
                                                     </Link>
                                                 </DropdownMenuItem>
                                                 <DropdownMenuSeparator />
-                                                <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteClient(client.id)}>
-                                                    <Trash2 className="mr-2 h-4 w-4" />Delete
-                                                </DropdownMenuItem>
+                                                <DropdownMenuItem className="text-destructive"><Trash2 className="mr-2 h-4 w-4" />Delete</DropdownMenuItem>
                                             </DropdownMenuContent>
                                         </DropdownMenu>
                                     </TableCell>

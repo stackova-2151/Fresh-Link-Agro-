@@ -1,4 +1,4 @@
-import type { RentalItem, StockTransaction, Chamber, GatePass, User, Vendor, Client, Invoice, OutwardEntry, DeliveryOrder, GoodsReceiptNote } from '@/lib/types';
+import type { RentalItem, Chamber, User, Vendor, Client, Invoice, OutwardEntry, DeliveryOrder, GoodsReceiptNote } from '@/lib/types';
 
 export const users: User[] = [
   { id: 'user_01', name: 'Alex', email: 'alex@example.com', role: 'Admin' },
@@ -31,24 +31,6 @@ export const clients: Client[] = [
         billingCycle: 'monthly', 
         rentAmount: 50000, 
         pendingPayment: 10000 
-    },
-    { 
-        id: 'cust_02', 
-        name: 'Prestige Catering', 
-        email: 'contact@prestige.in',
-        phone: '9876543211', 
-        address: '123 Food Street, Bangalore', 
-        gstNumber: '29FGHIJ5678K1Z2',
-        panNumber: 'FGHIJ5678K',
-        bankDetails: {
-            accountName: 'Prestige Catering',
-            bankName: 'HDFC Bank',
-            accountNo: '987654321098',
-            ifsc: 'HDFC0005678'
-        },
-        billingCycle: 'monthly', 
-        rentAmount: 25000, 
-        pendingPayment: 0 
     },
     { 
         id: 'cust_03', 
@@ -97,8 +79,6 @@ export const rentalItems: RentalItem[] = [
     chamberId: 'chamber_01',
     block: 'A',
     zone: 'Z1',
-    driverName: 'UNKNOWN',
-    vehicleNumber: 'UNKNOWN',
     images: [],
     condition: 'New'
   },
@@ -130,93 +110,6 @@ export const rentalItems: RentalItem[] = [
     images: [],
     condition: 'New'
   },
-  {
-    id: 'item_sheetal_08152',
-    inwardNumber: '08152',
-    name: 'WHIIP CREAM',
-    brand: 'PEARL',
-    batchNumber: '',
-    category: 'Dairy',
-    description: 'Cold storage',
-    rentalRate: 1.5,
-    rentalCycles: ['monthly'],
-    inwardQuantity: 30,
-    outwardQuantity: 0,
-    quantityAvailable: 30,
-    unit: 'boxes',
-    inwardWeight: 360.00,
-    outwardWeight: 0.00,
-    balanceWeight: 360.00,
-    expiryDate: new Date('2026-12-31'),
-    storageDate: new Date('2025-12-26'),
-    temperatureRange: '-18°C',
-    vendorId: 'vendor_03',
-    clientId: 'cust_03',
-    chamberId: 'chamber_01',
-    block: 'B',
-    zone: 'Z1',
-    images: [],
-    condition: 'New'
-  },
-  {
-    id: 'item_sheetal_08213',
-    inwardNumber: '08213',
-    name: 'WHIIP CREAM',
-    brand: 'DECOR',
-    batchNumber: 'BATCH-A1',
-    category: 'Dairy',
-    description: 'Cold storage',
-    rentalRate: 1.5,
-    rentalCycles: ['monthly'],
-    inwardQuantity: 100,
-    outwardQuantity: 100,
-    quantityAvailable: 0,
-    unit: 'boxes',
-    inwardWeight: 1200.00,
-    outwardWeight: 1200.00,
-    balanceWeight: 0.00,
-    expiryDate: new Date('2026-12-31'),
-    storageDate: new Date('2026-01-09'),
-    temperatureRange: '-18°C',
-    vendorId: 'vendor_03',
-    clientId: 'cust_03',
-    chamberId: 'chamber_01',
-    block: 'C',
-    zone: 'Z1',
-    driverName: 'BIRAPPA',
-    vehicleNumber: 'MH12 DT2119',
-    images: [],
-    condition: 'New'
-  },
-  {
-    id: 'item_sheetal_08213_choco',
-    inwardNumber: '08213',
-    name: 'CHOCO TRAPHAL',
-    brand: 'DECOR',
-    batchNumber: '',
-    category: 'Dairy',
-    description: 'Cold storage',
-    rentalRate: 1.5,
-    rentalCycles: ['monthly'],
-    inwardQuantity: 20,
-    outwardQuantity: 0,
-    quantityAvailable: 20,
-    unit: 'boxes',
-    inwardWeight: 240.00,
-    outwardWeight: 0.00,
-    balanceWeight: 240.00,
-    expiryDate: new Date('2026-12-31'),
-    storageDate: new Date('2026-01-09'),
-    temperatureRange: '-18°C',
-    vendorId: 'vendor_03',
-    clientId: 'cust_03',
-    chamberId: 'chamber_01',
-    block: 'C',
-    zone: 'Z2',
-    images: [],
-    condition: 'New'
-  },
-
   // JK TRADING COMPANY ITEMS
   {
     id: 'jk_06840',
@@ -245,39 +138,10 @@ export const rentalItems: RentalItem[] = [
     zone: 'Z1',
     images: [],
     condition: 'New'
-  },
-  {
-    id: 'jk_06856',
-    inwardNumber: '06856',
-    name: 'JWARI',
-    brand: 'MAHARAJA',
-    batchNumber: 'JKT114',
-    category: 'Grains',
-    description: 'Storage Item',
-    rentalRate: 0.45,
-    rentalCycles: ['monthly'],
-    inwardQuantity: 114,
-    outwardQuantity: 0,
-    quantityAvailable: 114,
-    unit: 'bags',
-    inwardWeight: 3420.00,
-    outwardWeight: 0.00,
-    balanceWeight: 3420.00,
-    expiryDate: new Date('2026-12-31'),
-    storageDate: new Date('2025-04-12'),
-    temperatureRange: 'Ambient',
-    vendorId: 'vendor_01',
-    clientId: 'cust_01',
-    chamberId: 'chamber_01',
-    block: 'D',
-    zone: 'Z2',
-    images: [],
-    condition: 'New'
   }
 ];
 
 export const outwardEntries: OutwardEntry[] = [
-  // SHEETAL ENTERPRISES ENTRIES
   {
     id: 'out_sheetal_01',
     outwardNumber: '24421',
@@ -290,33 +154,6 @@ export const outwardEntries: OutwardEntry[] = [
     weight: 240.00,
     driverName: 'AKSHAY',
     vehicleNumber: 'MH12TN5281'
-  },
-  {
-    id: 'out_sheetal_02',
-    outwardNumber: '24638',
-    outwardDate: new Date('2026-01-14'),
-    clientId: 'cust_03',
-    inwardNumber: '07994',
-    itemName: 'WHIIP CREAM',
-    brand: 'PEARL',
-    quantity: 3,
-    weight: 36.00,
-    driverName: 'AKSHAY',
-    vehicleNumber: 'MH12TN5281'
-  },
-  // JK TRADING COMPANY ENTRIES
-  {
-    id: 'out_jk_01',
-    outwardNumber: '24401',
-    outwardDate: new Date('2025-12-01'),
-    clientId: 'cust_01',
-    inwardNumber: '06840',
-    itemName: 'JWARI',
-    brand: 'MANIK',
-    quantity: 9,
-    weight: 270.00,
-    driverName: 'CHORGHE',
-    vehicleNumber: 'MH12UM4494'
   }
 ];
 
@@ -386,7 +223,7 @@ export const chambers: Chamber[] = [
   }
 ];
 
-export const gatePasses: GatePass[] = [];
+export const gatePasses: any[] = [];
 
 export const invoices: Invoice[] = [
     {
