@@ -80,7 +80,7 @@ Chambers:
 Output the optimal chamber placement for each item and the reason for the suggestion.  Suggest the quantity to put in each chamber.  If an item does not fit in any chamber, suggest reducing the quantity ordered.  If there is not enough information available to make a determination, leave the suggestion blank.
 
 Follow this JSON schema:
-${JSON.stringify(OptimizeChamberPlacementOutputSchema.shape, null, 2)}`,
+[{"itemName":"string","chamberName":"string","quantity":"number","reason":"string"}]`,
 });
 
 const optimizeChamberPlacementFlow = ai.defineFlow(

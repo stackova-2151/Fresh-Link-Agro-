@@ -1,11 +1,21 @@
 import type { StaticImageData } from 'next/image';
 
+export type UserRole = 'MASTER_ADMIN' | 'ADMIN' | 'SUB_ADMIN';
+export type UserStatus = 'ACTIVE' | 'INACTIVE';
+
 export type User = {
   id: string;
   name: string;
+  username?: string;
   email?: string;
+  mobile?: string;
+  password?: string;
   avatar?: string;
-  role?: 'Admin' | 'Gatekeeper' | 'Storekeeper';
+  role: UserRole;
+  status?: UserStatus;
+  createdBy?: string;
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 export type Vendor = {

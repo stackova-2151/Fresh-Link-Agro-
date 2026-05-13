@@ -1,9 +1,9 @@
 import type { RentalItem, Chamber, User, Vendor, Client, Invoice, OutwardEntry, DeliveryOrder, GoodsReceiptNote } from '@/lib/types';
 
 export const users: User[] = [
-  { id: 'user_01', name: 'Alex', email: 'alex@example.com', role: 'Admin' },
-  { id: 'user_02', name: 'Maria', email: 'maria@example.com', role: 'Storekeeper' },
-  { id: 'user_03', name: 'Chen', email: 'chen@example.com', role: 'Gatekeeper' }
+  { id: 'user_01', name: 'Alex', email: 'alex@example.com', role: 'ADMIN' },
+  { id: 'user_02', name: 'Maria', email: 'maria@example.com', role: 'SUB_ADMIN' },
+  { id: 'user_03', name: 'Chen', email: 'chen@example.com', role: 'SUB_ADMIN' }
 ];
 
 export const vendors: Vendor[] = [

@@ -1,128 +1,184 @@
-import { StatCard } from "@/components/stat-card";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { rentalItems, gatePasses, chambers, users, vendors, clients } from "@/lib/data";
-import { AlertCircle, Archive, ArrowDownRight, ArrowUpRight, CheckCircle2, Clock, Truck, Warehouse, Users, UserPlus, DollarSign } from "lucide-react";
+"use client";
+
+import { useMemo } from "react";
+
 import { PageHeader } from "@/components/page-header";
-import { Button } from "@/components/ui/button";
-import Link from "next/link";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { StatCard } from "@/components/stat-card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useUser } from "@/context/user-context";
+import { getChamberOccupancy, getTodayCounts, getTotalStock, getUserCounts } from "@/lib/dashboard-metrics";
+
+import { Archive, ArrowDownRight, ArrowUpRight, Users, Warehouse } from "lucide-react";
 
 export default function DashboardPage() {
-    const expiringSoonCount = rentalItems.filter(item => {
-        const today = new Date();
-        const expiry = item.expiryDate;
-        const diffDays = Math.ceil((expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-        return diffDays > 0 && diffDays <= 7;
-    }).length;
+    const { user } = useUser();
 
-    const onPremisesCount = gatePasses.filter(gp => gp.status === 'On-Premises').length;
+    const todayCounts = useMemo(() => getTodayCounts(), []);
+    const stock = useMemo(() => getTotalStock(), []);
+    const userCounts = useMemo(() => getUserCounts(), []);
+    const chamberRows = useMemo(() => getChamberOccupancy(), []);
 
-    const totalCapacity = chambers.reduce((acc, chamber) => acc + (chamber.boxDimensions ? chamber.boxDimensions.length * chamber.boxDimensions.width * chamber.boxDimensions.height : 0), 0);
-    const totalOccupied = 0; // This needs to be calculated based on items in chambers
-    const occupancyPercentage = totalCapacity > 0 ? (totalOccupied / totalCapacity * 100).toFixed(1) : 0;
+    const occupancyTotals = useMemo(() => {
+        const capacityVolume = chamberRows.reduce((acc, row) => acc + row.capacityVolume, 0);
+        const usedVolume = chamberRows.reduce((acc, row) => acc + row.usedVolume, 0);
+        const occupiedPercent = capacityVolume > 0 ? Math.round((usedVolume / capacityVolume) * 1000) / 10 : 0;
+        return { capacityVolume, usedVolume, occupiedPercent };
+    }, [chamberRows]);
 
-    const recentActivity = [
-        { user: "Alex", action: "approved Gate Pass", subject: "GP-2407-003", time: "5m ago", avatar: "https://picsum.photos/seed/alex/32/32" },
-        { user: "Maria", action: "added new stock for", subject: "Fresh Strawberries", time: "1h ago", avatar: "https://picsum.photos/seed/maria/32/32" },
-        { user: "System", action: "flagged temperature anomaly in", subject: "Chiller A-1", time: "2h ago", avatar: "" },
-        { user: "Chen", action: "checked out vehicle", subject: "KA05 CD5678", time: "3h ago", avatar: "https://picsum.photos/seed/chen/32/32" },
-    ];
-    
+    const role = user?.role;
+
+    const isMaster = role === 'MASTER_ADMIN';
+    const isAdmin = role === 'ADMIN';
+    const isSubAdmin = role === 'SUB_ADMIN';
+
+    const showUserAdminStats = isMaster;
+    const showUserSubAdminStats = isMaster || isAdmin;
+
     return (
         <div className="space-y-6">
             <PageHeader title="Dashboard" description={`Welcome back! Here's what's happening today.`} />
+
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <StatCard 
+                <StatCard
                     title="Warehouse Occupancy"
-                    value={`${occupancyPercentage}%`}
-                    description={`${(totalOccupied/1000000).toLocaleString()} / ${(totalCapacity/1000000).toLocaleString()} m³ occupied`}
+                    value={`${occupancyTotals.occupiedPercent}%`}
+                    description={`${Math.round(occupancyTotals.usedVolume).toLocaleString()} / ${Math.round(occupancyTotals.capacityVolume).toLocaleString()} vol occupied`}
                     icon={<Warehouse className="h-4 w-4 text-muted-foreground" />}
                 />
-                <StatCard 
-                    title="Vehicles On-Premises"
-                    value={onPremisesCount.toString()}
-                    description="+1 since last hour"
-                    icon={<Truck className="h-4 w-4 text-muted-foreground" />}
-                />
-                <StatCard 
-                    title="Items Expiring Soon"
-                    value={expiringSoonCount.toString()}
-                    description="In the next 7 days"
-                    icon={<AlertCircle className="h-4 w-4 text-muted-foreground" />}
-                />
-                 <StatCard 
-                    title="Total Clients"
-                    value={clients.length.toString()}
-                    description="Active clients"
-                    icon={<Users className="h-4 w-4 text-muted-foreground" />}
-                />
+
+                {showUserAdminStats && (
+                    <StatCard
+                        title="Total Admins"
+                        value={userCounts.totalAdmins.toString()}
+                        description={`${userCounts.activeAdmins} active / ${userCounts.inactiveAdmins} inactive`}
+                        icon={<Users className="h-4 w-4 text-muted-foreground" />}
+                    />
+                )}
+
+                {showUserSubAdminStats && (
+                    <StatCard
+                        title="Total Sub Admins"
+                        value={userCounts.totalSubAdmins.toString()}
+                        description={`${userCounts.activeSubAdmins} active / ${userCounts.inactiveSubAdmins} inactive`}
+                        icon={<Users className="h-4 w-4 text-muted-foreground" />}
+                    />
+                )}
+
+                {(isMaster || isAdmin || isSubAdmin) && (
+                    <StatCard
+                        title="Today Inward Count"
+                        value={todayCounts.todayInwardCount.toString()}
+                        description="From inward vouchers"
+                        icon={<ArrowDownRight className="h-4 w-4 text-muted-foreground" />}
+                    />
+                )}
+
+                {(isMaster || isAdmin || isSubAdmin) && (
+                    <StatCard
+                        title="Today Outward Count"
+                        value={todayCounts.todayOutwardCount.toString()}
+                        description="From outward vouchers"
+                        icon={<ArrowUpRight className="h-4 w-4 text-muted-foreground" />}
+                    />
+                )}
+
+                {(isMaster || isAdmin || isSubAdmin) && (
+                    <StatCard
+                        title="Total Stock"
+                        value={stock.totalQuantity.toLocaleString()}
+                        description={`${Math.round(stock.totalWeight).toLocaleString()} kg weight`}
+                        icon={<Archive className="h-4 w-4 text-muted-foreground" />}
+                    />
+                )}
+
+                {isMaster && (
+                    <StatCard
+                        title="Active Admins"
+                        value={userCounts.activeAdmins.toString()}
+                        description="Enabled admin accounts"
+                        icon={<Users className="h-4 w-4 text-muted-foreground" />}
+                    />
+                )}
+
+                {isMaster && (
+                    <StatCard
+                        title="Inactive Admins"
+                        value={userCounts.inactiveAdmins.toString()}
+                        description="Disabled admin accounts"
+                        icon={<Users className="h-4 w-4 text-muted-foreground" />}
+                    />
+                )}
+
+                {isAdmin && (
+                    <StatCard
+                        title="Active Sub Admins"
+                        value={userCounts.activeSubAdmins.toString()}
+                        description="Enabled sub admin accounts"
+                        icon={<Users className="h-4 w-4 text-muted-foreground" />}
+                    />
+                )}
+
+                {isAdmin && (
+                    <StatCard
+                        title="Inactive Sub Admins"
+                        value={userCounts.inactiveSubAdmins.toString()}
+                        description="Disabled sub admin accounts"
+                        icon={<Users className="h-4 w-4 text-muted-foreground" />}
+                    />
+                )}
             </div>
 
-            <div className="grid gap-4 lg:grid-cols-3">
-                <Card className="lg:col-span-2">
-                    <CardHeader>
-                        <CardTitle>Recent Gate Passes</CardTitle>
-                        <CardDescription>A log of the most recent vehicle movements.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Vehicle No.</TableHead>
-                                    <TableHead>Client/Vendor</TableHead>
-                                    <TableHead className="text-center">Type</TableHead>
-                                    <TableHead>Time</TableHead>
-                                    <TableHead className="text-right">Status</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {gatePasses.slice(0, 5).map(pass => (
-                                    <TableRow key={pass.id}>
-                                        <TableCell className="font-medium">{pass.vehicleNumber}</TableCell>
-                                        <TableCell>{pass.clientName}</TableCell>
-                                        <TableCell className="text-center">
-                                            {pass.type === 'IN' ? <ArrowDownRight className="h-5 w-5 mx-auto text-green-500" /> : <ArrowUpRight className="h-5 w-5 mx-auto text-red-500" />}
-                                        </TableCell>
-                                        <TableCell>{pass.exitTime ? new Date(pass.exitTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : new Date(pass.entryTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</TableCell>
-                                        <TableCell className="text-right">
-                                            <Badge variant={pass.status === 'Completed' ? 'secondary' : 'default'} className={
-                                                pass.status === 'On-Premises' ? 'bg-primary/10 text-primary' : 
-                                                pass.status === 'Completed' ? 'bg-gray-100 text-gray-800' : 'bg-green-100 text-green-800'
-                                            }>
-                                                {pass.status}
-                                            </Badge>
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </CardContent>
-                </Card>
+            <Card>
+                <CardHeader>
+                    <CardTitle>Chamber Occupancy Overview</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                        {chamberRows.map((row) => {
+                            const barClass =
+                                row.occupancyStatus === 'LOW'
+                                    ? 'bg-green-500'
+                                    : row.occupancyStatus === 'MEDIUM'
+                                        ? 'bg-yellow-500'
+                                        : 'bg-red-500';
 
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Recent Activity</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        {recentActivity.map((activity, index) => (
-                             <div key={index} className="flex items-start gap-4">
-                                <Avatar className="h-9 w-9">
-                                    {activity.avatar && <AvatarImage src={activity.avatar} alt="Avatar" />}
-                                    <AvatarFallback>{activity.user.charAt(0)}</AvatarFallback>
-                                </Avatar>
-                                <div className="grid gap-1">
-                                    <p className="text-sm font-medium leading-none">
-                                        <span className="font-semibold">{activity.user}</span> {activity.action} <span className="font-semibold">{activity.subject}</span>
-                                    </p>
-                                    <p className="text-sm text-muted-foreground">{activity.time}</p>
-                                </div>
-                            </div>
-                        ))}
-                    </CardContent>
-                </Card>
-            </div>
+                            return (
+                                <Card key={row.chamberId} className="shadow-none">
+                                    <CardHeader className="pb-2">
+                                        <CardTitle className="text-base">{row.chamberName}</CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="space-y-3">
+                                        <div className="flex items-center justify-between text-sm text-muted-foreground">
+                                            <span>Used</span>
+                                            <span className="font-mono">{Math.round(row.usedVolume).toLocaleString()}</span>
+                                        </div>
+                                        <div className="flex items-center justify-between text-sm text-muted-foreground">
+                                            <span>Capacity</span>
+                                            <span className="font-mono">{Math.round(row.capacityVolume).toLocaleString()}</span>
+                                        </div>
+
+                                        <div className="h-2 w-full rounded bg-slate-100 overflow-hidden">
+                                            <div
+                                                className={`h-full ${barClass}`}
+                                                style={{ width: `${row.occupiedPercent}%` }}
+                                            />
+                                        </div>
+
+                                        <div className="flex items-center justify-between text-sm">
+                                            <span className="text-muted-foreground">Occupied</span>
+                                            <span className="font-semibold">{Math.round(row.occupiedPercent)}%</span>
+                                        </div>
+                                        <div className="flex items-center justify-between text-sm">
+                                            <span className="text-muted-foreground">Empty</span>
+                                            <span className="font-semibold">{Math.round(row.emptyPercent)}%</span>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            );
+                        })}
+                    </div>
+                </CardContent>
+            </Card>
         </div>
     );
 }

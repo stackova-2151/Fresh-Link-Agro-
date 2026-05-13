@@ -6,103 +6,179 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
+  SidebarMenuSub,
+  SidebarMenuSubItem,
+  SidebarMenuSubButton,
   SidebarFooter,
 } from '@/components/ui/sidebar';
 import { usePathname } from 'next/navigation';
 import {
-  Archive,
-  BrainCircuit,
   LayoutDashboard,
   Settings,
-  Truck,
   Warehouse,
   LifeBuoy,
   FileText,
-  Users,
-  LogOut,
-  ArrowUpRight,
-  ClipboardList,
-  Receipt
+  Receipt,
+  Printer,
+  ChevronDown
 } from 'lucide-react';
 import Link from 'next/link';
 import { useUser } from '@/context/user-context';
+import type { UserRole } from '@/lib/types';
 
-const allMenuItems = [
+import type React from 'react';
+
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+
+type NavLinkItem = {
+  type: 'link';
+  href: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  roles: UserRole[];
+};
+
+type NavGroupItem = {
+  type: 'group';
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  roles: UserRole[];
+  children: Array<{
+    href: string;
+    label: string;
+    roles: UserRole[];
+  }>;
+};
+
+type NavItem = NavLinkItem | NavGroupItem;
+
+const allMenuItems: NavItem[] = [
   {
+    type: 'link',
     href: '/dashboard',
     label: 'Dashboard',
     icon: LayoutDashboard,
-    roles: ['Admin', 'Storekeeper'],
+    roles: ['MASTER_ADMIN', 'ADMIN', 'SUB_ADMIN'],
   },
   {
-    href: '/inventory',
-    label: 'Inward Register',
-    icon: Archive,
-    roles: ['Admin', 'Storekeeper'],
+    type: 'group',
+    label: 'Voucher Entry',
+    icon: FileText,
+    roles: ['SUB_ADMIN'],
+    children: [
+      {
+        href: '/inventory',
+        label: 'Inward Entry',
+        roles: ['SUB_ADMIN'],
+      },
+      {
+        href: '/outward',
+        label: 'Outward Entry',
+        roles: ['SUB_ADMIN'],
+      },
+      {
+        href: '/bill-processing',
+        label: 'Bill Processing',
+        roles: ['SUB_ADMIN'],
+      },
+      {
+        href: '/clients',
+        label: 'Customer Rate',
+        roles: ['SUB_ADMIN'],
+      },
+      {
+        href: '/clients',
+        label: 'Clients',
+        roles: ['SUB_ADMIN'],
+      },
+    ],
   },
   {
-    href: '/outward',
-    label: 'Outward Register',
-    icon: ArrowUpRight,
-    roles: ['Admin', 'Storekeeper'],
+    type: 'group',
+    label: 'Printing',
+    icon: Printer,
+    roles: ['SUB_ADMIN'],
+    children: [
+      {
+        href: '/printing/inward-register',
+        label: 'Inward Register',
+        roles: ['SUB_ADMIN'],
+      },
+      {
+        href: '/printing/outward-register',
+        label: 'Outward Register',
+        roles: ['SUB_ADMIN'],
+      },
+      {
+        href: '/reports',
+        label: 'Stock Report',
+        roles: ['SUB_ADMIN'],
+      },
+    ],
   },
   {
-    href: '/delivery-orders',
-    label: 'Delivery Orders',
-    icon: ClipboardList,
-    roles: ['Admin', 'Storekeeper'],
+    type: 'link',
+    href: '/admin-management',
+    label: 'Admin Management',
+    icon: Settings,
+    roles: ['MASTER_ADMIN'],
   },
   {
-    href: '/goods-receipt-notes',
-    label: 'Receipt Notes',
+    type: 'link',
+    href: '/sub-admin-management',
+    label: 'Sub Admin Management',
+    icon: Settings,
+    roles: ['ADMIN'],
+  },
+  {
+    type: 'link',
+    href: '/reports',
+    label: 'Reports',
     icon: Receipt,
-    roles: ['Admin', 'Storekeeper'],
+    roles: ['MASTER_ADMIN', 'ADMIN'],
   },
   {
+    type: 'link',
     href: '/chambers',
     label: 'Chambers',
     icon: Warehouse,
-    roles: ['Admin', 'Storekeeper'],
+    roles: ['SUB_ADMIN'],
   },
   {
-    href: '/clients',
-    label: 'Clients',
-    icon: Users,
-    roles: ['Admin', 'Storekeeper'],
-  },
-  {
-    href: '/gate-pass',
-    label: 'Gate Pass',
-    icon: Truck,
-    roles: ['Admin', 'Gatekeeper', 'Storekeeper'],
-  },
-  {
-    href: '/optimization',
-    label: 'AI Optimizer',
-    icon: BrainCircuit,
-    roles: ['Admin'],
-  },
-  {
-    href: '/reports',
-    label: 'Reports',
-    icon: FileText,
-    roles: ['Admin', 'Storekeeper'],
-  },
-  {
+    type: 'link',
     href: '/invoices',
     label: 'Invoices',
-    icon: FileText,
-    roles: ['Admin', 'Storekeeper'],
-  }
+    icon: Receipt,
+    roles: ['SUB_ADMIN'],
+  },
 ];
+
+function isNavItemAccessible(item: NavItem, role: UserRole | undefined) {
+  if (!role) return false;
+
+  if (item.type === 'link') {
+    return item.roles.includes(role);
+  }
+
+  const hasParentAccess = item.roles.includes(role);
+  const hasAnyChildAccess = item.children.some((child) => child.roles.includes(role));
+  return hasParentAccess && hasAnyChildAccess;
+}
+
+function isChildActive(pathname: string, href: string) {
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
 
 export function SidebarNav() {
   const pathname = usePathname();
-  const { user } = useUser();
+  const { user, logout } = useUser();
 
-  const menuItems = allMenuItems.filter(item => 
-    user?.role && item.roles.includes(user.role)
-  );
+  const role = user?.role as UserRole | undefined;
+
+  const menuItems = allMenuItems.filter((item) => isNavItemAccessible(item, role));
+
+  const defaultVoucherOpen = pathname.startsWith('/inventory') || pathname.startsWith('/outward') || pathname.startsWith('/invoices') || pathname.startsWith('/clients') || pathname.startsWith('/bill-processing');
+  const defaultPrintingOpen = pathname.startsWith('/printing') || pathname.startsWith('/reports');
 
   return (
     <>
@@ -114,48 +190,96 @@ export function SidebarNav() {
       </SidebarHeader>
       <SidebarContent>
         <SidebarMenu>
-          {menuItems.map((item) => (
-            <SidebarMenuItem key={item.href}>
-              <SidebarMenuButton
-                asChild
-                isActive={pathname.startsWith(item.href)}
-                tooltip={{ children: item.label, side: 'right' }}
+          {menuItems.map((item) => {
+            if (item.type === 'link') {
+              return (
+                <SidebarMenuItem key={item.href}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={isChildActive(pathname, item.href)}
+                    tooltip={{ children: item.label, side: 'right' }}
+                  >
+                    <Link href={item.href}>
+                      <item.icon />
+                      <span>{item.label}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              );
+            }
+
+            const isVoucherGroup = item.label === 'Voucher Entry';
+            const isPrintingGroup = item.label === 'Printing';
+
+            const groupDefaultOpen = isVoucherGroup ? defaultVoucherOpen : isPrintingGroup ? defaultPrintingOpen : false;
+            const groupIsActive = item.children.some((child) => isChildActive(pathname, child.href));
+
+            return (
+              <Collapsible
+                key={item.label}
+                defaultOpen={groupDefaultOpen}
+                className="w-full"
               >
-                <Link href={item.href}>
-                  <item.icon />
-                  <span>{item.label}</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          ))}
+                <SidebarMenuItem>
+                  <CollapsibleTrigger asChild>
+                    <SidebarMenuButton
+                      className="group"
+                      isActive={groupIsActive}
+                      tooltip={{ children: item.label, side: 'right' }}
+                    >
+                      <item.icon />
+                      <span>{item.label}</span>
+                      <ChevronDown className="ml-auto transition-transform group-data-[state=open]:rotate-180" />
+                    </SidebarMenuButton>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <SidebarMenuSub>
+                      {item.children
+                        .filter((child) => (role ? child.roles.includes(role) : false))
+                        .map((child) => (
+                          <SidebarMenuSubItem key={`${item.label}:${child.label}:${child.href}`}>
+                            <SidebarMenuSubButton
+                              asChild
+                              isActive={isChildActive(pathname, child.href)}
+                            >
+                              <Link href={child.href}>
+                                <span>{child.label}</span>
+                              </Link>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        ))}
+                    </SidebarMenuSub>
+                  </CollapsibleContent>
+                </SidebarMenuItem>
+              </Collapsible>
+            );
+          })}
         </SidebarMenu>
       </SidebarContent>
       <SidebarFooter>
         <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              asChild
-              isActive={pathname === '/settings'}
-              tooltip={{ children: 'Settings', side: 'right' }}
-            >
-              <Link href="/settings">
-                <Settings />
-                <span>Settings</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-          <SidebarMenuItem>
-             <SidebarMenuButton
+          {user?.role === 'MASTER_ADMIN' && (
+            <SidebarMenuItem>
+              <SidebarMenuButton
                 asChild
-                isActive={pathname === '/support'}
-                tooltip={{ children: 'Support', side: 'right' }}
+                isActive={pathname === '/settings'}
+                tooltip={{ children: 'Settings', side: 'right' }}
               >
-                <Link href="/support">
-                    <LifeBuoy />
-                    <span>Support</span>
+                <Link href="/settings">
+                  <Settings />
+                  <span>Settings</span>
                 </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          )}
+          {(user?.role === 'MASTER_ADMIN' || user?.role === 'ADMIN' || user?.role === 'SUB_ADMIN') && (
+            <SidebarMenuItem>
+              <SidebarMenuButton onClick={logout} tooltip={{ children: 'Logout', side: 'right' }}>
+                <LifeBuoy />
+                <span>Logout</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          )}
         </SidebarMenu>
       </SidebarFooter>
     </>

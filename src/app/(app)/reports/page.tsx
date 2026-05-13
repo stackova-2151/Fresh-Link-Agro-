@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Download, Filter, FileText, MapPin, Package, ClipboardList, ShieldCheck } from "lucide-react";
 import { format } from "date-fns";
+import { ProtectedRoute } from "@/components/auth/protected-route";
 
 export default function ReportsPage() {
     const [activeTab, setActiveTab] = useState("itemwise");
@@ -64,13 +65,14 @@ export default function ReportsPage() {
     ];
 
     return (
-        <div className="space-y-6">
-            <PageHeader title="Software Reports" description="Comprehensive operational and financial reporting as per requirements.">
-                <div className="flex gap-2">
-                    <Button variant="outline" onClick={() => window.print()}><FileText className="mr-2 h-4 w-4" /> Print PDF</Button>
-                    <Button variant="outline"><Download className="mr-2 h-4 w-4" /> Export CSV</Button>
-                </div>
-            </PageHeader>
+        <ProtectedRoute allowedRoles={["MASTER_ADMIN", "ADMIN"]}>
+            <div className="space-y-6">
+                <PageHeader title="Stock Report" description="Comprehensive operational and financial reporting as per requirements.">
+                    <div className="flex gap-2">
+                        <Button variant="outline" onClick={() => window.print()}><FileText className="mr-2 h-4 w-4" /> Print PDF</Button>
+                        <Button variant="outline"><Download className="mr-2 h-4 w-4" /> Export CSV</Button>
+                    </div>
+                </PageHeader>
             
             <Tabs defaultValue="itemwise" value={activeTab} onValueChange={setActiveTab} className="w-full">
                 <TabsList className="grid grid-cols-2 md:grid-cols-5 h-auto gap-2 bg-transparent p-0">
@@ -277,6 +279,7 @@ export default function ReportsPage() {
                     @page { margin: 1.5cm; }
                 }
             `}</style>
-        </div>
+            </div>
+        </ProtectedRoute>
     );
 }

@@ -161,7 +161,7 @@ export default function PrintGRNPage() {
             </div>
 
             <div className="max-w-4xl mx-auto mt-6 flex justify-center gap-4 print:hidden">
-                {user?.role === 'Admin' && (
+                {(user?.role === 'ADMIN' || user?.role === 'MASTER_ADMIN') && (
                     <Button variant="outline" onClick={handlePrint}>
                         <Download className="mr-2 h-4 w-4" /> Download PDF
                     </Button>

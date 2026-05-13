@@ -115,7 +115,7 @@ export default function CreateInvoicePage() {
       <PageHeader title="Storage Bill Generation" description="Generate professional storage invoice with automatic calculations." className="print:hidden">
         <div className="flex gap-2">
             <Badge variant="outline" className="h-10 px-4 capitalize bg-slate-100">{client.billingCycle} Cycle</Badge>
-            {user?.role === 'Admin' && (
+            {(user?.role === 'ADMIN' || user?.role === 'MASTER_ADMIN') && (
               <Button variant="outline" onClick={handlePrint}>
                 <Download className="mr-2 h-4 w-4"/> PDF
               </Button>

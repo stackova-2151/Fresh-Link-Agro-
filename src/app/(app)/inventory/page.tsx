@@ -1,213 +1,72 @@
 'use client';
 
-import { useState, useMemo, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
-import { rentalItems as initialRentalItems, clients, chambers } from "@/lib/data";
-import { Search, ChevronDown, MoreHorizontal, FileDown, Printer } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { cn } from "@/lib/utils";
+import { rentalItems as initialRentalItems, clients, chambers, vendors } from "@/lib/data";
+import { FileDown, Printer } from "lucide-react";
 import { RentalItem } from "@/lib/types";
-import { AddItemDialog } from "@/components/inventory/add-item-dialog";
-import {
-    Collapsible,
-    CollapsibleContent,
-    CollapsibleTrigger,
-  } from "@/components/ui/collapsible"
-import { differenceInDays } from "date-fns";
+import { BulkInwardEntryForm, InwardVoucher } from "@/components/inventory/bulk-inward-entry-form";
+import { useUser } from "@/context/user-context";
+import { useRouter } from "next/navigation";
+import { loadInwardVouchers, saveInwardVouchers } from "@/lib/voucher-storage";
 
 export default function InventoryPage() {
     const [rentalItems, setRentalItems] = useState<RentalItem[]>(initialRentalItems);
-    const [openCollapsibles, setOpenCollapsibles] = useState<string[]>(clients.map(c => c.id));
-    const [searchTerm, setSearchTerm] = useState("");
-    const [now, setNow] = useState<Date | null>(null);
+    const [vouchers, setVouchers] = useState<InwardVoucher[]>([]);
+    const [activeInwardNo, setActiveInwardNo] = useState<string>('');
+    const { user } = useUser();
+    const router = useRouter();
 
     useEffect(() => {
-        setNow(new Date());
+        setVouchers(loadInwardVouchers());
     }, []);
 
-    const handleItemAdded = (item: RentalItem) => {
-        setRentalItems(prev => {
-            const existingIndex = prev.findIndex(i => i.id === item.id);
-            if (existingIndex > -1) {
-                const updatedItems = [...prev];
-                updatedItems[existingIndex] = item;
-                return updatedItems;
-            }
-            return [item, ...prev];
-        });
-    };
-
-    const filteredItems = useMemo(() => {
-        if (!searchTerm) return rentalItems;
-        return rentalItems.filter(item => 
-            item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            item.brand.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            item.batchNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            item.inwardNumber.toLowerCase().includes(searchTerm.toLowerCase())
-        );
-    }, [rentalItems, searchTerm]);
-
-    const itemsByClient = useMemo(() => {
-        return clients.map(client => {
-            const clientItems = filteredItems.filter(item => item.clientId === client.id);
-            const summary = clientItems.reduce((acc, item) => {
-                acc.totalInQty += item.inwardQuantity;
-                acc.totalInWt += item.inwardWeight;
-                acc.totalOutQty += item.outwardQuantity;
-                acc.totalOutWt += item.outwardWeight;
-                acc.totalBalQty += item.quantityAvailable;
-                acc.totalBalWt += item.balanceWeight;
-                return acc;
-            }, { totalInQty: 0, totalInWt: 0, totalOutQty: 0, totalOutWt: 0, totalBalQty: 0, totalBalWt: 0 });
-
-            return {
-                ...client,
-                items: clientItems,
-                summary
-            };
-        }).filter(client => client.items.length > 0);
-    }, [filteredItems]);
-
-    const getChamberName = (id?: string) => {
-        return chambers.find(c => c.id === id)?.name || 'N/A';
-    };
+    useEffect(() => {
+        saveInwardVouchers(vouchers);
+    }, [vouchers]);
 
     return (
         <div className="space-y-6">
-            <PageHeader title="Stock Report (Chamberwise)" description="Detailed inventory tracking with real-time inward, outward and balance reconciliation.">
+            <PageHeader title="Inward Entry" description="One voucher for one client/vehicle with multiple inward item rows.">
                 <div className="flex gap-2 print:hidden">
-                    <Button variant="outline" onClick={() => window.print()}><Printer className="mr-2 h-4 w-4" /> Print Register</Button>
+                    <Button
+                        variant="outline"
+                        onClick={() => router.push(`/inventory/inward/${encodeURIComponent(activeInwardNo || '')}/print`)}
+                        disabled={!activeInwardNo}
+                    >
+                        <Printer className="mr-2 h-4 w-4" /> Print
+                    </Button>
                     <Button variant="outline"><FileDown className="mr-2 h-4 w-4" /> Export CSV</Button>
-                    <AddItemDialog onItemAdded={handleItemAdded} />
                 </div>
             </PageHeader>
-            <Card className="print:shadow-none print:border-none">
-                <CardHeader className="print:pb-0 print:text-center">
-                    <CardTitle className="font-headline text-xl">FRESH LINK AGRO COLD STORAGE PVT. LTD.</CardTitle>
-                    <CardDescription className="font-bold text-slate-800 uppercase tracking-wider">Customer Stock Report Chamberwise</CardDescription>
-                    <div className="relative pt-2 print:hidden">
-                        <Search className="absolute left-2.5 top-4.5 h-4 w-4 text-muted-foreground" />
-                        <Input 
-                            placeholder="Search by Inw No, Brand, or Item..." 
-                            className="pl-8" 
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                        />
-                    </div>
-                </CardHeader>
-                <CardContent className="print:p-0">
-                    <div className="space-y-8">
-                    {itemsByClient.map(clientData => (
-                        <Collapsible 
-                            key={clientData.id} 
-                            open={openCollapsibles.includes(clientData.id)}
-                            onOpenChange={() => {}}
-                            className="border rounded-lg overflow-hidden print:border-none"
-                        >
-                            <CollapsibleTrigger className="w-full print:hidden">
-                                <div className="flex items-center justify-between p-4 bg-slate-50 hover:bg-slate-100 transition-colors">
-                                    <div className="flex items-center gap-3">
-                                        <Badge className="bg-primary">{clientData.name}</Badge>
-                                        <span className="text-sm text-muted-foreground">{clientData.items.length} register entries</span>
-                                    </div>
-                                    <ChevronDown className="h-5 w-5" />
-                                </div>
-                            </CollapsibleTrigger>
-                            <CollapsibleContent className="data-[state=open]:block">
-                                <div className="p-4 bg-slate-50/50 hidden print:block border-b font-bold uppercase text-sm">
-                                    Customer: {clientData.name}
-                                </div>
-                                <div className="overflow-x-auto">
-                                <Table className="print:text-[10px]">
-                                    <TableHeader>
-                                        <TableRow className="bg-slate-100/50">
-                                            <TableHead className="w-[80px] border font-bold">Inw.No</TableHead>
-                                            <TableHead className="border font-bold">Inw.Date</TableHead>
-                                            <TableHead className="border font-bold">Chamber</TableHead>
-                                            <TableHead className="border font-bold">Item Description</TableHead>
-                                            <TableHead className="border font-bold">Brand</TableHead>
-                                            <TableHead className="text-right border font-bold">Inw.Qty</TableHead>
-                                            <TableHead className="text-right border font-bold">Out.Qty</TableHead>
-                                            <TableHead className="text-right border font-bold">Bal.Qty</TableHead>
-                                            <TableHead className="text-right border font-bold">Inw.Weight</TableHead>
-                                            <TableHead className="text-right border font-bold">Out.Weight</TableHead>
-                                            <TableHead className="text-right border font-bold">Bal.Weight</TableHead>
-                                            <TableHead className="text-right border print:hidden">Actions</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {clientData.items.map(item => (
-                                            <TableRow key={item.id} className="hover:bg-transparent">
-                                                <TableCell className="font-mono text-[10px] border">{item.inwardNumber}</TableCell>
-                                                <TableCell className="whitespace-nowrap border">{new Date(item.storageDate).toLocaleDateString()}</TableCell>
-                                                <TableCell className="border">{getChamberName(item.chamberId)}</TableCell>
-                                                <TableCell className="font-medium border">{item.name}</TableCell>
-                                                <TableCell className="border font-bold">{item.brand}</TableCell>
-                                                <TableCell className="text-right border">{item.inwardQuantity}</TableCell>
-                                                <TableCell className="text-right border">{item.outwardQuantity || '0'}</TableCell>
-                                                <TableCell className="text-right font-bold border text-primary">{item.quantityAvailable}</TableCell>
-                                                <TableCell className="text-right border">{item.inwardWeight.toFixed(2)}</TableCell>
-                                                <TableCell className="text-right border">{item.outwardWeight.toFixed(2)}</TableCell>
-                                                <TableCell className="text-right font-bold border text-primary">{item.balanceWeight.toFixed(2)}</TableCell>
-                                                <TableCell className="text-right border print:hidden">
-                                                    <DropdownMenu>
-                                                        <DropdownMenuTrigger asChild>
-                                                        <Button variant="ghost" className="h-8 w-8 p-0">
-                                                            <MoreHorizontal className="h-4 w-4" />
-                                                        </Button>
-                                                        </DropdownMenuTrigger>
-                                                        <DropdownMenuContent align="end">
-                                                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                                            <DropdownMenuItem>Edit Entry</DropdownMenuItem>
-                                                            <DropdownMenuItem className="text-destructive">Delete Entry</DropdownMenuItem>
-                                                        </DropdownMenuContent>
-                                                    </DropdownMenu>
-                                                </TableCell>
-                                            </TableRow>
-                                        ))}
-                                    </TableBody>
-                                    <TableFooter className="bg-slate-50 font-headline">
-                                        <TableRow>
-                                            <TableCell colSpan={5} className="text-right font-bold border py-4 uppercase">Page Total / Grand Total</TableCell>
-                                            <TableCell className="text-right font-bold border">{clientData.summary.totalInQty}</TableCell>
-                                            <TableCell className="text-right font-bold border">{clientData.summary.totalOutQty}</TableCell>
-                                            <TableCell className="text-right font-bold border text-primary">{clientData.summary.totalBalQty}</TableCell>
-                                            <TableCell className="text-right font-bold border">{clientData.summary.totalInWt.toFixed(2)}</TableCell>
-                                            <TableCell className="text-right font-bold border">{clientData.summary.totalOutWt.toFixed(2)}</TableCell>
-                                            <TableCell className="text-right font-bold border text-primary">{clientData.summary.totalBalWt.toFixed(2)}</TableCell>
-                                            <TableCell className="border print:hidden" />
-                                        </TableRow>
-                                    </TableFooter>
-                                </Table>
-                                </div>
-                            </CollapsibleContent>
-                        </Collapsible>
-                    ))}
-                    </div>
-                </CardContent>
-            </Card>
 
-            <style jsx global>{`
-                @media print {
-                    body { background: white !important; }
-                    .print\\:hidden { display: none !important; }
-                    header, footer, nav, aside { display: none !important; }
-                    main { padding: 0 !important; margin: 0 !important; width: 100% !important; }
-                    @page { margin: 1cm; size: landscape; }
-                }
-            `}</style>
+            <BulkInwardEntryForm
+                clients={clients}
+                chambers={chambers}
+                vendors={vendors}
+                user={user}
+                existingItems={rentalItems}
+                vouchers={vouchers}
+                onVoucherNoChange={setActiveInwardNo}
+                onUpsert={({ mode, voucher, createdItems }) => {
+                    setVouchers((prev) => {
+                        const idx = prev.findIndex((v) => v.inwardNo.toUpperCase() === voucher.inwardNo.toUpperCase());
+                        if (idx === -1) return [voucher, ...prev];
+                        const next = [...prev];
+                        next[idx] = voucher;
+                        return next;
+                    });
+
+                    setRentalItems((prev) => {
+                        if (mode === 'edit') {
+                            const remaining = prev.filter((i) => i.inwardNumber.toUpperCase() !== voucher.inwardNo.toUpperCase());
+                            return [...createdItems, ...remaining];
+                        }
+                        return [...createdItems, ...prev];
+                    });
+                }}
+            />
         </div>
     );
 }
