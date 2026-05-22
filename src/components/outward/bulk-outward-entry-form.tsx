@@ -2,6 +2,7 @@
 
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 import { format } from 'date-fns';
 
@@ -24,6 +25,7 @@ export type OutwardVoucherItem = {
   chamberId: string;
   qty: number | '';
   bags: number | '';
+  bagWeight: number | '';
   totalWeight: number;
   inwardNumber: string;
   expDate: string;
@@ -59,7 +61,7 @@ type Props = {
 
 type RowField = keyof Omit<OutwardVoucherItem, 'id' | 'totalWeight' | 'expDate' | 'sourceRentalItemId'>;
 
-const GRID_FIELDS: RowField[] = ['itemName', 'brand', 'batch', 'chamberId', 'qty', 'bags', 'inwardNumber'];
+const GRID_FIELDS: RowField[] = ['itemName', 'brand', 'batch', 'chamberId', 'qty', 'bagWeight', 'inwardNumber'];
 
 function createId(prefix: string) {
   return `${prefix}_${Math.random().toString(16).slice(2)}_${Date.now()}`;
@@ -74,6 +76,7 @@ function createEmptyRow(): OutwardVoucherItem {
     chamberId: '',
     qty: '',
     bags: '',
+    bagWeight: '',
     totalWeight: 0,
     inwardNumber: '',
     expDate: '',
@@ -88,9 +91,14 @@ function isRowBlank(row: OutwardVoucherItem) {
     !row.batch &&
     !row.chamberId &&
     (row.qty === '' || row.qty === 0) &&
-    (row.bags === '' || row.bags === 0) &&
     !row.inwardNumber
   );
+}
+
+function calcTotalWeight(qty: number | '', bagWeight: number | '') {
+  const q = typeof qty === 'number' ? qty : 0;
+  const w = typeof bagWeight === 'number' ? bagWeight : 0;
+  return q > 0 && w > 0 ? q * w : 0;
 }
 
 function parseOutwardSeq(outwardNo: string) {
@@ -126,9 +134,18 @@ function parseNumberValue(value: string) {
   return Number.isFinite(parsed) ? parsed : ('' as const);
 }
 
-function calcDerivedBagWeight(item: RentalItem) {
-  if (!item.inwardQuantity) return 0;
-  return item.inwardWeight / item.inwardQuantity;
+function getUniqueBagWeightsFromInward(items: RentalItem[], inwardNumber: string, itemName: string, brand: string, chamberId: string, batch: string): number[] {
+  const lower = (s: string) => s.trim().toLowerCase();
+  const matches = items.filter((i) =>
+    i.inwardNumber === inwardNumber &&
+    lower(i.name) === lower(itemName) &&
+    lower(i.brand) === lower(brand) &&
+    (chamberId ? i.chamberId === chamberId : true) &&
+    (batch ? lower(i.batchNumber) === lower(batch) : true) &&
+    i.inwardQuantity > 0
+  );
+  const weights = matches.map((i) => parseFloat((i.inwardWeight / i.inwardQuantity).toFixed(4)));
+  return [...new Set(weights)].filter((w) => w > 0);
 }
 
 export function BulkOutwardEntryForm({
@@ -393,46 +410,68 @@ export function BulkOutwardEntryForm({
       row.expDate = toIsoDate(item.expiryDate);
       row.sourceRentalItemId = item.id;
 
-      const bags = typeof row.bags === 'number' ? row.bags : 0;
-      const bagWeight = calcDerivedBagWeight(item);
-      row.totalWeight = bags > 0 && bagWeight > 0 ? bags * bagWeight : 0;
+      // Smart BagWt: get unique bag weights from matching inward rows
+      const uniqueWeights = getUniqueBagWeightsFromInward(
+        existingItems,
+        item.inwardNumber,
+        item.name,
+        item.brand,
+        item.chamberId ?? '',
+        item.batchNumber
+      );
+      if (uniqueWeights.length === 1) {
+        row.bagWeight = uniqueWeights[0];
+      }
+      // If multiple, leave bagWeight as-is so dropdown appears
+
+      row.totalWeight = calcTotalWeight(row.qty, row.bagWeight);
+      // Sync bags = qty for internal stock deduction compatibility
+      row.bags = row.qty;
 
       next[rowIndex] = row;
       return next;
     });
-  }, []);
+  }, [existingItems]);
 
   const handleRowChange = useCallback(
     (rowIndex: number, field: RowField, value: string) => {
+      if (mode === 'edit') return; // Prevent row mutations in view mode
       setRows((prev) => {
         const next = [...prev];
         const row = { ...next[rowIndex] };
 
-        if (field === 'qty' || field === 'bags') {
+        if (field === 'qty' || field === 'bags' || field === 'bagWeight') {
           (row as any)[field] = parseNumberValue(value);
         } else if (field === 'inwardNumber') {
           row.inwardNumber = value;
+          // Clear source when user manually edits inward number
+          row.sourceRentalItemId = '';
+          row.expDate = '';
         } else {
           (row as any)[field] = value;
         }
 
-        const selectedItem = row.sourceRentalItemId ? existingItems.find((i) => i.id === row.sourceRentalItemId) : null;
-        if (selectedItem) {
-          const bags = typeof row.bags === 'number' ? row.bags : 0;
-          const bagWeight = calcDerivedBagWeight(selectedItem);
-          row.totalWeight = bags > 0 && bagWeight > 0 ? bags * bagWeight : 0;
-          row.expDate = toIsoDate(selectedItem.expiryDate);
-          row.inwardNumber = selectedItem.inwardNumber;
-        } else {
-          row.totalWeight = 0;
-          row.expDate = '';
+        // Sync bags = qty for internal stock deduction compatibility
+        if (field === 'qty') {
+          row.bags = row.qty;
+        }
+
+        // Recalculate totalWeight = qty × bagWeight
+        row.totalWeight = calcTotalWeight(row.qty, row.bagWeight);
+
+        // Restore expDate from selected item if still linked
+        if (row.sourceRentalItemId && field !== 'inwardNumber') {
+          const selectedItem = existingItems.find((i) => i.id === row.sourceRentalItemId);
+          if (selectedItem) {
+            row.expDate = toIsoDate(selectedItem.expiryDate);
+          }
         }
 
         next[rowIndex] = row;
         return next;
       });
     },
-    [existingItems]
+    [existingItems, mode]
   );
 
   const validateRows = useCallback(() => {
@@ -447,14 +486,16 @@ export function BulkOutwardEntryForm({
       if (!r.brand.trim()) return { ok: false as const, message: 'Brand is required', rowIndex: idx };
       if (!r.chamberId) return { ok: false as const, message: 'Chamber is required', rowIndex: idx };
       if (typeof r.qty !== 'number' || r.qty <= 0) return { ok: false as const, message: 'Qty must be > 0', rowIndex: idx };
-      if (typeof r.bags !== 'number' || r.bags <= 0) return { ok: false as const, message: 'Bags must be > 0', rowIndex: idx };
+      if (typeof r.bagWeight !== 'number' || r.bagWeight <= 0) return { ok: false as const, message: 'Bag Wt must be > 0', rowIndex: idx };
       if (!r.sourceRentalItemId) return { ok: false as const, message: 'Select Inward No from suggestions', rowIndex: idx };
 
       const stock = existingItems.find((i) => i.id === r.sourceRentalItemId);
       if (!stock) return { ok: false as const, message: 'Selected inward stock not found', rowIndex: idx };
 
-      if (r.bags > stock.quantityAvailable) {
-        return { ok: false as const, message: `Bags exceeds available (${stock.quantityAvailable})`, rowIndex: idx };
+      // Internal stock check uses bags (synced from qty at save-time)
+      const effectiveBags = typeof r.qty === 'number' ? r.qty : 0;
+      if (effectiveBags > stock.quantityAvailable) {
+        return { ok: false as const, message: `Qty exceeds available stock (${stock.quantityAvailable})`, rowIndex: idx };
       }
     }
 
@@ -462,6 +503,7 @@ export function BulkOutwardEntryForm({
   }, [clientId, existingItems, rows]);
 
   const handleSave = useCallback(() => {
+    if (mode === 'edit') return;
     const parsed = parseOutwardSeq(outwardNo);
     if (!parsed) {
       toast({ variant: 'destructive', title: 'Invalid Outward No format', description: 'Use OUT-001' });
@@ -483,7 +525,11 @@ export function BulkOutwardEntryForm({
 
     const enteredBy = user?.name ?? 'Unknown';
 
-    const nonBlankRows = rows.filter((r) => !isRowBlank(r));
+    const nonBlankRows = rows.filter((r) => !isRowBlank(r)).map((r) => ({
+      ...r,
+      // Save-time sync: bags = qty for internal stock deduction compatibility
+      bags: typeof r.qty === 'number' ? r.qty : r.bags,
+    }));
 
     const existingVoucher = vouchersByOutwardNo.get(outwardNo.trim().toUpperCase());
     const nextMode: OutwardConsoleMode = existingVoucher ? 'edit' : 'new';
@@ -545,6 +591,11 @@ export function BulkOutwardEntryForm({
   const [activeInwardRowId, setActiveInwardRowId] = useState<string | null>(null);
   const [showInwardSuggestions, setShowInwardSuggestions] = useState(false);
   const [inwardHighlightIndex, setInwardHighlightIndex] = useState(0);
+  const [inwardDropdownPosition, setInwardDropdownPosition] = useState<{
+    top: number;
+    left: number;
+    width: number;
+  } | null>(null);
 
   const activeInwardMatches = useMemo(() => {
     if (!activeInwardRowId) return [];
@@ -554,13 +605,78 @@ export function BulkOutwardEntryForm({
     return getFefoMatches(row);
   }, [activeInwardRowId, getFefoMatches, rows]);
 
+  const isEditMode = mode === 'edit';
+
+  // Smart BagWt: compute unique bag weights for a row when inward is selected
+  const getBagWeightOptions = useCallback(
+    (row: OutwardVoucherItem): number[] => {
+      if (!row.sourceRentalItemId || !row.inwardNumber) return [];
+      return getUniqueBagWeightsFromInward(
+        existingItems,
+        row.inwardNumber,
+        row.itemName,
+        row.brand,
+        row.chamberId,
+        row.batch
+      );
+    },
+    [existingItems]
+  );
+
+  const calculateDropdownPosition = useCallback((inputElement: HTMLInputElement) => {
+    const rect = inputElement.getBoundingClientRect();
+    const scrollY = window.scrollY || document.documentElement.scrollTop;
+    const scrollX = window.scrollX || document.documentElement.scrollLeft;
+    
+    return {
+      top: rect.bottom + scrollY + 4, // 4px gap like mt-1
+      left: rect.left + scrollX,
+      width: rect.width
+    };
+  }, []);
+
+  const showInwardDropdown = useCallback((rowKey: string, inputElement: HTMLInputElement) => {
+    setActiveInwardRowId(rowKey);
+    setShowInwardSuggestions(true);
+    setInwardHighlightIndex(0);
+    setInwardDropdownPosition(calculateDropdownPosition(inputElement));
+  }, [calculateDropdownPosition]);
+
+  const hideInwardDropdown = useCallback(() => {
+    setShowInwardSuggestions(false);
+    setInwardDropdownPosition(null);
+  }, []);
+
+  // Update dropdown position on scroll/resize
+  useEffect(() => {
+    if (!showInwardSuggestions || !activeInwardRowId || !inwardDropdownPosition) return;
+
+    const updatePosition = () => {
+      const inputElement = cellRefs.current[`${activeInwardRowId}:inwardNumber`];
+      if (inputElement) {
+        setInwardDropdownPosition(calculateDropdownPosition(inputElement));
+      }
+    };
+
+    const handleScroll = () => updatePosition();
+    const handleResize = () => updatePosition();
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    window.addEventListener('resize', handleResize, { passive: true });
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [showInwardSuggestions, activeInwardRowId, inwardDropdownPosition, calculateDropdownPosition]);
+
   return (
     <Card className="border shadow-sm">
       <CardHeader className="py-3">
         <div className="flex items-start justify-between gap-4">
           <div className="space-y-1">
             <div className="text-sm font-semibold">Outward Entry</div>
-            {mode === 'edit' && <div className="text-xs text-muted-foreground">Editing: {outwardNo}</div>}
+            {isEditMode && <div className="text-xs text-muted-foreground">Viewing: {outwardNo}</div>}
             {mode === 'clientView' && (
               <div className="text-xs text-muted-foreground">Showing results for: {selectedClient?.name ?? 'Client'}</div>
             )}
@@ -611,7 +727,7 @@ export function BulkOutwardEntryForm({
               />
 
               {showClientSuggestions && filteredClients.length > 0 && (
-                <div className="absolute z-50 mt-1 max-h-64 w-full overflow-auto rounded-md border bg-background shadow">
+                <div className="absolute z-[100] mt-1 max-h-64 w-full overflow-auto rounded-md border bg-background shadow-lg">
                   {filteredClients.map((client, index) => (
                     <div
                       key={client.id}
@@ -629,27 +745,27 @@ export function BulkOutwardEntryForm({
 
           <div className="md:col-span-2">
             <Label>Date</Label>
-            <Input type="date" value={voucherDate} onChange={(e) => setVoucherDate(e.target.value)} />
+            <Input type="date" value={voucherDate} onChange={(e) => { if (mode !== 'edit') setVoucherDate(e.target.value); }} readOnly={isEditMode} />
           </div>
 
           <div className="md:col-span-2">
             <Label>Gate Pass No</Label>
-            <Input value={gatePassNo} onChange={(e) => setGatePassNo(e.target.value)} />
+            <Input value={gatePassNo} onChange={(e) => { if (mode !== 'edit') setGatePassNo(e.target.value); }} readOnly={isEditMode} />
           </div>
 
           <div className="md:col-span-2">
             <Label>Vehicle No</Label>
-            <Input value={vehicleNo} onChange={(e) => setVehicleNo(e.target.value)} />
+            <Input value={vehicleNo} onChange={(e) => { if (mode !== 'edit') setVehicleNo(e.target.value); }} readOnly={isEditMode} />
           </div>
 
           <div className="md:col-span-2">
             <Label>Driver Name</Label>
-            <Input value={driverName} onChange={(e) => setDriverName(e.target.value)} />
+            <Input value={driverName} onChange={(e) => { if (mode !== 'edit') setDriverName(e.target.value); }} readOnly={isEditMode} />
           </div>
 
           <div className="md:col-span-2">
             <Label>Mobile No</Label>
-            <Input value={mobile} onChange={(e) => setMobile(e.target.value)} />
+            <Input value={mobile} onChange={(e) => { if (mode !== 'edit') setMobile(e.target.value); }} readOnly={isEditMode} />
           </div>
         </div>
 
@@ -661,8 +777,8 @@ export function BulkOutwardEntryForm({
                   <TableHead className="w-[110px]">Outward No</TableHead>
                   <TableHead className="w-[110px]">Inward No</TableHead>
                   <TableHead className="w-[220px]">Item Name</TableHead>
-                  <TableHead className="w-[140px]">Qty</TableHead>
-                  <TableHead className="w-[120px]">Bags</TableHead>
+                  <TableHead className="w-[90px] text-right">Qty</TableHead>
+                  <TableHead className="w-[100px] text-right">Bag Wt</TableHead>
                   <TableHead className="w-[130px] text-right">Tot Wt</TableHead>
                   <TableHead className="w-[140px]">Date</TableHead>
                 </TableRow>
@@ -673,8 +789,8 @@ export function BulkOutwardEntryForm({
                     <TableCell className="font-mono text-xs">{row.outwardNo}</TableCell>
                     <TableCell className="font-mono text-xs">{row.inwardNumber}</TableCell>
                     <TableCell>{row.itemName}</TableCell>
-                    <TableCell>{row.qty}</TableCell>
-                    <TableCell>{row.bags}</TableCell>
+                    <TableCell className="text-right">{row.qty}</TableCell>
+                    <TableCell className="text-right">{typeof row.bagWeight === 'number' ? row.bagWeight : ''}</TableCell>
                     <TableCell className="text-right">{row.totalWeight ? row.totalWeight.toFixed(2) : ''}</TableCell>
                     <TableCell>{row.date}</TableCell>
                   </TableRow>
@@ -683,7 +799,7 @@ export function BulkOutwardEntryForm({
             </Table>
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-md border">
+          <div className="overflow-x-auto overflow-y-visible rounded-md border">
             <Table className="text-sm">
               <TableHeader>
                 <TableRow className="bg-muted/30">
@@ -692,11 +808,11 @@ export function BulkOutwardEntryForm({
                   <TableHead className="w-[140px]">Batch</TableHead>
                   <TableHead className="w-[200px]">Chamber</TableHead>
                   <TableHead className="w-[90px] text-right">Qty</TableHead>
-                  <TableHead className="w-[90px] text-right">Bags</TableHead>
+                  <TableHead className="w-[110px] text-right">Bag Wt</TableHead>
                   <TableHead className="w-[120px] text-right">Tot Wt</TableHead>
                   <TableHead className="w-[140px]">Inward No</TableHead>
                   <TableHead className="w-[140px]">Exp Date</TableHead>
-                  <TableHead className="w-[70px] text-right">Del</TableHead>
+                  {mode !== 'edit' && <TableHead className="w-[70px] text-right">Del</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -716,6 +832,7 @@ export function BulkOutwardEntryForm({
                               tryAdvanceOnEnter(idx, 'itemName');
                             }
                           }}
+                          readOnly={isEditMode}
                           className="h-8"
                         />
                       </TableCell>
@@ -731,6 +848,7 @@ export function BulkOutwardEntryForm({
                               tryAdvanceOnEnter(idx, 'brand');
                             }
                           }}
+                          readOnly={isEditMode}
                           className="h-8"
                         />
                       </TableCell>
@@ -746,13 +864,14 @@ export function BulkOutwardEntryForm({
                               tryAdvanceOnEnter(idx, 'batch');
                             }
                           }}
+                          readOnly={isEditMode}
                           className="h-8"
                         />
                       </TableCell>
 
                       <TableCell className="p-1">
                         <Select value={row.chamberId} onValueChange={(val) => handleRowChange(idx, 'chamberId', val)}>
-                          <SelectTrigger className="h-8">
+                          <SelectTrigger className={`h-8${isEditMode ? ' pointer-events-none' : ''}`}>
                             <SelectValue placeholder="Select" />
                           </SelectTrigger>
                           <SelectContent>
@@ -777,24 +896,49 @@ export function BulkOutwardEntryForm({
                               tryAdvanceOnEnter(idx, 'qty');
                             }
                           }}
+                          readOnly={isEditMode}
                           className="h-8 text-right"
                         />
                       </TableCell>
 
                       <TableCell className="p-1">
-                        <Input
-                          ref={(el) => setCellRef(`${rowKey}:bags`, el)}
-                          inputMode="numeric"
-                          value={row.bags}
-                          onChange={(e) => handleRowChange(idx, 'bags', e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
-                              tryAdvanceOnEnter(idx, 'bags');
-                            }
-                          }}
-                          className="h-8 text-right"
-                        />
+                        {(() => {
+                          const opts = getBagWeightOptions(row);
+                          if (opts.length > 1) {
+                            return (
+                              <div className="relative">
+                                <Input
+                                  ref={(el) => setCellRef(`${rowKey}:bagWeight`, el)}
+                                  inputMode="decimal"
+                                  value={row.bagWeight}
+                                  onChange={(e) => handleRowChange(idx, 'bagWeight', e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') { e.preventDefault(); tryAdvanceOnEnter(idx, 'bagWeight'); }
+                                  }}
+                                  readOnly={isEditMode}
+                                  className="h-8 text-right"
+                                  list={`bw-opts-${rowKey}`}
+                                />
+                                <datalist id={`bw-opts-${rowKey}`}>
+                                  {opts.map((w) => <option key={w} value={w} />)}
+                                </datalist>
+                              </div>
+                            );
+                          }
+                          return (
+                            <Input
+                              ref={(el) => setCellRef(`${rowKey}:bagWeight`, el)}
+                              inputMode="decimal"
+                              value={row.bagWeight}
+                              onChange={(e) => handleRowChange(idx, 'bagWeight', e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') { e.preventDefault(); tryAdvanceOnEnter(idx, 'bagWeight'); }
+                              }}
+                              readOnly={isEditMode}
+                              className="h-8 text-right"
+                            />
+                          );
+                        })()}
                       </TableCell>
 
                       <TableCell className="p-1">
@@ -807,20 +951,23 @@ export function BulkOutwardEntryForm({
                             ref={(el) => setCellRef(`${rowKey}:inwardNumber`, el)}
                             value={row.inwardNumber}
                             onChange={(e) => {
+                              if (isEditMode) return;
                               handleRowChange(idx, 'inwardNumber', e.target.value);
-                              setActiveInwardRowId(rowKey);
-                              setShowInwardSuggestions(true);
-                              setInwardHighlightIndex(0);
+                              if (e.target) {
+                                showInwardDropdown(rowKey, e.target);
+                              }
                             }}
-                            onFocus={() => {
-                              setActiveInwardRowId(rowKey);
-                              setShowInwardSuggestions(true);
-                              setInwardHighlightIndex(0);
+                            onFocus={(e) => {
+                              if (isEditMode) return;
+                              if (e.target) {
+                                showInwardDropdown(rowKey, e.target);
+                              }
                             }}
                             onBlur={() => {
-                              setTimeout(() => setShowInwardSuggestions(false), 0);
+                              setTimeout(() => hideInwardDropdown(), 150);
                             }}
                             onKeyDown={(e) => {
+                              if (isEditMode) return;
                               if (e.key === 'ArrowDown') {
                                 if (!showInwardSuggestions || activeInwardMatches.length === 0) return;
                                 e.preventDefault();
@@ -836,7 +983,7 @@ export function BulkOutwardEntryForm({
                               }
 
                               if (e.key === 'Escape') {
-                                setShowInwardSuggestions(false);
+                                hideInwardDropdown();
                                 return;
                               }
 
@@ -846,7 +993,7 @@ export function BulkOutwardEntryForm({
                                   const selected = activeInwardMatches[inwardHighlightIndex];
                                   if (selected) {
                                     applyInwardSelectionToRow(idx, selected);
-                                    setShowInwardSuggestions(false);
+                                    hideInwardDropdown();
                                     tryAdvanceOnEnter(idx, 'inwardNumber');
                                   }
                                   return;
@@ -855,30 +1002,9 @@ export function BulkOutwardEntryForm({
                                 tryAdvanceOnEnter(idx, 'inwardNumber');
                               }
                             }}
+                            readOnly={isEditMode}
                             className="h-8 font-mono"
                           />
-
-                          {showInwardSuggestions && activeInwardRowId === rowKey && activeInwardMatches.length > 0 && (
-                            <div className="absolute z-50 mt-1 max-h-64 w-full overflow-auto rounded-md border bg-background shadow">
-                              {activeInwardMatches.map((item, index) => (
-                                <div
-                                  key={item.id}
-                                  className={`cursor-pointer px-3 py-2 text-sm ${index === inwardHighlightIndex ? 'bg-muted' : ''}`}
-                                  onMouseDown={() => {
-                                    applyInwardSelectionToRow(idx, item);
-                                    setShowInwardSuggestions(false);
-                                  }}
-                                  onMouseEnter={() => setInwardHighlightIndex(index)}
-                                >
-                                  <div className="flex items-center justify-between gap-3">
-                                    <div className="font-mono text-xs">{item.inwardNumber}</div>
-                                    <div className="text-xs text-muted-foreground">Exp: {toIsoDate(item.expiryDate)}</div>
-                                  </div>
-                                  <div className="mt-1 text-xs text-muted-foreground">Avail: {item.quantityAvailable}</div>
-                                </div>
-                              ))}
-                            </div>
-                          )}
                         </div>
                       </TableCell>
 
@@ -886,22 +1012,24 @@ export function BulkOutwardEntryForm({
                         <Input value={row.expDate} readOnly className="h-8" />
                       </TableCell>
 
-                      <TableCell className="p-1 text-right">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          className="h-8 px-2"
-                          onClick={() => {
-                            setRows((prev) => {
-                              const next = prev.filter((r) => r.id !== rowKey);
-                              return next.length === 0 ? [createEmptyRow()] : next;
-                            });
-                          }}
-                          disabled={rows.length <= 1}
-                        >
-                          Del
-                        </Button>
-                      </TableCell>
+                      {mode !== 'edit' && (
+                        <TableCell className="p-1 text-right">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            className="h-8 px-2"
+                            onClick={() => {
+                              setRows((prev) => {
+                                const next = prev.filter((r) => r.id !== rowKey);
+                                return next.length === 0 ? [createEmptyRow()] : next;
+                              });
+                            }}
+                            disabled={rows.length <= 1}
+                          >
+                            Del
+                          </Button>
+                        </TableCell>
+                      )}
                     </TableRow>
                   );
                 })}
@@ -913,9 +1041,11 @@ export function BulkOutwardEntryForm({
         {mode !== 'clientView' && (
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div className="flex gap-2">
-              <Button type="button" onClick={handleSave}>
-                {saveButtonLabel}
-              </Button>
+              {mode !== 'edit' && (
+                <Button type="button" onClick={handleSave}>
+                  Save Entry
+                </Button>
+              )}
             </div>
 
             <div className="text-xs text-muted-foreground">
@@ -929,7 +1059,7 @@ export function BulkOutwardEntryForm({
           <div className="grid grid-cols-1 gap-3 md:grid-cols-12">
             <div className="md:col-span-8">
               <Label>Notes</Label>
-              <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} />
+              <Textarea value={notes} onChange={(e) => { if (mode !== 'edit') setNotes(e.target.value); }} readOnly={isEditMode} />
             </div>
             <div className="md:col-span-4">
               <div className="rounded-md border p-3 text-xs">
@@ -943,6 +1073,42 @@ export function BulkOutwardEntryForm({
           </div>
         )}
       </CardContent>
+
+      {/* Portal-rendered Inward No dropdown */}
+      {showInwardSuggestions && activeInwardRowId && activeInwardMatches.length > 0 && inwardDropdownPosition && typeof window !== 'undefined' && 
+        createPortal(
+          <div 
+            className="fixed z-[100] max-h-64 overflow-auto rounded-md border bg-background shadow-lg"
+            style={{
+              top: inwardDropdownPosition.top,
+              left: inwardDropdownPosition.left,
+              width: inwardDropdownPosition.width,
+            }}
+          >
+            {activeInwardMatches.map((item, index) => (
+              <div
+                key={item.id}
+                className={`cursor-pointer px-3 py-2 text-sm ${index === inwardHighlightIndex ? 'bg-muted' : ''}`}
+                onMouseDown={() => {
+                  const rowIndex = rows.findIndex(r => r.id === activeInwardRowId);
+                  if (rowIndex !== -1) {
+                    applyInwardSelectionToRow(rowIndex, item);
+                    hideInwardDropdown();
+                  }
+                }}
+                onMouseEnter={() => setInwardHighlightIndex(index)}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div className="font-mono text-xs">{item.inwardNumber}</div>
+                  <div className="text-xs text-muted-foreground">Exp: {toIsoDate(item.expiryDate)}</div>
+                </div>
+                <div className="mt-1 text-xs text-muted-foreground">Avail: {item.quantityAvailable}</div>
+              </div>
+            ))}
+          </div>,
+          document.body
+        )
+      }
     </Card>
   );
 }

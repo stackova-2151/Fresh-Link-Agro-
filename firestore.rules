@@ -1,0 +1,167 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helper functions ────────────────────────────────────────────────────
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function userDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function getUserRole() {
+      return userDoc().role;
+    }
+
+    function isActive() {
+      return userDoc().status == 'ACTIVE';
+    }
+
+    function isMasterAdmin() {
+      return isAuthenticated() && isActive() && getUserRole() == 'MASTER_ADMIN';
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && isActive() && getUserRole() == 'ADMIN';
+    }
+
+    function isSubAdmin() {
+      return isAuthenticated() && isActive() && getUserRole() == 'SUB_ADMIN';
+    }
+
+    function isAdminOrAbove() {
+      return isMasterAdmin() || isAdmin();
+    }
+
+    function isAnyRole() {
+      return isMasterAdmin() || isAdmin() || isSubAdmin();
+    }
+
+    // ── Users collection ────────────────────────────────────────────────────
+    // Only Admin SDK (server-side) can create/delete users.
+    // Reads allowed for own doc or by admins.
+    // Updates allowed by MASTER_ADMIN (any user) or ADMIN (SUB_ADMIN only).
+
+    match /users/{uid} {
+      allow read: if isAuthenticated() && (
+        request.auth.uid == uid || isAdminOrAbove()
+      );
+      allow create: if false; // Server-side only via Admin SDK
+      allow update: if isMasterAdmin() || (
+        isAdmin() && resource.data.role == 'SUB_ADMIN'
+      );
+      allow delete: if false; // Server-side only via Admin SDK
+    }
+
+    // ── Clients ─────────────────────────────────────────────────────────────
+
+    match /clients/{clientId} {
+      allow read: if isAnyRole();
+      allow create: if isAdminOrAbove();
+      allow update: if isAdminOrAbove();
+      allow delete: if isAdminOrAbove();
+    }
+
+    // ── Chambers ────────────────────────────────────────────────────────────
+
+    match /chambers/{chamberId} {
+      allow read: if isAnyRole();
+      allow create: if isAdminOrAbove();
+      allow update: if isAdminOrAbove();
+      allow delete: if isAdminOrAbove();
+    }
+
+    // ── Vendors ─────────────────────────────────────────────────────────────
+
+    match /vendors/{vendorId} {
+      allow read: if isAnyRole();
+      allow create: if isAdminOrAbove();
+      allow update: if isAdminOrAbove();
+      allow delete: if isAdminOrAbove();
+    }
+
+    // ── Inward Vouchers ─────────────────────────────────────────────────────
+    // All roles can create and update (SUB_ADMIN enters inward).
+    // Only ADMIN+ can delete.
+
+    match /inwardVouchers/{voucherId} {
+      allow read: if isAnyRole();
+      allow create: if isAnyRole();
+      allow update: if isAnyRole();
+      allow delete: if isAdminOrAbove();
+    }
+
+    // ── Rental Items ────────────────────────────────────────────────────────
+
+    match /rentalItems/{itemId} {
+      allow read: if isAnyRole();
+      allow create: if isAnyRole();
+      allow update: if isAnyRole();
+      allow delete: if isAdminOrAbove();
+    }
+
+    // ── Outward Vouchers ────────────────────────────────────────────────────
+
+    match /outwardVouchers/{voucherId} {
+      allow read: if isAnyRole();
+      allow create: if isAnyRole();
+      allow update: if isAnyRole();
+      allow delete: if isAdminOrAbove();
+    }
+
+    // ── Invoices ────────────────────────────────────────────────────────────
+
+    match /invoices/{invoiceId} {
+      allow read: if isAnyRole();
+      allow create: if isAdminOrAbove();
+      allow update: if isAdminOrAbove();
+      allow delete: if isMasterAdmin();
+    }
+
+    // ── Delivery Orders ─────────────────────────────────────────────────────
+
+    match /deliveryOrders/{id} {
+      allow read: if isAnyRole();
+      allow create: if isAnyRole();
+      allow update: if isAnyRole();
+      allow delete: if isAdminOrAbove();
+    }
+
+    // ── Goods Receipt Notes ─────────────────────────────────────────────────
+
+    match /goodsReceiptNotes/{id} {
+      allow read: if isAnyRole();
+      allow create: if isAnyRole();
+      allow update: if isAnyRole();
+      allow delete: if isAdminOrAbove();
+    }
+
+    // ── Gate Passes ─────────────────────────────────────────────────────────
+
+    match /gatePasses/{id} {
+      allow read: if isAnyRole();
+      allow create: if isAnyRole();
+      allow update: if isAnyRole();
+      allow delete: if isAdminOrAbove();
+    }
+
+    // ── Audit Logs ──────────────────────────────────────────────────────────
+    // Append-only for all authenticated users. No updates or deletes.
+
+    match /auditLogs/{id} {
+      allow read: if isAdminOrAbove();
+      allow create: if isAnyRole();
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    // ── Deny all other collections ──────────────────────────────────────────
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

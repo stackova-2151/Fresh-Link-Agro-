@@ -1,75 +1,188 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-
 import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
 import { FileDown, Printer } from 'lucide-react';
 
 import { useUser } from '@/context/user-context';
-import { chambers, clients, rentalItems as initialRentalItems } from '@/lib/data';
-import type { RentalItem } from '@/lib/types';
 import { useRouter } from 'next/navigation';
-import { loadOutwardVouchers, saveOutwardVouchers } from '@/lib/voucher-storage';
+import { useToast } from '@/hooks/use-toast';
 
-import { BulkOutwardEntryForm, type OutwardVoucher } from '@/components/outward/bulk-outward-entry-form';
+import {
+  collection,
+  doc,
+  getDocs,
+  setDoc,
+  query,
+  where,
+  orderBy,
+  increment,
+  updateDoc,
+} from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { clientsService, chambersService, rentalItemsService } from '@/lib/firestore';
+
+import type { RentalItem, Chamber, Client, Vendor } from '@/lib/types';
+import {
+  BulkOutwardEntryForm,
+  type OutwardVoucher,
+  type OutwardConsoleMode,
+} from '@/components/outward/bulk-outward-entry-form';
+
+const OUTWARD_COLLECTION = 'outwardVouchers';
+
+// ── Firestore helpers ─────────────────────────────────────────────────────────
+
+async function loadOutwardVouchersFromFirestore(): Promise<OutwardVoucher[]> {
+  try {
+    const snap = await getDocs(
+      query(collection(db, OUTWARD_COLLECTION), orderBy('date', 'desc'))
+    );
+    return snap.docs.map((d) => ({ id: d.id, ...d.data() } as OutwardVoucher));
+  } catch (err) {
+    console.error('Failed to load outward vouchers:', err);
+    return [];
+  }
+}
+
+async function saveOutwardVoucherToFirestore(voucher: OutwardVoucher): Promise<void> {
+  const { id, ...rest } = voucher;
+  await setDoc(doc(db, OUTWARD_COLLECTION, id), rest);
+}
+
+/**
+ * Atomically deducts stock from rentalItems using Firestore increment().
+ * This is safe for concurrent writes.
+ */
+async function applyStockDeduction(
+  items: OutwardVoucher['items']
+): Promise<void> {
+  for (const row of items) {
+    if (!row.sourceRentalItemId) continue;
+    const bags = typeof row.bags === 'number' ? row.bags : 0;
+    const wt = row.totalWeight || 0;
+    if (bags <= 0) continue;
+
+    await updateDoc(doc(db, 'rentalItems', row.sourceRentalItemId), {
+      outwardQuantity: increment(bags),
+      quantityAvailable: increment(-bags),
+      outwardWeight: increment(wt),
+      balanceWeight: increment(-wt),
+    });
+  }
+}
+
+/**
+ * Reverses a previous stock deduction (for edit mode).
+ */
+async function reverseStockDeduction(
+  items: OutwardVoucher['items']
+): Promise<void> {
+  for (const row of items) {
+    if (!row.sourceRentalItemId) continue;
+    const bags = typeof row.bags === 'number' ? row.bags : 0;
+    const wt = row.totalWeight || 0;
+    if (bags <= 0) continue;
+
+    await updateDoc(doc(db, 'rentalItems', row.sourceRentalItemId), {
+      outwardQuantity: increment(-bags),
+      quantityAvailable: increment(bags),
+      outwardWeight: increment(-wt),
+      balanceWeight: increment(wt),
+    });
+  }
+}
+
+// ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function OutwardRegisterPage() {
   const { user } = useUser();
-  const [rentalItems, setRentalItems] = useState<RentalItem[]>(initialRentalItems);
+  const router = useRouter();
+  const { toast } = useToast();
+
+  const [clients, setClients] = useState<Client[]>([]);
+  const [chambers, setChambers] = useState<Chamber[]>([]);
+  const [rentalItems, setRentalItems] = useState<RentalItem[]>([]);
   const [vouchers, setVouchers] = useState<OutwardVoucher[]>([]);
   const [activeOutwardNo, setActiveOutwardNo] = useState<string>('');
-  const router = useRouter();
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setVouchers(loadOutwardVouchers());
+    async function fetchAll() {
+      try {
+        const [c, ch, ri, ov] = await Promise.all([
+          clientsService.getAll(),
+          chambersService.getAll(),
+          rentalItemsService.getAll(),
+          loadOutwardVouchersFromFirestore(),
+        ]);
+        setClients(c);
+        setChambers(ch);
+        setRentalItems(ri);
+        setVouchers(ov);
+      } catch (err) {
+        toast({ variant: 'destructive', title: 'Failed to load data', description: String(err) });
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchAll();
   }, []);
 
-  useEffect(() => {
-    saveOutwardVouchers(vouchers);
-  }, [vouchers]);
+  const handleUpsert = async ({
+    mode,
+    voucher,
+  }: {
+    mode: OutwardConsoleMode;
+    voucher: OutwardVoucher;
+  }) => {
+    try {
+      if (mode === 'edit') {
+        // Reverse previous stock deduction before applying new one
+        const existing = vouchers.find(
+          (v) => v.outwardNo.toUpperCase() === voucher.outwardNo.toUpperCase()
+        );
+        if (existing) {
+          await reverseStockDeduction(existing.items);
+        }
+      }
 
-  const restoreVoucherStock = (items: RentalItem[], voucher: OutwardVoucher) => {
-    const map = new Map<string, RentalItem>(items.map((i) => [i.id, { ...i }]));
+      // Save voucher to Firestore
+      await saveOutwardVoucherToFirestore(voucher);
 
-    voucher.items.forEach((row) => {
-      if (!row.sourceRentalItemId) return;
-      const stock = map.get(row.sourceRentalItemId);
-      if (!stock) return;
+      // Apply stock deduction atomically
+      await applyStockDeduction(voucher.items);
 
-      const bags = typeof row.bags === 'number' ? row.bags : 0;
-      const wt = row.totalWeight || 0;
+      // Refresh rental items from Firestore to get updated stock
+      const updatedItems = await rentalItemsService.getAll();
+      setRentalItems(updatedItems);
 
-      stock.outwardQuantity = Math.max(0, stock.outwardQuantity - bags);
-      stock.quantityAvailable = stock.quantityAvailable + bags;
-      stock.outwardWeight = Math.max(0, stock.outwardWeight - wt);
-      stock.balanceWeight = stock.balanceWeight + wt;
-      map.set(stock.id, stock);
-    });
+      // Update local vouchers state
+      setVouchers((prev) => {
+        const idx = prev.findIndex(
+          (v) => v.outwardNo.toUpperCase() === voucher.outwardNo.toUpperCase()
+        );
+        if (idx === -1) return [voucher, ...prev];
+        const next = [...prev];
+        next[idx] = voucher;
+        return next;
+      });
 
-    return Array.from(map.values());
+      toast({ title: 'Success', description: 'Outward entry saved to Firestore.' });
+    } catch (err) {
+      console.error('Outward save error:', err);
+      toast({
+        variant: 'destructive',
+        title: 'Failed to save outward entry',
+        description: String(err),
+      });
+    }
   };
 
-  const applyVoucherStock = (items: RentalItem[], voucher: OutwardVoucher) => {
-    const map = new Map<string, RentalItem>(items.map((i) => [i.id, { ...i }]));
-
-    voucher.items.forEach((row) => {
-      if (!row.sourceRentalItemId) return;
-      const stock = map.get(row.sourceRentalItemId);
-      if (!stock) return;
-
-      const bags = typeof row.bags === 'number' ? row.bags : 0;
-      const wt = row.totalWeight || 0;
-
-      stock.outwardQuantity = stock.outwardQuantity + bags;
-      stock.quantityAvailable = Math.max(0, stock.quantityAvailable - bags);
-      stock.outwardWeight = stock.outwardWeight + wt;
-      stock.balanceWeight = Math.max(0, stock.balanceWeight - wt);
-      map.set(stock.id, stock);
-    });
-
-    return Array.from(map.values());
-  };
+  if (loading) {
+    return <div className="p-6 text-muted-foreground">Loading...</div>;
+  }
 
   return (
     <div className="space-y-6">
@@ -80,7 +193,9 @@ export default function OutwardRegisterPage() {
         <div className="flex gap-2 print:hidden">
           <Button
             variant="outline"
-            onClick={() => router.push(`/outward/${encodeURIComponent(activeOutwardNo || '')}/print`)}
+            onClick={() =>
+              router.push(`/outward/${encodeURIComponent(activeOutwardNo || '')}/print`)
+            }
             disabled={!activeOutwardNo}
           >
             <Printer className="mr-2 h-4 w-4" /> Print
@@ -100,25 +215,7 @@ export default function OutwardRegisterPage() {
         existingItems={rentalItems}
         vouchers={vouchers}
         onVoucherNoChange={setActiveOutwardNo}
-        onUpsert={({ mode, voucher }) => {
-          setVouchers((prev) => {
-            const idx = prev.findIndex((v) => v.outwardNo.toUpperCase() === voucher.outwardNo.toUpperCase());
-            if (idx === -1) return [voucher, ...prev];
-            const next = [...prev];
-            next[idx] = voucher;
-            return next;
-          });
-
-          setRentalItems((prev) => {
-            if (mode === 'edit') {
-              const existing = vouchers.find((v) => v.outwardNo.toUpperCase() === voucher.outwardNo.toUpperCase());
-              const restored = existing ? restoreVoucherStock(prev, existing) : prev;
-              return applyVoucherStock(restored, voucher);
-            }
-
-            return applyVoucherStock(prev, voucher);
-          });
-        }}
+        onUpsert={handleUpsert}
       />
     </div>
   );

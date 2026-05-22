@@ -1,7 +1,9 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+
 import type React from 'react';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 import { PageHeader } from '@/components/page-header';
@@ -10,7 +12,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
-import { clients } from '@/lib/data';
+import { clientsService } from '@/lib/firestore';
 import type { Client } from '@/lib/types';
 
 function buildPrintUrl(params: { customerId?: string; from?: string; to?: string }) {
@@ -25,6 +27,8 @@ function buildPrintUrl(params: { customerId?: string; from?: string; to?: string
 export default function OutwardRegisterFilterPage() {
   const router = useRouter();
 
+  const [clients, setClients] = useState<Client[]>([]);
+
   const [customerId, setCustomerId] = useState<string>('');
   const [customerInput, setCustomerInput] = useState<string>('');
 
@@ -35,24 +39,37 @@ export default function OutwardRegisterFilterPage() {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [highlightIndex, setHighlightIndex] = useState(0);
 
-  const selectedCustomer = useMemo(() => clients.find((c) => c.id === customerId) ?? null, [customerId]);
-
-  const handleCustomerInputChange = useCallback((value: string) => {
-    setCustomerInput(value);
-    setCustomerId('');
-
-    if (!value.trim()) {
-      setFilteredCustomers([]);
-      setShowSuggestions(false);
-      setHighlightIndex(0);
-      return;
-    }
-
-    const results = clients.filter((c) => c.name.toLowerCase().includes(value.toLowerCase()));
-    setFilteredCustomers(results);
-    setShowSuggestions(true);
-    setHighlightIndex(0);
+  // Load clients from Firestore on mount
+  useEffect(() => {
+    clientsService.getAll().then(setClients).catch(console.error);
   }, []);
+
+  const selectedCustomer = useMemo(
+    () => clients.find((c) => c.id === customerId) ?? null,
+    [clients, customerId]
+  );
+
+  const handleCustomerInputChange = useCallback(
+    (value: string) => {
+      setCustomerInput(value);
+      setCustomerId('');
+
+      if (!value.trim()) {
+        setFilteredCustomers([]);
+        setShowSuggestions(false);
+        setHighlightIndex(0);
+        return;
+      }
+
+      const results = clients.filter((c) =>
+        c.name.toLowerCase().includes(value.toLowerCase())
+      );
+      setFilteredCustomers(results);
+      setShowSuggestions(true);
+      setHighlightIndex(0);
+    },
+    [clients]
+  );
 
   const handleCustomerSelect = useCallback((client: Client) => {
     setCustomerId(client.id);
@@ -74,7 +91,9 @@ export default function OutwardRegisterFilterPage() {
       if (e.key === 'ArrowUp') {
         if (!showSuggestions || filteredCustomers.length === 0) return;
         e.preventDefault();
-        setHighlightIndex((prev) => (prev === 0 ? filteredCustomers.length - 1 : prev - 1));
+        setHighlightIndex((prev) =>
+          prev === 0 ? filteredCustomers.length - 1 : prev - 1
+        );
         return;
       }
 
@@ -106,7 +125,10 @@ export default function OutwardRegisterFilterPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Outward Register" description="Filter and print outward register from saved outward vouchers." />
+      <PageHeader
+        title="Outward Register"
+        description="Filter and print outward register from saved outward vouchers."
+      />
 
       <Card className="max-w-4xl mx-auto border shadow-sm">
         <CardHeader className="py-4">
@@ -135,7 +157,9 @@ export default function OutwardRegisterFilterPage() {
                     {filteredCustomers.map((c, index) => (
                       <div
                         key={c.id}
-                        className={`cursor-pointer px-3 py-2 text-sm ${index === highlightIndex ? 'bg-muted' : ''}`}
+                        className={`cursor-pointer px-3 py-2 text-sm ${
+                          index === highlightIndex ? 'bg-muted' : ''
+                        }`}
                         onMouseDown={() => handleCustomerSelect(c)}
                         onMouseEnter={() => setHighlightIndex(index)}
                       >
@@ -146,18 +170,28 @@ export default function OutwardRegisterFilterPage() {
                 )}
               </div>
               {selectedCustomer ? (
-                <div className="mt-1 text-xs text-muted-foreground">Selected: {selectedCustomer.name}</div>
+                <div className="mt-1 text-xs text-muted-foreground">
+                  Selected: {selectedCustomer.name}
+                </div>
               ) : null}
             </div>
 
             <div className="md:col-span-3">
               <Label>From Date</Label>
-              <Input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
+              <Input
+                type="date"
+                value={fromDate}
+                onChange={(e) => setFromDate(e.target.value)}
+              />
             </div>
 
             <div className="md:col-span-3">
               <Label>To Date</Label>
-              <Input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
+              <Input
+                type="date"
+                value={toDate}
+                onChange={(e) => setToDate(e.target.value)}
+              />
             </div>
           </div>
 

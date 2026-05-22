@@ -213,18 +213,21 @@ export function BulkInwardEntryForm({
   }, [rows]);
 
   const addNewRow = useCallback(() => {
+    if (mode === 'edit') return;
     setRows((prev) => [...prev, createEmptyRow()]);
-  }, []);
+  }, [mode]);
 
   const removeRow = useCallback((rowId: string) => {
+    if (mode === 'edit') return;
     setRows((prev) => {
       const next = prev.filter((r) => r.id !== rowId);
       return next.length === 0 ? [createEmptyRow()] : next;
     });
-  }, []);
+  }, [mode]);
 
   const handleRowChange = useCallback(
     (rowIndex: number, field: RowField, value: string) => {
+      if (mode === 'edit') return; // Prevent row mutations in view mode
       setRows((prev) => {
         const next = [...prev];
         const row = { ...next[rowIndex] };
@@ -243,7 +246,7 @@ export function BulkInwardEntryForm({
         return next;
       });
     },
-    []
+    [mode]
   );
 
   const tryAdvanceOnEnter = useCallback(
@@ -412,6 +415,7 @@ export function BulkInwardEntryForm({
   }, [clearForNewEntry, inwardNo, loadVoucher, vouchersByInwardNo]);
 
   const handleSave = useCallback(() => {
+    if (mode === 'edit') return;
     const parsed = parseInwardSeq(inwardNo);
     if (!parsed) {
       toast({ variant: 'destructive', title: 'Invalid Inward No format', description: 'Use INW-001' });
@@ -549,7 +553,7 @@ export function BulkInwardEntryForm({
     vouchersByInwardNo,
   ]);
 
-  const saveButtonLabel = mode === 'edit' ? 'Update Entry' : 'Save Entry';
+  const isEditMode = mode === 'edit';
 
   return (
     <Card className="border shadow-sm">
@@ -557,7 +561,7 @@ export function BulkInwardEntryForm({
         <div className="flex items-start justify-between gap-4">
           <div className="space-y-1">
             <div className="text-sm font-semibold">Inward Entry</div>
-            {mode === 'edit' && <div className="text-xs text-muted-foreground">Editing: {inwardNo}</div>}
+            {isEditMode && <div className="text-xs text-muted-foreground">Viewing: {inwardNo}</div>}
             {mode === 'clientView' && (
               <div className="text-xs text-muted-foreground">
                 Showing results for: {selectedClient?.name ?? 'Client'}
@@ -609,7 +613,7 @@ export function BulkInwardEntryForm({
               />
 
               {showSuggestions && filteredClients.length > 0 && (
-                <div className="absolute z-50 mt-1 max-h-64 w-full overflow-auto rounded-md border bg-background shadow">
+                <div className="absolute z-[100] mt-1 max-h-64 w-full overflow-auto rounded-md border bg-background shadow-lg">
                   {filteredClients.map((client, index) => (
                     <div
                       key={client.id}
@@ -630,31 +634,29 @@ export function BulkInwardEntryForm({
             <Input
               type="date"
               value={voucherDate}
-              onChange={(e) => {
-                const next = e.target.value;
-                setVoucherDate(next);
-              }}
+              onChange={(e) => { if (mode !== 'edit') setVoucherDate(e.target.value); }}
+              readOnly={isEditMode}
             />
           </div>
 
           <div className="md:col-span-2">
             <Label>Gate Pass No</Label>
-            <Input value={gatePassNo} onChange={(e) => setGatePassNo(e.target.value)} />
+            <Input value={gatePassNo} onChange={(e) => { if (mode !== 'edit') setGatePassNo(e.target.value); }} readOnly={isEditMode} />
           </div>
 
           <div className="md:col-span-2">
             <Label>Vehicle No</Label>
-            <Input value={vehicleNo} onChange={(e) => setVehicleNo(e.target.value)} />
+            <Input value={vehicleNo} onChange={(e) => { if (mode !== 'edit') setVehicleNo(e.target.value); }} readOnly={isEditMode} />
           </div>
 
           <div className="md:col-span-2">
             <Label>Driver Name</Label>
-            <Input value={driverName} onChange={(e) => setDriverName(e.target.value)} />
+            <Input value={driverName} onChange={(e) => { if (mode !== 'edit') setDriverName(e.target.value); }} readOnly={isEditMode} />
           </div>
 
           <div className="md:col-span-2">
             <Label>Mobile No</Label>
-            <Input value={mobile} onChange={(e) => setMobile(e.target.value)} />
+            <Input value={mobile} onChange={(e) => { if (mode !== 'edit') setMobile(e.target.value); }} readOnly={isEditMode} />
           </div>
         </div>
 
@@ -696,7 +698,7 @@ export function BulkInwardEntryForm({
             </Table>
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-md border">
+          <div className="overflow-x-auto overflow-y-visible rounded-md border">
             <Table className="text-sm">
               <TableHeader>
                 <TableRow className="bg-muted/30">
@@ -710,7 +712,7 @@ export function BulkInwardEntryForm({
                   <TableHead className="w-[120px]">Unit</TableHead>
                   <TableHead className="w-[110px] text-right">Bag Wt</TableHead>
                   <TableHead className="w-[120px] text-right">Tot Wt</TableHead>
-                  <TableHead className="w-[70px] text-right">Del</TableHead>
+                  {mode !== 'edit' && <TableHead className="w-[70px] text-right">Del</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -729,6 +731,7 @@ export function BulkInwardEntryForm({
                               tryAdvanceOnEnter(idx, 'itemName');
                             }
                           }}
+                          readOnly={isEditMode}
                           className="h-8"
                         />
                       </TableCell>
@@ -743,6 +746,7 @@ export function BulkInwardEntryForm({
                               tryAdvanceOnEnter(idx, 'brand');
                             }
                           }}
+                          readOnly={isEditMode}
                           className="h-8"
                         />
                       </TableCell>
@@ -758,6 +762,7 @@ export function BulkInwardEntryForm({
                               tryAdvanceOnEnter(idx, 'mfgDate');
                             }
                           }}
+                          readOnly={isEditMode}
                           className="h-8"
                         />
                       </TableCell>
@@ -773,6 +778,7 @@ export function BulkInwardEntryForm({
                               tryAdvanceOnEnter(idx, 'expDate');
                             }
                           }}
+                          readOnly={isEditMode}
                           className="h-8"
                         />
                       </TableCell>
@@ -787,6 +793,7 @@ export function BulkInwardEntryForm({
                               tryAdvanceOnEnter(idx, 'batch');
                             }
                           }}
+                          readOnly={isEditMode}
                           className="h-8"
                         />
                       </TableCell>
@@ -795,7 +802,7 @@ export function BulkInwardEntryForm({
                           value={row.chamberId}
                           onValueChange={(val) => handleRowChange(idx, 'chamberId', val)}
                         >
-                          <SelectTrigger className="h-8">
+                          <SelectTrigger className={`h-8${isEditMode ? ' pointer-events-none' : ''}`}>
                             <SelectValue placeholder="Select" />
                           </SelectTrigger>
                           <SelectContent>
@@ -819,12 +826,13 @@ export function BulkInwardEntryForm({
                               tryAdvanceOnEnter(idx, 'bags');
                             }
                           }}
+                          readOnly={isEditMode}
                           className="h-8 text-right"
                         />
                       </TableCell>
                       <TableCell className="p-1">
                         <Select value={row.unit} onValueChange={(val) => handleRowChange(idx, 'unit', val)}>
-                          <SelectTrigger className="h-8">
+                          <SelectTrigger className={`h-8${isEditMode ? ' pointer-events-none' : ''}`}>
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -845,23 +853,26 @@ export function BulkInwardEntryForm({
                               tryAdvanceOnEnter(idx, 'bagWeight');
                             }
                           }}
+                          readOnly={isEditMode}
                           className="h-8 text-right"
                         />
                       </TableCell>
                       <TableCell className="p-1">
                         <Input value={row.totalWeight ? row.totalWeight.toFixed(2) : ''} readOnly className="h-8 text-right" />
                       </TableCell>
-                      <TableCell className="p-1 text-right">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          className="h-8 px-2"
-                          onClick={() => removeRow(row.id)}
-                          disabled={rows.length <= 1}
-                        >
-                          Del
-                        </Button>
-                      </TableCell>
+                      {mode !== 'edit' && (
+                        <TableCell className="p-1 text-right">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            className="h-8 px-2"
+                            onClick={() => removeRow(row.id)}
+                            disabled={rows.length <= 1}
+                          >
+                            Del
+                          </Button>
+                        </TableCell>
+                      )}
                     </TableRow>
                   );
                 })}
@@ -873,9 +884,11 @@ export function BulkInwardEntryForm({
         {mode !== 'clientView' && (
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div className="flex gap-2">
-              <Button type="button" onClick={handleSave}>
-                {saveButtonLabel}
-              </Button>
+              {mode !== 'edit' && (
+                <Button type="button" onClick={handleSave}>
+                  Save Entry
+                </Button>
+              )}
             </div>
 
             <div className="text-xs text-muted-foreground">
@@ -889,7 +902,7 @@ export function BulkInwardEntryForm({
           <div className="grid grid-cols-1 gap-3 md:grid-cols-12">
             <div className="md:col-span-8">
               <Label>Notes</Label>
-              <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} />
+              <Textarea value={notes} onChange={(e) => { if (mode !== 'edit') setNotes(e.target.value); }} readOnly={isEditMode} />
             </div>
             <div className="md:col-span-4">
               <div className="rounded-md border p-3 text-xs">

@@ -4,12 +4,13 @@ export type UserRole = 'MASTER_ADMIN' | 'ADMIN' | 'SUB_ADMIN';
 export type UserStatus = 'ACTIVE' | 'INACTIVE';
 
 export type User = {
-  id: string;
+  id: string;          // Firestore document ID (= Firebase Auth UID after migration)
+  uid?: string;        // Firebase Auth UID — same as id after migration
   name: string;
   username?: string;
   email?: string;
   mobile?: string;
-  password?: string;
+  password?: string;   // Legacy only — NOT stored in Firestore, kept for localStorage compat during migration
   avatar?: string;
   role: UserRole;
   status?: UserStatus;

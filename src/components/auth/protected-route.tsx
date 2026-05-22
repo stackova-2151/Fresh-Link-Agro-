@@ -29,11 +29,18 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
     }
   }, [allowedRoles, isLoading, pathname, router, user]);
 
-  if (isLoading) return null;
+  // Show a lightweight spinner while auth restores — no blank flash
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      </div>
+    );
+  }
 
   if (!user) return null;
 
   if (allowedRoles && allowedRoles.length > 0 && !allowedRoles.includes(user.role)) return null;
 
-  return children;
+  return <>{children}</>;
 }

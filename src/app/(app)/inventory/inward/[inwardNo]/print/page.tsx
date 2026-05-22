@@ -3,31 +3,54 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { format } from 'date-fns';
+import { collection, getDocs, query, where } from 'firebase/firestore';
 
 import { Button } from '@/components/ui/button';
 import { Download, Printer } from 'lucide-react';
 
-import { clients } from '@/lib/data';
-import { loadInwardVouchers } from '@/lib/voucher-storage';
+import { db } from '@/lib/firebase';
+import { clientsService } from '@/lib/firestore';
 import type { InwardVoucher } from '@/components/inventory/bulk-inward-entry-form';
+import type { Client } from '@/lib/types';
+
+async function loadVoucherByInwardNo(inwardNo: string): Promise<InwardVoucher | null> {
+  try {
+    const snap = await getDocs(
+      query(collection(db, 'inwardVouchers'), where('inwardNo', '==', inwardNo))
+    );
+    if (snap.empty) return null;
+    const d = snap.docs[0];
+    return { id: d.id, ...d.data() } as InwardVoucher;
+  } catch {
+    return null;
+  }
+}
 
 export default function InwardPrintPage() {
   const params = useParams();
   const inwardNoParam = (params.inwardNo as string | undefined) ?? '';
 
   const [voucher, setVoucher] = useState<InwardVoucher | null>(null);
+  const [client, setClient] = useState<Client | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const key = decodeURIComponent(inwardNoParam || '').trim().toUpperCase();
-    const all = loadInwardVouchers();
-    const found = all.find((v) => v.inwardNo.trim().toUpperCase() === key) ?? null;
-    setVoucher(found);
-  }, [inwardNoParam]);
 
-  const client = useMemo(() => {
-    if (!voucher) return null;
-    return clients.find((c) => c.id === voucher.clientId) ?? null;
-  }, [voucher]);
+    async function load() {
+      const found = await loadVoucherByInwardNo(key);
+      setVoucher(found);
+
+      if (found?.clientId) {
+        const c = await clientsService.getById(found.clientId);
+        setClient(c);
+      }
+
+      setLoading(false);
+    }
+
+    load();
+  }, [inwardNoParam]);
 
   useEffect(() => {
     if (!voucher) return;
@@ -44,6 +67,10 @@ export default function InwardPrintPage() {
     if (!voucher) return 0;
     return voucher.items.reduce((sum, r) => sum + (r.totalWeight || 0), 0);
   }, [voucher]);
+
+  if (loading) {
+    return <div className="p-8 text-center text-muted-foreground">Loading...</div>;
+  }
 
   if (!voucher) {
     return <div className="p-8 text-center">Voucher not found: {decodeURIComponent(inwardNoParam || '')}</div>;
@@ -63,7 +90,7 @@ export default function InwardPrintPage() {
           </div>
           <div className="text-right flex flex-col items-end">
             <div className="w-12 h-12 relative opacity-50 mb-1">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className="w-12 h-12 text-green-600"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className="w-12 h-12 text-green-600"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" /></svg>
             </div>
             <p className="text-[10px] font-bold text-green-700 uppercase">Fresh Link</p>
           </div>
@@ -138,19 +165,14 @@ export default function InwardPrintPage() {
                   <td className="p-2 text-right font-bold">{(item.totalWeight || 0).toFixed(2)}</td>
                 </tr>
               ))}
-
               {[...Array(Math.max(0, 5 - voucher.items.length))].map((_, i) => (
                 <tr key={`empty-${i}`} className="border-b border-slate-200 h-10">
-                  <td className="border-r border-slate-800" />
-                  <td className="border-r border-slate-800" />
-                  <td className="border-r border-slate-800" />
-                  <td className="border-r border-slate-800" />
-                  <td className="border-r border-slate-800" />
-                  <td className="border-r border-slate-800" />
+                  <td className="border-r border-slate-800" /><td className="border-r border-slate-800" />
+                  <td className="border-r border-slate-800" /><td className="border-r border-slate-800" />
+                  <td className="border-r border-slate-800" /><td className="border-r border-slate-800" />
                   <td className="p-2" />
                 </tr>
               ))}
-
               <tr className="border-t-2 border-slate-800 bg-slate-50 font-bold h-10">
                 <td colSpan={5} className="border-r border-slate-800 p-2 text-right uppercase">Total</td>
                 <td className="border-r border-slate-800 p-2 text-center">{totalQty}</td>
@@ -191,7 +213,6 @@ export default function InwardPrintPage() {
           .print\\:hidden { display: none !important; }
           header, footer, nav, aside { display: none !important; }
           main { padding: 0 !important; margin: 0 !important; width: 100% !important; }
-          .card { border: none !important; box-shadow: none !important; }
           @page { margin: 1.5cm; }
         }
       `}</style>

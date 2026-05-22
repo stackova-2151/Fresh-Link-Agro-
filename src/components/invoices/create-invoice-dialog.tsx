@@ -20,11 +20,15 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { clients } from '@/lib/data';
+import type { Client } from '@/lib/types';
 import { PlusCircle, FilePlus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
-export function CreateInvoiceDialog() {
+interface CreateInvoiceDialogProps {
+  clients: Client[];
+}
+
+export function CreateInvoiceDialog({ clients }: CreateInvoiceDialogProps) {
   const [selectedClientId, setSelectedClientId] = useState<string>('');
   const [open, setOpen] = useState(false);
   const router = useRouter();

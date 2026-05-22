@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
@@ -16,165 +15,50 @@ import { useUser } from '@/context/user-context';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Eye, EyeOff } from 'lucide-react';
-import { ensureMasterAdminSeeded, getUserByEmail, getUserByUsername, loadUsers, saveUsers, normalizeStatus } from '@/lib/user-storage';
-import { LogIn } from 'lucide-react';
+import { Eye, EyeOff, LogIn } from 'lucide-react';
 
 export function LoginPageClient() {
-  const { login } = useUser();
+  const { login, user, isLoading } = useUser();
   const router = useRouter();
 
   const [loginIdentifier, setLoginIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-
-  const [isBootstrapping, setIsBootstrapping] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // If already logged in, redirect to dashboard
   useEffect(() => {
-    try {
-      const authError = localStorage.getItem('authError');
-      if (authError) {
-        localStorage.removeItem('authError');
-        setError(authError);
-      }
-    } catch {
-      // ignore
+    if (!isLoading && user) {
+      router.push('/dashboard');
     }
-  }, []);
+  }, [user, isLoading, router]);
 
-  useEffect(() => {
-    let cancelled = false;
+  const isSubmitDisabled = useMemo(
+    () => isSubmitting || !loginIdentifier.trim() || !password,
+    [isSubmitting, loginIdentifier, password]
+  );
 
-    (async () => {
-      setIsBootstrapping(true);
-      const result = await ensureMasterAdminSeeded();
-      if (cancelled) return;
-
-      if (!result.ok) {
-        setError(result.error);
-      }
-
-      setIsBootstrapping(false);
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const isSubmitDisabled = useMemo(() => {
-    if (isBootstrapping) return true;
-    return !loginIdentifier.trim() || !password;
-  }, [loginIdentifier, password, isBootstrapping]);
-
-  const handleLogin = () => {
+  const handleLogin = async () => {
     setError(null);
+    setIsSubmitting(true);
 
-    if (isBootstrapping) return;
-
-    // TEMPORARY TEST LOGIN MODE - Check hardcoded test users first
-    const normalizedIdentifier = loginIdentifier.trim().toLowerCase();
-    const normalizedPassword = password.trim();
-
-    // MASTER_ADMIN test user
-    if ((normalizedIdentifier === 'masteradmin' || normalizedIdentifier === 'masteradmin@gmail.com') && normalizedPassword === '123456') {
-      const tempMasterAdmin = {
-        id: 'temp_master_admin',
-        name: 'Master Admin (Test)',
-        email: 'masteradmin@gmail.com',
-        role: 'MASTER_ADMIN' as const,
-        status: 'ACTIVE' as const,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      
-      // Ensure temp user exists in users storage for session validation
-      const existingUsers = loadUsers();
-      const tempUserExists = existingUsers.some(u => u.id === tempMasterAdmin.id);
-      if (!tempUserExists) {
-        saveUsers([...existingUsers, tempMasterAdmin]);
+    try {
+      const result = await login(loginIdentifier.trim(), password);
+      if (result.error) {
+        setError(result.error);
+      } else {
+        router.push('/dashboard');
       }
-      
-      login(tempMasterAdmin);
-      router.push('/dashboard');
-      return;
+    } finally {
+      setIsSubmitting(false);
     }
+  };
 
-    // ADMIN test user
-    if ((normalizedIdentifier === 'admin' || normalizedIdentifier === 'admin@gmail.com') && normalizedPassword === '123456') {
-      const tempAdmin = {
-        id: 'temp_admin',
-        name: 'Admin (Test)',
-        email: 'admin@gmail.com',
-        role: 'ADMIN' as const,
-        status: 'ACTIVE' as const,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      
-      // Ensure temp user exists in users storage for session validation
-      const existingUsers = loadUsers();
-      const tempUserExists = existingUsers.some(u => u.id === tempAdmin.id);
-      if (!tempUserExists) {
-        saveUsers([...existingUsers, tempAdmin]);
-      }
-      
-      login(tempAdmin);
-      router.push('/dashboard');
-      return;
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !isSubmitDisabled) {
+      handleLogin();
     }
-
-    // SUB_ADMIN test user
-    if ((normalizedIdentifier === 'subadmin' || normalizedIdentifier === 'subadmin@gmail.com') && normalizedPassword === '123456') {
-      const tempSubAdmin = {
-        id: 'temp_sub_admin',
-        name: 'Sub Admin (Test)',
-        email: 'subadmin@gmail.com',
-        username: 'subadmin',
-        role: 'SUB_ADMIN' as const,
-        status: 'ACTIVE' as const,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      
-      // Ensure temp user exists in users storage for session validation
-      const existingUsers = loadUsers();
-      const tempUserExists = existingUsers.some(u => u.id === tempSubAdmin.id);
-      if (!tempUserExists) {
-        saveUsers([...existingUsers, tempSubAdmin]);
-      }
-      
-      login(tempSubAdmin);
-      router.push('/dashboard');
-      return;
-    }
-
-    // EXISTING REAL LOGIN LOGIC - Continue with normal validation
-    // Try email first, then username
-    let userToLogin = getUserByEmail(loginIdentifier);
-    
-    if (!userToLogin) {
-      userToLogin = getUserByUsername(loginIdentifier);
-    }
-
-    if (!userToLogin) {
-      setError('Invalid credentials.');
-      return;
-    }
-
-    if (normalizeStatus(userToLogin.status) === 'INACTIVE') {
-      setError('Your account is inactive. Please contact the administrator.');
-      return;
-    }
-
-    if ((userToLogin.password || '') !== password) {
-      setError('Invalid credentials.');
-      return;
-    }
-
-    login(userToLogin);
-    router.push('/dashboard');
   };
 
   return (
@@ -182,12 +66,24 @@ export function LoginPageClient() {
       <Card className="w-full max-w-sm">
         <CardHeader>
           <div className="flex items-center gap-2 mb-2">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-8 h-8 text-primary"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="w-8 h-8 text-primary"
+            >
+              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+            </svg>
             <h1 className="text-2xl font-bold font-headline text-primary">FoodSafe</h1>
           </div>
           <CardTitle className="text-2xl">Login</CardTitle>
           <CardDescription>Sign in to continue.</CardDescription>
         </CardHeader>
+
         <CardContent className="grid gap-4">
           {error && (
             <Alert variant="destructive">
@@ -197,14 +93,16 @@ export function LoginPageClient() {
 
           <div className="space-y-4">
             <div className="grid gap-2">
-              <Label htmlFor="loginIdentifier">Email or Username</Label>
+              <Label htmlFor="loginIdentifier">Email</Label>
               <Input
                 id="loginIdentifier"
-                type="text"
+                type="email"
                 value={loginIdentifier}
                 onChange={(e) => setLoginIdentifier(e.target.value)}
-                placeholder="name@company.com or username"
+                onKeyDown={handleKeyDown}
+                placeholder="name@company.com"
                 autoComplete="username"
+                disabled={isSubmitting}
               />
             </div>
 
@@ -213,17 +111,20 @@ export function LoginPageClient() {
               <div className="relative">
                 <Input
                   id="password"
-                  type={showPassword ? "text" : "password"}
+                  type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  onKeyDown={handleKeyDown}
                   placeholder="Enter your password"
                   autoComplete="current-password"
                   className="pr-10"
+                  disabled={isSubmitting}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                  tabIndex={-1}
                 >
                   {showPassword ? (
                     <EyeOff className="h-4 w-4" />
@@ -235,10 +136,27 @@ export function LoginPageClient() {
             </div>
           </div>
         </CardContent>
+
         <CardFooter>
-          <Button className="w-full" onClick={handleLogin} disabled={isSubmitDisabled}>
-            <LogIn className="mr-2 h-4 w-4" />
-            Login
+          <Button
+            className="w-full"
+            onClick={handleLogin}
+            disabled={isSubmitDisabled}
+          >
+            {isSubmitting ? (
+              <span className="flex items-center gap-2">
+                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                </svg>
+                Signing in...
+              </span>
+            ) : (
+              <>
+                <LogIn className="mr-2 h-4 w-4" />
+                Login
+              </>
+            )}
           </Button>
         </CardFooter>
       </Card>

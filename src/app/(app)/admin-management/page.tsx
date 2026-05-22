@@ -7,10 +7,25 @@ import { ProtectedRoute } from '@/components/auth/protected-route';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,9 +41,11 @@ import { Switch } from '@/components/ui/switch';
 
 import { useToast } from '@/hooks/use-toast';
 import { useUser } from '@/context/user-context';
+import { authHeaders } from '@/lib/auth-client';
+import { collection, getDocs, query, where } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 import type { User } from '@/lib/types';
-import { createUser, deleteUser, loadUsers, updateUser } from '@/lib/user-storage';
 
 type AdminFormState = {
   name: string;
@@ -45,14 +62,30 @@ function isValidEmail(email: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 }
 
-function toBoolStatus(status: User['status'] | undefined) {
-  return status !== 'INACTIVE';
-}
-
 function formatDate(iso: string | undefined) {
   if (!iso) return '-';
   const d = new Date(iso);
   return Number.isNaN(d.getTime()) ? '-' : d.toLocaleDateString();
+}
+
+async function loadAdmins(): Promise<User[]> {
+  const snap = await getDocs(
+    query(collection(db, 'users'), where('role', '==', 'ADMIN'))
+  );
+  return snap.docs.map((d) => {
+    const data = d.data();
+    return {
+      id: d.id,
+      uid: d.id,
+      name: data.name,
+      email: data.email,
+      mobile: data.mobile,
+      role: data.role,
+      status: data.status,
+      createdAt: data.createdAt?.toDate?.()?.toISOString(),
+      updatedAt: data.updatedAt?.toDate?.()?.toISOString(),
+    } as User;
+  });
 }
 
 export default function AdminManagementPage() {
@@ -60,11 +93,9 @@ export default function AdminManagementPage() {
   const { user: currentUser, refreshCurrentUser } = useUser();
 
   const [admins, setAdmins] = useState<User[]>([]);
-
   const [createOpen, setCreateOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [editing, setEditing] = useState<User | null>(null);
-
   const [isSending, setIsSending] = useState(false);
 
   const [form, setForm] = useState<AdminFormState>({
@@ -76,127 +107,106 @@ export default function AdminManagementPage() {
     status: true,
   });
 
-  const existingEmails = useMemo(() => {
-    const all = loadUsers();
-    return new Set(all.map((u) => (u.email || '').trim().toLowerCase()).filter(Boolean));
-  }, [admins.length]);
-
-  const load = () => {
-    const all = loadUsers();
-    setAdmins(all.filter((u) => u.role === 'ADMIN'));
+  const load = async () => {
+    try {
+      const data = await loadAdmins();
+      setAdmins(data);
+    } catch {
+      toast({ title: 'Error', description: 'Failed to load admins.', variant: 'destructive' });
+    }
   };
 
   useEffect(() => {
     load();
   }, []);
 
-  const resetForm = () => {
-    setForm({
-      name: '',
-      email: '',
-      mobile: '',
-      password: '',
-      confirmPassword: '',
-      status: true,
-    });
-  };
+  const resetForm = () =>
+    setForm({ name: '', email: '', mobile: '', password: '', confirmPassword: '', status: true });
 
   const validateCreate = (): string | null => {
-    const name = form.name.trim();
-    const email = form.email.trim().toLowerCase();
-    const mobile = form.mobile.trim();
-
-    if (!name) return 'Full Name is required.';
-    if (!email) return 'Email is required.';
-    if (!isValidEmail(email)) return 'Enter a valid email address.';
-    if (existingEmails.has(email)) return 'Email already exists.';
-    if (!mobile) return 'Mobile Number is required.';
-
+    if (!form.name.trim()) return 'Full Name is required.';
+    if (!form.email.trim()) return 'Email is required.';
+    if (!isValidEmail(form.email)) return 'Enter a valid email address.';
+    if (!form.mobile.trim()) return 'Mobile Number is required.';
     if (!form.password) return 'Password is required.';
-    if (form.password.length < MIN_PASSWORD_LEN) return `Password must be at least ${MIN_PASSWORD_LEN} characters.`;
+    if (form.password.length < MIN_PASSWORD_LEN)
+      return `Password must be at least ${MIN_PASSWORD_LEN} characters.`;
     if (form.password !== form.confirmPassword) return 'Passwords do not match.';
-
     return null;
   };
 
   const validateEdit = (): string | null => {
-    if (!editing) return 'No admin selected.';
-
-    const name = form.name.trim();
-    const email = form.email.trim().toLowerCase();
-    const mobile = form.mobile.trim();
-
-    if (!name) return 'Full Name is required.';
-    if (!email) return 'Email is required.';
-    if (!isValidEmail(email)) return 'Enter a valid email address.';
-
-    const all = loadUsers();
-    const duplicate = all.find((u) => (u.email || '').trim().toLowerCase() === email && u.id !== editing.id);
-    if (duplicate) return 'Email already exists.';
-
-    if (!mobile) return 'Mobile Number is required.';
-
+    if (!form.name.trim()) return 'Full Name is required.';
+    if (!form.email.trim()) return 'Email is required.';
+    if (!isValidEmail(form.email)) return 'Enter a valid email address.';
+    if (!form.mobile.trim()) return 'Mobile Number is required.';
     if (form.password || form.confirmPassword) {
-      if (form.password.length < MIN_PASSWORD_LEN) return `Password must be at least ${MIN_PASSWORD_LEN} characters.`;
+      if (form.password.length < MIN_PASSWORD_LEN)
+        return `Password must be at least ${MIN_PASSWORD_LEN} characters.`;
       if (form.password !== form.confirmPassword) return 'Passwords do not match.';
     }
-
     return null;
   };
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     const err = validateCreate();
     if (err) {
       toast({ title: 'Validation error', description: err, variant: 'destructive' });
       return;
     }
 
-    const payload = {
-      name: form.name.trim(),
-      email: form.email.trim().toLowerCase(),
-      mobile: form.mobile.trim(),
-      password: form.password,
-      role: 'ADMIN',
-      status: form.status ? 'ACTIVE' : 'INACTIVE',
-      createdBy: currentUser?.id,
-      avatar: '',
-      username: undefined,
-    } as const;
-
-    createUser(payload);
-
     setIsSending(true);
-    (async () => {
-      try {
-        const res = await fetch('/api/send-admin-mail', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: payload.name, email: payload.email, password: payload.password }),
-        });
+    try {
+      const headers = await authHeaders();
 
-        if (!res.ok) {
-          toast({
-            title: 'Admin created',
-            description: 'User created but email sending failed.',
-            variant: 'destructive',
-          });
-        } else {
-          toast({ title: 'Admin created', description: 'Admin created and credentials email sent.' });
-        }
-      } catch {
+      // Create user via secure API
+      const createRes = await fetch('/api/admin/create-user', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          name: form.name.trim(),
+          email: form.email.trim().toLowerCase(),
+          mobile: form.mobile.trim(),
+          password: form.password,
+          role: 'ADMIN',
+        }),
+      });
+
+      const createData = await createRes.json();
+      if (!createRes.ok) {
+        toast({ title: 'Error', description: createData.error, variant: 'destructive' });
+        return;
+      }
+
+      // Send credentials email
+      const mailRes = await fetch('/api/send-admin-mail', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          name: form.name.trim(),
+          email: form.email.trim().toLowerCase(),
+        }),
+      });
+
+      if (!mailRes.ok) {
         toast({
           title: 'Admin created',
-          description: 'User created but email sending failed.',
+          description: 'Admin created but email sending failed.',
           variant: 'destructive',
         });
-      } finally {
-        setIsSending(false);
-        resetForm();
-        setCreateOpen(false);
-        load();
-        refreshCurrentUser();
+      } else {
+        toast({ title: 'Admin created', description: 'Admin created and credentials email sent.' });
       }
-    })();
+
+      resetForm();
+      setCreateOpen(false);
+      await load();
+      await refreshCurrentUser();
+    } catch {
+      toast({ title: 'Error', description: 'Failed to create admin.', variant: 'destructive' });
+    } finally {
+      setIsSending(false);
+    }
   };
 
   const openEdit = (admin: User) => {
@@ -207,50 +217,96 @@ export default function AdminManagementPage() {
       mobile: admin.mobile || '',
       password: '',
       confirmPassword: '',
-      status: toBoolStatus(admin.status),
+      status: admin.status !== 'INACTIVE',
     });
     setEditOpen(true);
   };
 
-  const handleEdit = () => {
+  const handleEdit = async () => {
     const err = validateEdit();
     if (err) {
       toast({ title: 'Validation error', description: err, variant: 'destructive' });
       return;
     }
-
     if (!editing) return;
 
-    updateUser(editing.id, {
-      name: form.name.trim(),
-      email: form.email.trim().toLowerCase(),
-      mobile: form.mobile.trim(),
-      status: form.status ? 'ACTIVE' : 'INACTIVE',
-      ...(form.password ? { password: form.password } : {}),
-    });
+    setIsSending(true);
+    try {
+      const headers = await authHeaders();
+      const body: Record<string, string> = {
+        uid: editing.uid || editing.id,
+        name: form.name.trim(),
+        email: form.email.trim().toLowerCase(),
+        mobile: form.mobile.trim(),
+      };
+      if (form.password) body.password = form.password;
 
-    toast({ title: 'Admin updated', description: 'Admin account has been updated successfully.' });
-    setEditOpen(false);
-    setEditing(null);
-    resetForm();
-    load();
-    refreshCurrentUser();
+      const res = await fetch('/api/admin/update-user', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        toast({ title: 'Error', description: data.error, variant: 'destructive' });
+        return;
+      }
+
+      toast({ title: 'Admin updated', description: 'Admin account updated successfully.' });
+      setEditOpen(false);
+      setEditing(null);
+      resetForm();
+      await load();
+      await refreshCurrentUser();
+    } catch {
+      toast({ title: 'Error', description: 'Failed to update admin.', variant: 'destructive' });
+    } finally {
+      setIsSending(false);
+    }
   };
 
-  const handleToggleStatus = (admin: User) => {
+  const handleToggleStatus = async (admin: User) => {
     const nextStatus = admin.status === 'INACTIVE' ? 'ACTIVE' : 'INACTIVE';
-    updateUser(admin.id, { status: nextStatus });
-
-    toast({ title: 'Status updated', description: `Admin marked as ${nextStatus}.` });
-    load();
-    refreshCurrentUser();
+    try {
+      const headers = await authHeaders();
+      const res = await fetch('/api/admin/toggle-status', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ uid: admin.uid || admin.id, status: nextStatus }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast({ title: 'Error', description: data.error, variant: 'destructive' });
+        return;
+      }
+      toast({ title: 'Status updated', description: `Admin marked as ${nextStatus}.` });
+      await load();
+      await refreshCurrentUser();
+    } catch {
+      toast({ title: 'Error', description: 'Failed to update status.', variant: 'destructive' });
+    }
   };
 
-  const handleDelete = (admin: User) => {
-    deleteUser(admin.id);
-    toast({ title: 'Admin deleted', description: 'Admin account has been deleted successfully.' });
-    load();
-    refreshCurrentUser();
+  const handleDelete = async (admin: User) => {
+    try {
+      const headers = await authHeaders();
+      const res = await fetch('/api/admin/delete-user', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ uid: admin.uid || admin.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast({ title: 'Error', description: data.error, variant: 'destructive' });
+        return;
+      }
+      toast({ title: 'Admin deleted', description: 'Admin account deleted successfully.' });
+      await load();
+      await refreshCurrentUser();
+    } catch {
+      toast({ title: 'Error', description: 'Failed to delete admin.', variant: 'destructive' });
+    }
   };
 
   return (
@@ -271,47 +327,30 @@ export default function AdminManagementPage() {
                   <DialogTitle>Create Admin</DialogTitle>
                   <DialogDescription>Admin users login using email and password.</DialogDescription>
                 </DialogHeader>
-
                 <div className="grid gap-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="admin_name">Full Name</Label>
-                    <Input id="admin_name" value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} />
-                  </div>
-
-                  <div className="grid gap-2">
-                    <Label htmlFor="admin_email">Email</Label>
-                    <Input id="admin_email" type="email" value={form.email} onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))} />
-                  </div>
-
-                  <div className="grid gap-2">
-                    <Label htmlFor="admin_mobile">Mobile Number</Label>
-                    <Input id="admin_mobile" value={form.mobile} onChange={(e) => setForm((p) => ({ ...p, mobile: e.target.value }))} />
-                  </div>
-
+                  {(['name', 'email', 'mobile'] as const).map((field) => (
+                    <div key={field} className="grid gap-2">
+                      <Label htmlFor={`admin_${field}`} className="capitalize">{field === 'mobile' ? 'Mobile Number' : field === 'email' ? 'Email' : 'Full Name'}</Label>
+                      <Input
+                        id={`admin_${field}`}
+                        type={field === 'email' ? 'email' : 'text'}
+                        value={form[field]}
+                        onChange={(e) => setForm((p) => ({ ...p, [field]: e.target.value }))}
+                      />
+                    </div>
+                  ))}
                   <div className="grid gap-2">
                     <Label htmlFor="admin_password">Password</Label>
                     <Input id="admin_password" type="password" value={form.password} onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))} />
                   </div>
-
                   <div className="grid gap-2">
                     <Label htmlFor="admin_confirm">Confirm Password</Label>
                     <Input id="admin_confirm" type="password" value={form.confirmPassword} onChange={(e) => setForm((p) => ({ ...p, confirmPassword: e.target.value }))} />
                   </div>
-
-                  <div className="flex items-center justify-between">
-                    <Label>Status</Label>
-                    <div className="flex items-center gap-3">
-                      <Badge variant={form.status ? 'secondary' : 'destructive'} className={form.status ? 'bg-green-100 text-green-800' : ''}>
-                        {form.status ? 'ACTIVE' : 'INACTIVE'}
-                      </Badge>
-                      <Switch checked={form.status} onCheckedChange={(v) => setForm((p) => ({ ...p, status: v }))} />
-                    </div>
-                  </div>
                 </div>
-
                 <DialogFooter>
                   <Button variant="outline" onClick={() => { resetForm(); setCreateOpen(false); }} disabled={isSending}>Cancel</Button>
-                  <Button onClick={handleCreate} disabled={isSending}>Create</Button>
+                  <Button onClick={handleCreate} disabled={isSending}>{isSending ? 'Creating...' : 'Create'}</Button>
                 </DialogFooter>
               </DialogContent>
             </Dialog>
@@ -336,15 +375,12 @@ export default function AdminManagementPage() {
                     <TableCell colSpan={7} className="text-center text-muted-foreground">No admins found.</TableCell>
                   </TableRow>
                 )}
-
                 {admins.map((admin) => (
                   <TableRow key={admin.id}>
                     <TableCell className="font-medium">{admin.name}</TableCell>
                     <TableCell>{admin.email || '-'}</TableCell>
                     <TableCell>{admin.mobile || '-'}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{admin.role}</Badge>
-                    </TableCell>
+                    <TableCell><Badge variant="outline">{admin.role}</Badge></TableCell>
                     <TableCell>
                       <Badge className={admin.status === 'INACTIVE' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'} variant="secondary">
                         {admin.status === 'INACTIVE' ? 'INACTIVE' : 'ACTIVE'}
@@ -353,11 +389,9 @@ export default function AdminManagementPage() {
                     <TableCell>{formatDate(admin.createdAt)}</TableCell>
                     <TableCell className="text-right space-x-2">
                       <Button variant="outline" size="sm" onClick={() => openEdit(admin)}>Edit</Button>
-
                       <Button variant="outline" size="sm" onClick={() => handleToggleStatus(admin)}>
                         {admin.status === 'INACTIVE' ? 'Activate' : 'Deactivate'}
                       </Button>
-
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
                           <Button variant="destructive" size="sm">Delete</Button>
@@ -365,9 +399,7 @@ export default function AdminManagementPage() {
                         <AlertDialogContent>
                           <AlertDialogHeader>
                             <AlertDialogTitle>Delete Admin</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              This action cannot be undone. This will permanently delete the admin account.
-                            </AlertDialogDescription>
+                            <AlertDialogDescription>This action cannot be undone.</AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
                             <AlertDialogCancel>Cancel</AlertDialogCancel>
@@ -383,62 +415,37 @@ export default function AdminManagementPage() {
           </CardContent>
         </Card>
 
+        {/* Edit Dialog */}
         <Dialog open={editOpen} onOpenChange={setEditOpen}>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Edit Admin</DialogTitle>
               <DialogDescription>Update admin account details.</DialogDescription>
             </DialogHeader>
-
             <div className="grid gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="edit_admin_name">Full Name</Label>
-                <Input id="edit_admin_name" value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} />
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="edit_admin_email">Email</Label>
-                <Input id="edit_admin_email" type="email" value={form.email} onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))} />
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="edit_admin_mobile">Mobile Number</Label>
-                <Input id="edit_admin_mobile" value={form.mobile} onChange={(e) => setForm((p) => ({ ...p, mobile: e.target.value }))} />
-              </div>
-
+              {(['name', 'email', 'mobile'] as const).map((field) => (
+                <div key={field} className="grid gap-2">
+                  <Label htmlFor={`edit_admin_${field}`} className="capitalize">{field === 'mobile' ? 'Mobile Number' : field === 'email' ? 'Email' : 'Full Name'}</Label>
+                  <Input
+                    id={`edit_admin_${field}`}
+                    type={field === 'email' ? 'email' : 'text'}
+                    value={form[field]}
+                    onChange={(e) => setForm((p) => ({ ...p, [field]: e.target.value }))}
+                  />
+                </div>
+              ))}
               <div className="grid gap-2">
                 <Label htmlFor="edit_admin_password">New Password (optional)</Label>
                 <Input id="edit_admin_password" type="password" value={form.password} onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))} />
               </div>
-
               <div className="grid gap-2">
                 <Label htmlFor="edit_admin_confirm">Confirm New Password</Label>
                 <Input id="edit_admin_confirm" type="password" value={form.confirmPassword} onChange={(e) => setForm((p) => ({ ...p, confirmPassword: e.target.value }))} />
               </div>
-
-              <div className="flex items-center justify-between">
-                <Label>Status</Label>
-                <div className="flex items-center gap-3">
-                  <Badge variant={form.status ? 'secondary' : 'destructive'} className={form.status ? 'bg-green-100 text-green-800' : ''}>
-                    {form.status ? 'ACTIVE' : 'INACTIVE'}
-                  </Badge>
-                  <Switch checked={form.status} onCheckedChange={(v) => setForm((p) => ({ ...p, status: v }))} />
-                </div>
-              </div>
             </div>
-
             <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setEditOpen(false);
-                  setEditing(null);
-                  resetForm();
-                }}
-              >
-                Cancel
-              </Button>
-              <Button onClick={handleEdit}>Save</Button>
+              <Button variant="outline" onClick={() => { setEditOpen(false); setEditing(null); resetForm(); }}>Cancel</Button>
+              <Button onClick={handleEdit} disabled={isSending}>{isSending ? 'Saving...' : 'Save'}</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

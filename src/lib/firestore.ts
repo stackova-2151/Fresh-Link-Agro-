@@ -101,7 +101,8 @@ async function update<T>(
   id: string,
   data: Partial<T>
 ): Promise<void> {
-  await updateDoc(doc(db, collectionName, id), data as Record<string, unknown>);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await updateDoc(doc(db, collectionName, id), data as any);
 }
 
 async function remove(collectionName: string, id: string): Promise<void> {

@@ -1,16 +1,31 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { PageHeader } from '@/components/page-header';
 import { ProtectedRoute } from '@/components/auth/protected-route';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,13 +37,14 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { Switch } from '@/components/ui/switch';
 
 import { useToast } from '@/hooks/use-toast';
 import { useUser } from '@/context/user-context';
+import { authHeaders } from '@/lib/auth-client';
+import { collection, getDocs, query, where } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 import type { User } from '@/lib/types';
-import { createUser, deleteUser, loadUsers, updateUser } from '@/lib/user-storage';
 
 type SubAdminFormState = {
   name: string;
@@ -37,7 +53,6 @@ type SubAdminFormState = {
   mobile: string;
   password: string;
   confirmPassword: string;
-  status: boolean;
 };
 
 const MIN_PASSWORD_LEN = 6;
@@ -46,235 +61,211 @@ function isValidEmail(email: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 }
 
-function toBoolStatus(status: User['status'] | undefined) {
-  return status !== 'INACTIVE';
-}
-
 function formatDate(iso: string | undefined) {
   if (!iso) return '-';
   const d = new Date(iso);
   return Number.isNaN(d.getTime()) ? '-' : d.toLocaleDateString();
 }
 
+async function loadSubAdmins(): Promise<User[]> {
+  const snap = await getDocs(
+    query(collection(db, 'users'), where('role', '==', 'SUB_ADMIN'))
+  );
+  return snap.docs.map((d) => {
+    const data = d.data();
+    return {
+      id: d.id,
+      uid: d.id,
+      name: data.name,
+      email: data.email,
+      username: data.username,
+      mobile: data.mobile,
+      role: data.role,
+      status: data.status,
+      createdAt: data.createdAt?.toDate?.()?.toISOString(),
+      updatedAt: data.updatedAt?.toDate?.()?.toISOString(),
+    } as User;
+  });
+}
+
+const emptyForm = (): SubAdminFormState => ({
+  name: '', username: '', email: '', mobile: '', password: '', confirmPassword: '',
+});
+
 export default function SubAdminManagementPage() {
   const { toast } = useToast();
-  const { user: currentUser, refreshCurrentUser } = useUser();
+  const { refreshCurrentUser } = useUser();
 
   const [subAdmins, setSubAdmins] = useState<User[]>([]);
-
   const [createOpen, setCreateOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [editing, setEditing] = useState<User | null>(null);
-
   const [isSending, setIsSending] = useState(false);
+  const [form, setForm] = useState<SubAdminFormState>(emptyForm());
 
-  const [form, setForm] = useState<SubAdminFormState>({
-    name: '',
-    username: '',
-    email: '',
-    mobile: '',
-    password: '',
-    confirmPassword: '',
-    status: true,
-  });
-
-  const existing = useMemo(() => {
-    const all = loadUsers();
-    return {
-      usernames: new Set(all.map((u) => (u.username || '').trim().toLowerCase()).filter(Boolean)),
-      emails: new Set(all.map((u) => (u.email || '').trim().toLowerCase()).filter(Boolean)),
-    };
-  }, [subAdmins.length]);
-
-  const load = () => {
-    const all = loadUsers();
-    setSubAdmins(all.filter((u) => u.role === 'SUB_ADMIN'));
+  const load = async () => {
+    try {
+      setSubAdmins(await loadSubAdmins());
+    } catch {
+      toast({ title: 'Error', description: 'Failed to load sub admins.', variant: 'destructive' });
+    }
   };
 
-  useEffect(() => {
-    load();
-  }, []);
-
-  const resetForm = () => {
-    setForm({
-      name: '',
-      username: '',
-      email: '',
-      mobile: '',
-      password: '',
-      confirmPassword: '',
-      status: true,
-    });
-  };
+  useEffect(() => { load(); }, []);
 
   const validateCreate = (): string | null => {
-    const name = form.name.trim();
-    const username = form.username.trim().toLowerCase();
-    const email = form.email.trim().toLowerCase();
-    const mobile = form.mobile.trim();
-
-    if (!name) return 'Full Name is required.';
-    if (!username) return 'User Name is required.';
-    if (existing.usernames.has(username)) return 'Username already exists.';
-
-    if (!email) return 'Email is required.';
-    if (!isValidEmail(email)) return 'Enter a valid email address.';
-    if (existing.emails.has(email)) return 'Email already exists.';
-
-    if (!mobile) return 'Mobile Number is required.';
-
+    if (!form.name.trim()) return 'Full Name is required.';
+    if (!form.username.trim()) return 'Username is required.';
+    if (!form.email.trim()) return 'Email is required.';
+    if (!isValidEmail(form.email)) return 'Enter a valid email address.';
+    if (!form.mobile.trim()) return 'Mobile Number is required.';
     if (!form.password) return 'Password is required.';
     if (form.password.length < MIN_PASSWORD_LEN) return `Password must be at least ${MIN_PASSWORD_LEN} characters.`;
     if (form.password !== form.confirmPassword) return 'Passwords do not match.';
-
     return null;
   };
 
   const validateEdit = (): string | null => {
-    if (!editing) return 'No sub admin selected.';
-
-    const name = form.name.trim();
-    const username = form.username.trim().toLowerCase();
-    const email = form.email.trim().toLowerCase();
-    const mobile = form.mobile.trim();
-
-    if (!name) return 'Full Name is required.';
-    if (!username) return 'User Name is required.';
-
-    const all = loadUsers();
-    const duplicateUsername = all.find((u) => (u.username || '').trim().toLowerCase() === username && u.id !== editing.id);
-    if (duplicateUsername) return 'Username already exists.';
-
-    if (!email) return 'Email is required.';
-    if (!isValidEmail(email)) return 'Enter a valid email address.';
-    const duplicateEmail = all.find((u) => (u.email || '').trim().toLowerCase() === email && u.id !== editing.id);
-    if (duplicateEmail) return 'Email already exists.';
-
-    if (!mobile) return 'Mobile Number is required.';
-
+    if (!form.name.trim()) return 'Full Name is required.';
+    if (!form.email.trim()) return 'Email is required.';
+    if (!isValidEmail(form.email)) return 'Enter a valid email address.';
+    if (!form.mobile.trim()) return 'Mobile Number is required.';
     if (form.password || form.confirmPassword) {
       if (form.password.length < MIN_PASSWORD_LEN) return `Password must be at least ${MIN_PASSWORD_LEN} characters.`;
       if (form.password !== form.confirmPassword) return 'Passwords do not match.';
     }
-
     return null;
   };
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     const err = validateCreate();
-    if (err) {
-      toast({ title: 'Validation error', description: err, variant: 'destructive' });
-      return;
-    }
-
-    const payload = {
-      name: form.name.trim(),
-      username: form.username.trim().toLowerCase(),
-      email: form.email.trim().toLowerCase(),
-      mobile: form.mobile.trim(),
-      password: form.password,
-      role: 'SUB_ADMIN',
-      status: form.status ? 'ACTIVE' : 'INACTIVE',
-      createdBy: currentUser?.id,
-      avatar: '',
-    } as const;
-
-    createUser(payload);
+    if (err) { toast({ title: 'Validation error', description: err, variant: 'destructive' }); return; }
 
     setIsSending(true);
-    (async () => {
-      try {
-        const res = await fetch('/api/send-subadmin-mail', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: payload.name,
-            email: payload.email,
-            username: payload.username,
-            password: payload.password,
-          }),
-        });
+    try {
+      const headers = await authHeaders();
 
-        if (!res.ok) {
-          toast({
-            title: 'Sub Admin created',
-            description: 'User created but email sending failed.',
-            variant: 'destructive',
-          });
-        } else {
-          toast({ title: 'Sub Admin created', description: 'Sub admin created and credentials email sent.' });
-        }
-      } catch {
-        toast({
-          title: 'Sub Admin created',
-          description: 'User created but email sending failed.',
-          variant: 'destructive',
-        });
-      } finally {
-        setIsSending(false);
-        resetForm();
-        setCreateOpen(false);
-        load();
-        refreshCurrentUser();
+      const createRes = await fetch('/api/admin/create-user', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          name: form.name.trim(),
+          email: form.email.trim().toLowerCase(),
+          username: form.username.trim().toLowerCase(),
+          mobile: form.mobile.trim(),
+          password: form.password,
+          role: 'SUB_ADMIN',
+        }),
+      });
+
+      const createData = await createRes.json();
+      if (!createRes.ok) {
+        toast({ title: 'Error', description: createData.error, variant: 'destructive' });
+        return;
       }
-    })();
+
+      const mailRes = await fetch('/api/send-subadmin-mail', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          name: form.name.trim(),
+          email: form.email.trim().toLowerCase(),
+          username: form.username.trim().toLowerCase(),
+        }),
+      });
+
+      toast({
+        title: 'Sub Admin created',
+        description: mailRes.ok ? 'Sub admin created and credentials email sent.' : 'Created but email sending failed.',
+        variant: mailRes.ok ? 'default' : 'destructive',
+      });
+
+      setForm(emptyForm());
+      setCreateOpen(false);
+      await load();
+      await refreshCurrentUser();
+    } catch {
+      toast({ title: 'Error', description: 'Failed to create sub admin.', variant: 'destructive' });
+    } finally {
+      setIsSending(false);
+    }
   };
 
   const openEdit = (sa: User) => {
     setEditing(sa);
-    setForm({
-      name: sa.name || '',
-      username: sa.username || '',
-      email: sa.email || '',
-      mobile: sa.mobile || '',
-      password: '',
-      confirmPassword: '',
-      status: toBoolStatus(sa.status),
-    });
+    setForm({ name: sa.name || '', username: sa.username || '', email: sa.email || '', mobile: sa.mobile || '', password: '', confirmPassword: '' });
     setEditOpen(true);
   };
 
-  const handleEdit = () => {
+  const handleEdit = async () => {
     const err = validateEdit();
-    if (err) {
-      toast({ title: 'Validation error', description: err, variant: 'destructive' });
-      return;
-    }
-
+    if (err) { toast({ title: 'Validation error', description: err, variant: 'destructive' }); return; }
     if (!editing) return;
 
-    updateUser(editing.id, {
-      name: form.name.trim(),
-      username: form.username.trim().toLowerCase(),
-      email: form.email.trim().toLowerCase(),
-      mobile: form.mobile.trim(),
-      status: form.status ? 'ACTIVE' : 'INACTIVE',
-      ...(form.password ? { password: form.password } : {}),
-    });
+    setIsSending(true);
+    try {
+      const headers = await authHeaders();
+      const body: Record<string, string> = {
+        uid: editing.uid || editing.id,
+        name: form.name.trim(),
+        email: form.email.trim().toLowerCase(),
+        username: form.username.trim().toLowerCase(),
+        mobile: form.mobile.trim(),
+      };
+      if (form.password) body.password = form.password;
 
-    toast({ title: 'Sub Admin updated', description: 'Sub admin account has been updated successfully.' });
-    setEditOpen(false);
-    setEditing(null);
-    resetForm();
-    load();
-    refreshCurrentUser();
+      const res = await fetch('/api/admin/update-user', { method: 'POST', headers, body: JSON.stringify(body) });
+      const data = await res.json();
+      if (!res.ok) { toast({ title: 'Error', description: data.error, variant: 'destructive' }); return; }
+
+      toast({ title: 'Sub Admin updated', description: 'Account updated successfully.' });
+      setEditOpen(false);
+      setEditing(null);
+      setForm(emptyForm());
+      await load();
+      await refreshCurrentUser();
+    } catch {
+      toast({ title: 'Error', description: 'Failed to update sub admin.', variant: 'destructive' });
+    } finally {
+      setIsSending(false);
+    }
   };
 
-  const handleToggleStatus = (sa: User) => {
+  const handleToggleStatus = async (sa: User) => {
     const nextStatus = sa.status === 'INACTIVE' ? 'ACTIVE' : 'INACTIVE';
-    updateUser(sa.id, { status: nextStatus });
-
-    toast({ title: 'Status updated', description: `Sub admin marked as ${nextStatus}.` });
-    load();
-    refreshCurrentUser();
+    try {
+      const headers = await authHeaders();
+      const res = await fetch('/api/admin/toggle-status', { method: 'POST', headers, body: JSON.stringify({ uid: sa.uid || sa.id, status: nextStatus }) });
+      const data = await res.json();
+      if (!res.ok) { toast({ title: 'Error', description: data.error, variant: 'destructive' }); return; }
+      toast({ title: 'Status updated', description: `Sub admin marked as ${nextStatus}.` });
+      await load();
+    } catch {
+      toast({ title: 'Error', description: 'Failed to update status.', variant: 'destructive' });
+    }
   };
 
-  const handleDelete = (sa: User) => {
-    deleteUser(sa.id);
-    toast({ title: 'Sub Admin deleted', description: 'Sub admin account has been deleted successfully.' });
-    load();
-    refreshCurrentUser();
+  const handleDelete = async (sa: User) => {
+    try {
+      const headers = await authHeaders();
+      const res = await fetch('/api/admin/delete-user', { method: 'POST', headers, body: JSON.stringify({ uid: sa.uid || sa.id }) });
+      const data = await res.json();
+      if (!res.ok) { toast({ title: 'Error', description: data.error, variant: 'destructive' }); return; }
+      toast({ title: 'Sub Admin deleted', description: 'Account deleted successfully.' });
+      await load();
+    } catch {
+      toast({ title: 'Error', description: 'Failed to delete sub admin.', variant: 'destructive' });
+    }
   };
+
+  const fields: { key: keyof SubAdminFormState; label: string; type?: string }[] = [
+    { key: 'name', label: 'Full Name' },
+    { key: 'username', label: 'Username' },
+    { key: 'email', label: 'Email', type: 'email' },
+    { key: 'mobile', label: 'Mobile Number' },
+    { key: 'password', label: 'Password', type: 'password' },
+    { key: 'confirmPassword', label: 'Confirm Password', type: 'password' },
+  ];
 
   return (
     <ProtectedRoute allowedRoles={['MASTER_ADMIN', 'ADMIN']}>
@@ -284,62 +275,24 @@ export default function SubAdminManagementPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Sub Admins</CardTitle>
-
             <Dialog open={createOpen} onOpenChange={(open) => { if (!isSending) setCreateOpen(open); }}>
-              <DialogTrigger asChild>
-                <Button>Create Sub Admin</Button>
-              </DialogTrigger>
+              <DialogTrigger asChild><Button>Create Sub Admin</Button></DialogTrigger>
               <DialogContent>
                 <DialogHeader>
                   <DialogTitle>Create Sub Admin</DialogTitle>
-                  <DialogDescription>Sub admins login using username and password.</DialogDescription>
+                  <DialogDescription>Sub admins login using email and password.</DialogDescription>
                 </DialogHeader>
-
                 <div className="grid gap-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="sa_name">Full Name</Label>
-                    <Input id="sa_name" value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} />
-                  </div>
-
-                  <div className="grid gap-2">
-                    <Label htmlFor="sa_username">User Name</Label>
-                    <Input id="sa_username" value={form.username} disabled={isSending} onChange={(e) => setForm((p) => ({ ...p, username: e.target.value }))} />
-                  </div>
-
-                  <div className="grid gap-2">
-                    <Label htmlFor="sa_email">Email</Label>
-                    <Input id="sa_email" type="email" value={form.email} onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))} />
-                  </div>
-
-                  <div className="grid gap-2">
-                    <Label htmlFor="sa_mobile">Mobile Number</Label>
-                    <Input id="sa_mobile" value={form.mobile} onChange={(e) => setForm((p) => ({ ...p, mobile: e.target.value }))} />
-                  </div>
-
-                  <div className="grid gap-2">
-                    <Label htmlFor="sa_password">Password</Label>
-                    <Input id="sa_password" type="password" value={form.password} onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))} />
-                  </div>
-
-                  <div className="grid gap-2">
-                    <Label htmlFor="sa_confirm">Confirm Password</Label>
-                    <Input id="sa_confirm" type="password" value={form.confirmPassword} onChange={(e) => setForm((p) => ({ ...p, confirmPassword: e.target.value }))} />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <Label>Status</Label>
-                    <div className="flex items-center gap-3">
-                      <Badge variant={form.status ? 'secondary' : 'destructive'} className={form.status ? 'bg-green-100 text-green-800' : ''}>
-                        {form.status ? 'ACTIVE' : 'INACTIVE'}
-                      </Badge>
-                      <Switch checked={form.status} onCheckedChange={(v) => setForm((p) => ({ ...p, status: v }))} />
+                  {fields.map(({ key, label, type }) => (
+                    <div key={key} className="grid gap-2">
+                      <Label htmlFor={`sa_${key}`}>{label}</Label>
+                      <Input id={`sa_${key}`} type={type || 'text'} value={form[key]} onChange={(e) => setForm((p) => ({ ...p, [key]: e.target.value }))} />
                     </div>
-                  </div>
+                  ))}
                 </div>
-
                 <DialogFooter>
-                  <Button variant="outline" onClick={() => { resetForm(); setCreateOpen(false); }} disabled={isSending}>Cancel</Button>
-                  <Button onClick={handleCreate} disabled={isSending}>Create</Button>
+                  <Button variant="outline" onClick={() => { setForm(emptyForm()); setCreateOpen(false); }} disabled={isSending}>Cancel</Button>
+                  <Button onClick={handleCreate} disabled={isSending}>{isSending ? 'Creating...' : 'Create'}</Button>
                 </DialogFooter>
               </DialogContent>
             </Dialog>
@@ -353,7 +306,6 @@ export default function SubAdminManagementPage() {
                   <TableHead>Username</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Mobile</TableHead>
-                  <TableHead>Role</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
@@ -361,20 +313,14 @@ export default function SubAdminManagementPage() {
               </TableHeader>
               <TableBody>
                 {subAdmins.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={8} className="text-center text-muted-foreground">No sub admins found.</TableCell>
-                  </TableRow>
+                  <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">No sub admins found.</TableCell></TableRow>
                 )}
-
                 {subAdmins.map((sa) => (
                   <TableRow key={sa.id}>
                     <TableCell className="font-medium">{sa.name}</TableCell>
                     <TableCell>{sa.username || '-'}</TableCell>
                     <TableCell>{sa.email || '-'}</TableCell>
                     <TableCell>{sa.mobile || '-'}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{sa.role}</Badge>
-                    </TableCell>
                     <TableCell>
                       <Badge className={sa.status === 'INACTIVE' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'} variant="secondary">
                         {sa.status === 'INACTIVE' ? 'INACTIVE' : 'ACTIVE'}
@@ -383,21 +329,15 @@ export default function SubAdminManagementPage() {
                     <TableCell>{formatDate(sa.createdAt)}</TableCell>
                     <TableCell className="text-right space-x-2">
                       <Button variant="outline" size="sm" onClick={() => openEdit(sa)}>Edit</Button>
-
                       <Button variant="outline" size="sm" onClick={() => handleToggleStatus(sa)}>
                         {sa.status === 'INACTIVE' ? 'Activate' : 'Deactivate'}
                       </Button>
-
                       <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="destructive" size="sm">Delete</Button>
-                        </AlertDialogTrigger>
+                        <AlertDialogTrigger asChild><Button variant="destructive" size="sm">Delete</Button></AlertDialogTrigger>
                         <AlertDialogContent>
                           <AlertDialogHeader>
                             <AlertDialogTitle>Delete Sub Admin</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              This action cannot be undone. This will permanently delete the sub admin account.
-                            </AlertDialogDescription>
+                            <AlertDialogDescription>This action cannot be undone.</AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
                             <AlertDialogCancel>Cancel</AlertDialogCancel>
@@ -413,67 +353,24 @@ export default function SubAdminManagementPage() {
           </CardContent>
         </Card>
 
+        {/* Edit Dialog */}
         <Dialog open={editOpen} onOpenChange={setEditOpen}>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Edit Sub Admin</DialogTitle>
               <DialogDescription>Update sub admin account details.</DialogDescription>
             </DialogHeader>
-
             <div className="grid gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="edit_sa_name">Full Name</Label>
-                <Input id="edit_sa_name" value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} />
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="edit_sa_username">User Name</Label>
-                <Input id="edit_sa_username" value={form.username} onChange={(e) => setForm((p) => ({ ...p, username: e.target.value }))} />
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="edit_sa_email">Email</Label>
-                <Input id="edit_sa_email" type="email" value={form.email} onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))} />
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="edit_sa_mobile">Mobile Number</Label>
-                <Input id="edit_sa_mobile" value={form.mobile} onChange={(e) => setForm((p) => ({ ...p, mobile: e.target.value }))} />
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="edit_sa_password">New Password (optional)</Label>
-                <Input id="edit_sa_password" type="password" value={form.password} onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))} />
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="edit_sa_confirm">Confirm New Password</Label>
-                <Input id="edit_sa_confirm" type="password" value={form.confirmPassword} onChange={(e) => setForm((p) => ({ ...p, confirmPassword: e.target.value }))} />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <Label>Status</Label>
-                <div className="flex items-center gap-3">
-                  <Badge variant={form.status ? 'secondary' : 'destructive'} className={form.status ? 'bg-green-100 text-green-800' : ''}>
-                    {form.status ? 'ACTIVE' : 'INACTIVE'}
-                  </Badge>
-                  <Switch checked={form.status} onCheckedChange={(v) => setForm((p) => ({ ...p, status: v }))} />
+              {fields.map(({ key, label, type }) => (
+                <div key={key} className="grid gap-2">
+                  <Label htmlFor={`edit_sa_${key}`}>{key === 'password' ? 'New Password (optional)' : key === 'confirmPassword' ? 'Confirm New Password' : label}</Label>
+                  <Input id={`edit_sa_${key}`} type={type || 'text'} value={form[key]} onChange={(e) => setForm((p) => ({ ...p, [key]: e.target.value }))} />
                 </div>
-              </div>
+              ))}
             </div>
-
             <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setEditOpen(false);
-                  setEditing(null);
-                  resetForm();
-                }}
-              >
-                Cancel
-              </Button>
-              <Button onClick={handleEdit}>Save</Button>
+              <Button variant="outline" onClick={() => { setEditOpen(false); setEditing(null); setForm(emptyForm()); }}>Cancel</Button>
+              <Button onClick={handleEdit} disabled={isSending}>{isSending ? 'Saving...' : 'Save'}</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

@@ -1,19 +1,89 @@
 'use client';
 
-import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
-import { User } from '@/lib/types';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  type ReactNode,
+} from 'react';
+import {
+  signInWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
+  type User as FirebaseUser,
+} from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
 import { useRouter, usePathname } from 'next/navigation';
-import { loadUsers, normalizeStatus } from '@/lib/user-storage';
+
+import { auth, db } from '@/lib/firebase';
+import type { User, UserRole, UserStatus } from '@/lib/types';
+
+// ─── Context shape ────────────────────────────────────────────────────────────
 
 interface UserContextType {
   user: User | null;
-  login: (userData: User) => void;
-  logout: () => void;
-  refreshCurrentUser: () => void;
+  login: (email: string, password: string) => Promise<{ error?: string }>;
+  logout: () => Promise<void>;
+  refreshCurrentUser: () => Promise<void>;
   isLoading: boolean;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+async function fetchFirestoreUser(uid: string): Promise<User | null> {
+  try {
+    const snap = await getDoc(doc(db, 'users', uid));
+    if (!snap.exists()) return null;
+
+    const data = snap.data() as {
+      name: string;
+      email: string;
+      username?: string;
+      mobile?: string;
+      role: UserRole;
+      status: UserStatus;
+      createdBy?: string;
+      createdAt?: { toDate?: () => Date } | string;
+      updatedAt?: { toDate?: () => Date } | string;
+    };
+
+    if (data.status === 'INACTIVE') return null;
+
+    const toIso = (v: unknown): string | undefined => {
+      if (!v) return undefined;
+      if (typeof v === 'string') return v;
+      if (typeof v === 'object' && v !== null && 'toDate' in v) {
+        return (v as { toDate: () => Date }).toDate().toISOString();
+      }
+      return undefined;
+    };
+
+    return {
+      id: uid,
+      uid,
+      name: data.name,
+      email: data.email,
+      username: data.username,
+      mobile: data.mobile,
+      role: data.role,
+      status: data.status,
+      createdBy: data.createdBy,
+      createdAt: toIso(data.createdAt),
+      updatedAt: toIso(data.updatedAt),
+    };
+  } catch {
+    return null;
+  }
+}
+
+// ─── Provider ─────────────────────────────────────────────────────────────────
+// KEY CHANGE: isLoading no longer blocks rendering of the entire app.
+// The app shell renders immediately. Pages that need auth use useUser() and
+// handle their own loading state, or rely on ProtectedRoute.
 
 export const UserProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -21,105 +91,105 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
   const router = useRouter();
   const pathname = usePathname();
 
-  const clearSession = () => {
-    setUser(null);
-    try {
-      localStorage.removeItem('currentUser');
-    } catch (error) {
-      console.error('Failed to remove user from localStorage', error);
-    }
-  };
-
-  const isAllowedRole = (role: unknown): role is User['role'] => {
-    return role === 'MASTER_ADMIN' || role === 'ADMIN' || role === 'SUB_ADMIN';
-  };
-
-  const validateAndSyncUser = (candidate: User | null) => {
-    if (!candidate) return null;
-
-    if (!isAllowedRole(candidate.role)) {
-      clearSession();
-      return null;
-    }
-
-    const existing = loadUsers().find((u) => u.id === candidate.id);
-    if (!existing) {
-      clearSession();
-      return null;
-    }
-
-    if (normalizeStatus(existing.status) === 'INACTIVE') {
-      try {
-        localStorage.setItem('authError', 'Your account is inactive. Please contact the administrator.');
-      } catch (error) {
-        console.error('Failed to store auth error', error);
-      }
-      clearSession();
-      return null;
-    }
-
-    return existing;
-  };
-
+  // ── Session restore via onAuthStateChanged ──────────────────────────────────
   useEffect(() => {
-    try {
-      const storedUser = localStorage.getItem('currentUser');
-      if (storedUser) {
-        const parsed = JSON.parse(storedUser) as User;
-        const validated = validateAndSyncUser(parsed);
-        setUser(validated);
+    const unsubscribe = onAuthStateChanged(
+      auth,
+      async (firebaseUser: FirebaseUser | null) => {
+        if (!firebaseUser) {
+          setUser(null);
+          setIsLoading(false);
+          return;
+        }
+
+        const appUser = await fetchFirestoreUser(firebaseUser.uid);
+
+        if (!appUser) {
+          await signOut(auth);
+          setUser(null);
+          setIsLoading(false);
+          return;
+        }
+
+        setUser(appUser);
+        setIsLoading(false);
       }
-    } catch (error) {
-        console.error("Failed to parse user from localStorage", error)
-    } finally {
-      setIsLoading(false);
-    }
+    );
+
+    return () => unsubscribe();
   }, []);
 
+  // ── Single redirect: unauthenticated users → /login ─────────────────────────
+  // Only fires after auth restore is complete (isLoading=false).
+  // Does NOT block rendering — the redirect happens in the background.
   useEffect(() => {
     if (!isLoading && !user && pathname !== '/login') {
-      router.push('/login');
+      router.replace('/login');
     }
   }, [user, isLoading, pathname, router]);
 
-  const login = (userData: User) => {
-    const validated = validateAndSyncUser(userData);
-    if (!validated) {
+  // ── login ───────────────────────────────────────────────────────────────────
+  const login = useCallback(
+    async (email: string, password: string): Promise<{ error?: string }> => {
+      try {
+        const credential = await signInWithEmailAndPassword(auth, email, password);
+        const appUser = await fetchFirestoreUser(credential.user.uid);
+
+        if (!appUser) {
+          await signOut(auth);
+          return { error: 'Your account is inactive or not found. Contact the administrator.' };
+        }
+
+        setUser(appUser);
+        return {};
+      } catch (err: unknown) {
+        const code = (err as { code?: string }).code ?? '';
+        if (
+          code === 'auth/user-not-found' ||
+          code === 'auth/wrong-password' ||
+          code === 'auth/invalid-credential' ||
+          code === 'auth/invalid-email'
+        ) {
+          return { error: 'Invalid credentials.' };
+        }
+        if (code === 'auth/too-many-requests') {
+          return { error: 'Too many failed attempts. Try again later.' };
+        }
+        return { error: 'Login failed. Please try again.' };
+      }
+    },
+    []
+  );
+
+  // ── logout ──────────────────────────────────────────────────────────────────
+  const logout = useCallback(async () => {
+    await signOut(auth);
+    setUser(null);
+    router.push('/login');
+  }, [router]);
+
+  // ── refreshCurrentUser ──────────────────────────────────────────────────────
+  const refreshCurrentUser = useCallback(async () => {
+    const firebaseUser = auth.currentUser;
+    if (!firebaseUser) {
+      setUser(null);
+      return;
+    }
+
+    const appUser = await fetchFirestoreUser(firebaseUser.uid);
+    if (!appUser) {
+      await signOut(auth);
+      setUser(null);
       router.push('/login');
       return;
     }
 
-    setUser(validated);
-    try {
-        localStorage.setItem('currentUser', JSON.stringify(validated));
-    } catch (error) {
-        console.error("Failed to save user to localStorage", error)
-    }
-  };
+    setUser(appUser);
+  }, [router]);
 
-  const logout = () => {
-    clearSession();
-    router.push('/login');
-  };
-
-  const refreshCurrentUser = () => {
-    setUser((prev) => {
-      const next = validateAndSyncUser(prev);
-      if (!next && pathname !== '/login') {
-        router.push('/login');
-      }
-      return next;
-    });
-  };
-  
-  if (isLoading) {
-    return <div>Loading...</div>; // Or a proper loading spinner component
-  }
-
-  if (!user && pathname !== '/login') {
-    return null; // Don't render children if no user and not on login page
-  }
-
+  // ── Render ──────────────────────────────────────────────────────────────────
+  // NO full-screen blocking spinner.
+  // Children render immediately. ProtectedRoute handles per-page auth gating.
   return (
     <UserContext.Provider value={{ user, login, logout, refreshCurrentUser, isLoading }}>
       {children}

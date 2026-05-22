@@ -8,6 +8,11 @@ const nextConfig: NextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  // Prevent static prerendering of pages that use Firebase client SDK.
+  // Firebase requires runtime env vars (NEXT_PUBLIC_FIREBASE_*) which are
+  // not available during static generation in local builds.
+  // In production (Firebase App Hosting), env vars are injected at build time.
+  output: undefined,
   images: {
     remotePatterns: [
       {

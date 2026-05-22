@@ -12,6 +12,7 @@ import {
   SidebarFooter,
 } from '@/components/ui/sidebar';
 import { usePathname } from 'next/navigation';
+import { useMemo } from 'react';
 import {
   LayoutDashboard,
   Settings,
@@ -20,14 +21,12 @@ import {
   FileText,
   Receipt,
   Printer,
-  ChevronDown
+  ChevronDown,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useUser } from '@/context/user-context';
 import type { UserRole } from '@/lib/types';
-
 import type React from 'react';
-
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 type NavLinkItem = {
@@ -66,31 +65,11 @@ const allMenuItems: NavItem[] = [
     icon: FileText,
     roles: ['SUB_ADMIN'],
     children: [
-      {
-        href: '/inventory',
-        label: 'Inward Entry',
-        roles: ['SUB_ADMIN'],
-      },
-      {
-        href: '/outward',
-        label: 'Outward Entry',
-        roles: ['SUB_ADMIN'],
-      },
-      {
-        href: '/bill-processing',
-        label: 'Bill Processing',
-        roles: ['SUB_ADMIN'],
-      },
-      {
-        href: '/clients',
-        label: 'Customer Rate',
-        roles: ['SUB_ADMIN'],
-      },
-      {
-        href: '/clients',
-        label: 'Clients',
-        roles: ['SUB_ADMIN'],
-      },
+      { href: '/inventory', label: 'Inward Entry', roles: ['SUB_ADMIN'] },
+      { href: '/outward', label: 'Outward Entry', roles: ['SUB_ADMIN'] },
+      { href: '/bill-processing', label: 'Bill Processing', roles: ['SUB_ADMIN'] },
+      { href: '/clients', label: 'Customer Rate', roles: ['SUB_ADMIN'] },
+      { href: '/clients', label: 'Clients', roles: ['SUB_ADMIN'] },
     ],
   },
   {
@@ -99,21 +78,9 @@ const allMenuItems: NavItem[] = [
     icon: Printer,
     roles: ['SUB_ADMIN'],
     children: [
-      {
-        href: '/printing/inward-register',
-        label: 'Inward Register',
-        roles: ['SUB_ADMIN'],
-      },
-      {
-        href: '/printing/outward-register',
-        label: 'Outward Register',
-        roles: ['SUB_ADMIN'],
-      },
-      {
-        href: '/reports',
-        label: 'Stock Report',
-        roles: ['SUB_ADMIN'],
-      },
+      { href: '/printing/inward-register', label: 'Inward Register', roles: ['SUB_ADMIN'] },
+      { href: '/printing/outward-register', label: 'Outward Register', roles: ['SUB_ADMIN'] },
+      { href: '/reports', label: 'Stock Report', roles: ['SUB_ADMIN'] },
     ],
   },
   {
@@ -155,14 +122,8 @@ const allMenuItems: NavItem[] = [
 
 function isNavItemAccessible(item: NavItem, role: UserRole | undefined) {
   if (!role) return false;
-
-  if (item.type === 'link') {
-    return item.roles.includes(role);
-  }
-
-  const hasParentAccess = item.roles.includes(role);
-  const hasAnyChildAccess = item.children.some((child) => child.roles.includes(role));
-  return hasParentAccess && hasAnyChildAccess;
+  if (item.type === 'link') return item.roles.includes(role);
+  return item.roles.includes(role) && item.children.some((c) => c.roles.includes(role));
 }
 
 function isChildActive(pathname: string, href: string) {
@@ -175,25 +136,54 @@ export function SidebarNav() {
 
   const role = user?.role as UserRole | undefined;
 
-  const menuItems = allMenuItems.filter((item) => isNavItemAccessible(item, role));
+  // Memoized: only recomputes when role changes (not on every navigation)
+  const menuItems = useMemo(
+    () => allMenuItems.filter((item) => isNavItemAccessible(item, role)),
+    [role]
+  );
 
-  const defaultVoucherOpen = pathname.startsWith('/inventory') || pathname.startsWith('/outward') || pathname.startsWith('/invoices') || pathname.startsWith('/clients') || pathname.startsWith('/bill-processing');
-  const defaultPrintingOpen = pathname.startsWith('/printing') || pathname.startsWith('/reports');
+  // Memoized: only recomputes when pathname changes
+  const defaultVoucherOpen = useMemo(
+    () =>
+      pathname.startsWith('/inventory') ||
+      pathname.startsWith('/outward') ||
+      pathname.startsWith('/invoices') ||
+      pathname.startsWith('/clients') ||
+      pathname.startsWith('/bill-processing'),
+    [pathname]
+  );
+
+  const defaultPrintingOpen = useMemo(
+    () => pathname.startsWith('/printing') || pathname.startsWith('/reports'),
+    [pathname]
+  );
 
   return (
     <>
       <SidebarHeader>
         <div className="flex items-center gap-2 p-2">
-           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-8 h-8 text-primary"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="w-8 h-8 text-primary"
+          >
+            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+          </svg>
           <h1 className="text-xl font-bold font-headline text-primary">FoodSafe</h1>
         </div>
       </SidebarHeader>
+
       <SidebarContent>
         <SidebarMenu>
           {menuItems.map((item) => {
             if (item.type === 'link') {
               return (
-                <SidebarMenuItem key={item.href}>
+                <SidebarMenuItem key={item.href + item.label}>
                   <SidebarMenuButton
                     asChild
                     isActive={isChildActive(pathname, item.href)}
@@ -210,16 +200,17 @@ export function SidebarNav() {
 
             const isVoucherGroup = item.label === 'Voucher Entry';
             const isPrintingGroup = item.label === 'Printing';
-
-            const groupDefaultOpen = isVoucherGroup ? defaultVoucherOpen : isPrintingGroup ? defaultPrintingOpen : false;
-            const groupIsActive = item.children.some((child) => isChildActive(pathname, child.href));
+            const groupDefaultOpen = isVoucherGroup
+              ? defaultVoucherOpen
+              : isPrintingGroup
+              ? defaultPrintingOpen
+              : false;
+            const groupIsActive = item.children.some((child) =>
+              isChildActive(pathname, child.href)
+            );
 
             return (
-              <Collapsible
-                key={item.label}
-                defaultOpen={groupDefaultOpen}
-                className="w-full"
-              >
+              <Collapsible key={item.label} defaultOpen={groupDefaultOpen} className="w-full">
                 <SidebarMenuItem>
                   <CollapsibleTrigger asChild>
                     <SidebarMenuButton
@@ -256,6 +247,7 @@ export function SidebarNav() {
           })}
         </SidebarMenu>
       </SidebarContent>
+
       <SidebarFooter>
         <SidebarMenu>
           {user?.role === 'MASTER_ADMIN' && (
@@ -272,7 +264,7 @@ export function SidebarNav() {
               </SidebarMenuButton>
             </SidebarMenuItem>
           )}
-          {(user?.role === 'MASTER_ADMIN' || user?.role === 'ADMIN' || user?.role === 'SUB_ADMIN') && (
+          {user && (
             <SidebarMenuItem>
               <SidebarMenuButton onClick={logout} tooltip={{ children: 'Logout', side: 'right' }}>
                 <LifeBuoy />

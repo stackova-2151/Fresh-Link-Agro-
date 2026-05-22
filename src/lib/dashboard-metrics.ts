@@ -1,22 +1,26 @@
-'use client';
+/**
+ * Dashboard metrics — Firestore-only, async.
+ * All functions return Promises. Call from useEffect with loading state.
+ */
+import {
+  collection,
+  getDocs,
+  query,
+  where,
+} from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
-import { chambers, rentalItems } from '@/lib/data';
-import { loadInwardVouchers, loadOutwardVouchers } from '@/lib/voucher-storage';
-import { loadUsers, normalizeStatus } from '@/lib/user-storage';
-
-import type { UserStatus } from '@/lib/types';
-
-type TodayCounts = {
+export type TodayCounts = {
   todayInwardCount: number;
   todayOutwardCount: number;
 };
 
-type TotalStock = {
+export type TotalStock = {
   totalQuantity: number;
   totalWeight: number;
 };
 
-type UserCounts = {
+export type UserCounts = {
   totalAdmins: number;
   activeAdmins: number;
   inactiveAdmins: number;
@@ -25,9 +29,9 @@ type UserCounts = {
   inactiveSubAdmins: number;
 };
 
-type OccupancyStatus = 'LOW' | 'MEDIUM' | 'HIGH';
+export type OccupancyStatus = 'LOW' | 'MEDIUM' | 'HIGH';
 
-type ChamberOccupancyRow = {
+export type ChamberOccupancyRow = {
   chamberId: string;
   chamberName: string;
   capacityVolume: number;
@@ -60,84 +64,116 @@ function statusFromOccupiedPercent(p: number): OccupancyStatus {
   return 'HIGH';
 }
 
-export function getTodayCounts(): TodayCounts {
+export async function getTodayCounts(): Promise<TodayCounts> {
   const today = toIsoDate(new Date());
 
-  const inward = loadInwardVouchers();
-  const outward = loadOutwardVouchers();
+  const [inwardSnap, outwardSnap] = await Promise.all([
+    getDocs(query(collection(db, 'inwardVouchers'), where('date', '==', today))),
+    getDocs(query(collection(db, 'outwardVouchers'), where('date', '==', today))),
+  ]);
 
   return {
-    todayInwardCount: inward.filter((v) => v.date === today).length,
-    todayOutwardCount: outward.filter((v) => v.date === today).length,
+    todayInwardCount: inwardSnap.size,
+    todayOutwardCount: outwardSnap.size,
   };
 }
 
-export function getTotalStock(): TotalStock {
-  const totalQuantity = rentalItems.reduce((acc, item) => acc + safeNumber(item.quantityAvailable), 0);
-  const totalWeight = rentalItems.reduce((acc, item) => acc + safeNumber(item.balanceWeight), 0);
+export async function getTotalStock(): Promise<TotalStock> {
+  const snap = await getDocs(collection(db, 'rentalItems'));
+
+  let totalQuantity = 0;
+  let totalWeight = 0;
+
+  snap.docs.forEach((d) => {
+    const data = d.data();
+    totalQuantity += safeNumber(data.quantityAvailable);
+    totalWeight += safeNumber(data.balanceWeight);
+  });
+
   return { totalQuantity, totalWeight };
 }
 
-export function getUserCounts(): UserCounts {
-  const users = loadUsers();
+export async function getUserCounts(): Promise<UserCounts> {
+  const snap = await getDocs(collection(db, 'users'));
 
-  const isActive = (status: UserStatus | undefined) => normalizeStatus(status) === 'ACTIVE';
+  let totalAdmins = 0;
+  let activeAdmins = 0;
+  let totalSubAdmins = 0;
+  let activeSubAdmins = 0;
 
-  const admins = users.filter((u) => u.role === 'ADMIN');
-  const subAdmins = users.filter((u) => u.role === 'SUB_ADMIN');
+  snap.docs.forEach((d) => {
+    const data = d.data() as { role: string; status: string };
+    const isActive = data.status !== 'INACTIVE';
 
-  const activeAdmins = admins.filter((u) => isActive(u.status)).length;
-  const activeSubAdmins = subAdmins.filter((u) => isActive(u.status)).length;
+    if (data.role === 'ADMIN') {
+      totalAdmins++;
+      if (isActive) activeAdmins++;
+    } else if (data.role === 'SUB_ADMIN') {
+      totalSubAdmins++;
+      if (isActive) activeSubAdmins++;
+    }
+  });
 
   return {
-    totalAdmins: admins.length,
+    totalAdmins,
     activeAdmins,
-    inactiveAdmins: admins.length - activeAdmins,
-    totalSubAdmins: subAdmins.length,
+    inactiveAdmins: totalAdmins - activeAdmins,
+    totalSubAdmins,
     activeSubAdmins,
-    inactiveSubAdmins: subAdmins.length - activeSubAdmins,
+    inactiveSubAdmins: totalSubAdmins - activeSubAdmins,
   };
 }
 
-export function getChamberOccupancy(): ChamberOccupancyRow[] {
-  const itemsByChamber = new Map<string, typeof rentalItems>();
+export async function getChamberOccupancy(): Promise<ChamberOccupancyRow[]> {
+  const [chambersSnap, itemsSnap] = await Promise.all([
+    getDocs(collection(db, 'chambers')),
+    getDocs(collection(db, 'rentalItems')),
+  ]);
 
-  rentalItems.forEach((item) => {
-    if (!item.chamberId) return;
-    const arr = itemsByChamber.get(item.chamberId) || [];
-    arr.push(item);
-    itemsByChamber.set(item.chamberId, arr);
+  // Group items by chamberId
+  const itemsByChamber = new Map<string, Array<{ quantityAvailable: number; boxDimensions?: { length: number; width: number; height: number } }>>();
+
+  itemsSnap.docs.forEach((d) => {
+    const data = d.data();
+    if (!data.chamberId) return;
+    const arr = itemsByChamber.get(data.chamberId) || [];
+    arr.push(data as { quantityAvailable: number; boxDimensions?: { length: number; width: number; height: number } });
+    itemsByChamber.set(data.chamberId, arr);
   });
 
-  return chambers.map((chamber) => {
+  return chambersSnap.docs.map((d) => {
+    const chamber = d.data() as {
+      id?: string;
+      name: string;
+      boxDimensions?: { length: number; width: number; height: number };
+    };
+    const chamberId = d.id;
     const dims = chamber.boxDimensions;
-    const capacityVolume = dims ? safeNumber(dims.length) * safeNumber(dims.width) * safeNumber(dims.height) : 0;
+    const capacityVolume = dims
+      ? safeNumber(dims.length) * safeNumber(dims.width) * safeNumber(dims.height)
+      : 0;
 
-    const chamberItems = itemsByChamber.get(chamber.id) || [];
-
+    const chamberItems = itemsByChamber.get(chamberId) || [];
     const usedVolume = chamberItems.reduce((acc, item) => {
       const itemDims = item.boxDimensions;
       const itemVolume = itemDims
         ? safeNumber(itemDims.length) * safeNumber(itemDims.width) * safeNumber(itemDims.height)
         : 0;
-
       return acc + itemVolume * safeNumber(item.quantityAvailable);
     }, 0);
 
     const cappedUsed = Math.min(usedVolume, capacityVolume);
     const emptyVolume = Math.max(0, capacityVolume - cappedUsed);
-
     const occupiedPercent = percent(cappedUsed, capacityVolume);
-    const emptyPercent = 100 - occupiedPercent;
 
     return {
-      chamberId: chamber.id,
+      chamberId,
       chamberName: chamber.name,
       capacityVolume,
       usedVolume: cappedUsed,
       emptyVolume,
       occupiedPercent,
-      emptyPercent,
+      emptyPercent: 100 - occupiedPercent,
       occupancyStatus: statusFromOccupiedPercent(occupiedPercent),
     };
   });
