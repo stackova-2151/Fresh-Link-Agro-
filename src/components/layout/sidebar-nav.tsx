@@ -1,4 +1,5 @@
 'use client';
+import Image from "next/image";
 
 import {
   SidebarContent,
@@ -169,20 +170,8 @@ export function SidebarNav() {
   return (
     <>
       <SidebarHeader>
-        <div className="flex items-center gap-2 p-2">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="w-8 h-8 text-primary"
-          >
-            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
-          </svg>
-          <h1 className="text-xl font-bold font-headline text-primary">FoodSafe</h1>
+        <div className="flex items-center justify-center p-1">
+          <Image src="/logo1.png" alt="Fresh Link" width={120} height={20} className="object-contain" priority />
         </div>
       </SidebarHeader>
 
@@ -269,15 +258,13 @@ export function SidebarNav() {
                                 <SidebarMenuSubItem>
                                   <CollapsibleTrigger asChild>
                                     <SidebarMenuSubButton
-  className="group"
-  isActive={subGroupIsActive}
->
-  <span className="mr-2 h-2 w-2 rounded-full bg-current flex-shrink-0"></span>
-
-  <span>{child.label}</span>
-
-  <ChevronDown className="ml-auto h-4 w-4 transition-transform group-data-[state=open]:rotate-180" />
-</SidebarMenuSubButton>
+                                      className="group"
+                                      isActive={subGroupIsActive}
+                                    >
+                                      <span className="mr-2 h-2 w-2 rounded-full bg-current flex-shrink-0"></span>
+                                      <span>{child.label}</span>
+                                      <ChevronDown className="ml-auto h-4 w-4 transition-transform group-data-[state=open]:rotate-180" />
+                                    </SidebarMenuSubButton>
                                   </CollapsibleTrigger>
                                   <CollapsibleContent>
                                     <SidebarMenuSub className="ml-4">
