@@ -20,6 +20,10 @@ import { useToast } from "@/hooks/use-toast";
 
 const VOUCHERS_COLLECTION = "inwardVouchers";
 
+function createId(prefix: string) {
+    return `${prefix}_${Math.random().toString(16).slice(2)}_${Date.now()}`;
+}
+
 async function loadVouchersFromFirestore(): Promise<InwardVoucher[]> {
     try {
         const snap = await getDocs(collection(db, VOUCHERS_COLLECTION));
@@ -83,19 +87,114 @@ export default function InventoryPage() {
     }) => {
         try {
             console.log('Saving voucher to Firestore:', voucher.inwardNo);
-            
-            // Save voucher to Firestore
+
             await saveVoucherToFirestore(voucher);
             console.log('Voucher saved successfully');
 
-            // Save each rental item to Firestore
-            console.log('Saving rental items:', createdItems.length);
-            for (const item of createdItems) {
-                await rentalItemsService.createWithId(item);
-            }
-            console.log('All items saved successfully');
+            if (mode === 'edit') {
+                const inwardNoUpper = voucher.inwardNo.toUpperCase();
+                const existingRentalItems = rentalItems.filter(
+                    (i) => i.inwardNumber.toUpperCase() === inwardNoUpper
+                );
 
-            // Update local state
+                const findMatchingRentalItem = (row: typeof voucher.items[0]) => {
+                    return existingRentalItems.find(
+                        (item) =>
+                            item.name.trim().toLowerCase() === row.itemName.trim().toLowerCase() &&
+                            item.brand.trim().toLowerCase() === row.brand.trim().toLowerCase() &&
+                            item.batchNumber.trim() === row.batch.trim() &&
+                            item.chamberId === row.chamberId
+                    );
+                };
+
+                const usedRentalItemIds = new Set<string>();
+
+                for (const row of voucher.items) {
+                    const matchingItem = findMatchingRentalItem(row);
+
+                    if (matchingItem) {
+                        const qty = typeof row.bags === 'number' ? row.bags : 0;
+                        const wt = row.totalWeight;
+                        const exp = row.expDate ? new Date(row.expDate) : new Date(voucher.date);
+                        const storage = new Date(voucher.date);
+
+                        await rentalItemsService.update(matchingItem.id, {
+                            name: row.itemName.trim(),
+                            brand: row.brand.trim(),
+                            batchNumber: row.batch.trim(),
+                            chamberId: row.chamberId,
+                            inwardQuantity: qty,
+                            quantityAvailable: qty,
+                            inwardWeight: wt,
+                            balanceWeight: wt,
+                            expiryDate: exp,
+                            storageDate: storage,
+                            clientId: voucher.clientId,
+                            driverName: voucher.driverName,
+                            vehicleNumber: voucher.vehicleNo,
+                        });
+
+                        usedRentalItemIds.add(matchingItem.id);
+                    } else {
+                        const qty = typeof row.bags === 'number' ? row.bags : 0;
+                        const wt = row.totalWeight;
+                        const exp = row.expDate ? new Date(row.expDate) : new Date(voucher.date);
+                        const storage = new Date(voucher.date);
+                        const vendorId = vendors[0]?.id ?? 'vendor_01';
+
+                        const newItem: RentalItem = {
+                            id: createId('rental_item'),
+                            inwardNumber: voucher.inwardNo,
+                            name: row.itemName.trim(),
+                            brand: row.brand.trim(),
+                            batchNumber: row.batch.trim(),
+                            category: 'General',
+                            description: '',
+                            rentalRate: 0,
+                            rentalCycles: ['daily'],
+                            inwardQuantity: qty,
+                            outwardQuantity: 0,
+                            quantityAvailable: qty,
+                            unit: 'kg',
+                            inwardWeight: wt,
+                            outwardWeight: 0,
+                            balanceWeight: wt,
+                            expiryDate: exp,
+                            storageDate: storage,
+                            temperatureRange: '',
+                            vendorId,
+                            clientId: voucher.clientId,
+                            chamberId: row.chamberId,
+                            block: '',
+                            zone: '',
+                            driverName: voucher.driverName,
+                            vehicleNumber: voucher.vehicleNo,
+                            images: [],
+                            condition: 'Good',
+                        };
+
+                        await rentalItemsService.createWithId(newItem);
+                        usedRentalItemIds.add(newItem.id);
+                    }
+                }
+
+                for (const existingItem of existingRentalItems) {
+                    if (!usedRentalItemIds.has(existingItem.id)) {
+                        await rentalItemsService.delete(existingItem.id);
+                    }
+                }
+
+                const updatedItems = await rentalItemsService.getAll();
+                setRentalItems(updatedItems);
+            } else {
+                console.log('Saving rental items:', createdItems.length);
+                for (const item of createdItems) {
+                    await rentalItemsService.createWithId(item);
+                }
+                console.log('All items saved successfully');
+                setRentalItems((prev) => [...createdItems, ...prev]);
+            }
+
             setVouchers((prev) => {
                 const idx = prev.findIndex((v) => v.inwardNo.toUpperCase() === voucher.inwardNo.toUpperCase());
                 if (idx === -1) return [voucher, ...prev];
@@ -103,16 +202,6 @@ export default function InventoryPage() {
                 next[idx] = voucher;
                 return next;
             });
-
-            setRentalItems((prev) => {
-                if (mode === 'edit') {
-                    const remaining = prev.filter((i) => i.inwardNumber.toUpperCase() !== voucher.inwardNo.toUpperCase());
-                    return [...createdItems, ...remaining];
-                }
-                return [...createdItems, ...prev];
-            });
-
-            toast({ title: "Success", description: "Inward entry saved to Firestore" });
         } catch (err) {
             console.error('Firestore save error:', err);
             toast({ variant: "destructive", title: "Failed to save to Firestore", description: String(err) });
@@ -134,7 +223,7 @@ export default function InventoryPage() {
                     >
                         <Printer className="mr-2 h-4 w-4" /> Print
                     </Button>
-                    <Button variant="outline"><FileDown className="mr-2 h-4 w-4" /> Export CSV</Button>
+                    {/* <Button variant="outline"><FileDown className="mr-2 h-4 w-4" /> Export CSV</Button> */}
                 </div>
             </PageHeader>
 

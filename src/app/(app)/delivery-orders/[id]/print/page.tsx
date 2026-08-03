@@ -8,6 +8,8 @@ import { Printer, Download } from 'lucide-react';
 import { useUser } from '@/context/user-context';
 import { deliveryOrdersService, clientsService } from '@/lib/firestore';
 import type { DeliveryOrder, Client } from '@/lib/types';
+import { PrintHeader } from '@/components/print/PrintHeader';
+import { PrintFooter } from '@/components/print/PrintFooter';
 
 export default function PrintDeliveryOrderPage() {
   const params = useParams();
@@ -53,32 +55,11 @@ export default function PrintDeliveryOrderPage() {
     <div className="bg-slate-50 min-h-screen p-4 sm:p-8 print:bg-white print:p-0">
       <div className="max-w-4xl mx-auto bg-white p-8 border shadow-sm print:shadow-none print:border-none">
         {/* Header */}
-        <div className="flex justify-between items-start border-b-2 border-slate-800 pb-4 mb-6">
-          <div className="space-y-1">
-            <h1 className="text-2xl font-bold font-headline text-slate-800 uppercase leading-tight">
-              FRESH LINK AGRO COLD STORAGE PVT. LTD.
-            </h1>
-            <p className="text-[10px] text-muted-foreground leading-tight">
-              Address : Gat No.319,Gaud Dara Road,Khed Shivapur,Tal.Haveli,Dist.Pune - 412205
-              <br />
-              MOBILE NO : 9699833995 / 8530818811 / 9423568775
-            </p>
-          </div>
-          <div className="text-right flex flex-col items-end">
-            <div className="w-12 h-12 relative opacity-50 mb-1">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className="w-12 h-12 text-green-600">
-                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
-              </svg>
-            </div>
-            <p className="text-[10px] font-bold text-green-700">Fresh Link</p>
-          </div>
-        </div>
-
-        <div className="text-center mb-6">
-          <span className="border-2 border-slate-800 px-10 py-1 font-bold text-sm bg-slate-50 uppercase tracking-widest">
-            Delivery Order
-          </span>
-        </div>
+        <PrintHeader
+          documentTitle="Delivery Order"
+          documentNumber={order.orderNumber}
+          documentDate={format(new Date(order.date), 'dd MMM yyyy')}
+        />
 
         {/* Info Grid */}
         <div className="grid grid-cols-12 gap-y-4 text-xs mb-8">
@@ -216,17 +197,9 @@ export default function PrintDeliveryOrderPage() {
         </div>
 
         {/* Footer Signature */}
-        <div className="flex justify-end mt-12 text-xs">
-          <div className="text-center space-y-12">
-            <p className="font-bold">
-              For{' '}
-              <span className="uppercase">Fresh Link Agro Cold Storage Pvt. Ltd.</span>
-            </p>
-            <div className="pt-8 border-t border-slate-400">
-              <p className="font-bold text-[10px]">Authorised Signatory</p>
-            </div>
-          </div>
-        </div>
+        <PrintFooter
+          showAuthorisedSignature={true}
+        />
       </div>
 
       <div className="max-w-4xl mx-auto mt-6 flex justify-center gap-4 print:hidden">

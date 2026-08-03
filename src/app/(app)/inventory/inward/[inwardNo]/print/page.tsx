@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 
@@ -12,6 +12,8 @@ import { db } from '@/lib/firebase';
 import { clientsService } from '@/lib/firestore';
 import type { InwardVoucher } from '@/components/inventory/bulk-inward-entry-form';
 import type { Client } from '@/lib/types';
+import { PrintHeader } from '@/components/print/PrintHeader';
+import { PrintFooter } from '@/components/print/PrintFooter';
 
 async function loadVoucherByInwardNo(inwardNo: string): Promise<InwardVoucher | null> {
   try {
@@ -28,6 +30,7 @@ async function loadVoucherByInwardNo(inwardNo: string): Promise<InwardVoucher | 
 
 export default function InwardPrintPage() {
   const params = useParams();
+  const router = useRouter();
   const inwardNoParam = (params.inwardNo as string | undefined) ?? '';
 
   const [voucher, setVoucher] = useState<InwardVoucher | null>(null);
@@ -52,11 +55,26 @@ export default function InwardPrintPage() {
     load();
   }, [inwardNoParam]);
 
+  // Trigger print only after loading is complete and DOM is rendered
   useEffect(() => {
+    if (loading) return;
     if (!voucher) return;
-    const t = window.setTimeout(() => window.print(), 50);
-    return () => window.clearTimeout(t);
-  }, [voucher]);
+
+    // Wait for next frame to ensure React has finished rendering
+    requestAnimationFrame(() => {
+      window.print();
+    });
+  }, [loading, voucher]);
+
+  // Return to previous page after print dialog closes
+  useEffect(() => {
+    const handleAfterPrint = () => {
+      router.back();
+    };
+
+    window.addEventListener('afterprint', handleAfterPrint);
+    return () => window.removeEventListener('afterprint', handleAfterPrint);
+  }, [router]);
 
   const totalQty = useMemo(() => {
     if (!voucher) return 0;
@@ -77,28 +95,11 @@ export default function InwardPrintPage() {
   }
 
   return (
-    <div className="bg-slate-50 min-h-screen p-4 sm:p-8 print:bg-white print:p-0">
+    <div className="bg-slate-50 p-4 sm:p-8 print:bg-white print:p-0">
       <div className="max-w-4xl mx-auto bg-white p-8 border shadow-sm print:shadow-none print:border-none">
-        <div className="flex justify-between items-start border-b-2 border-slate-800 pb-4 mb-6">
-          <div className="space-y-1">
-            <h1 className="text-2xl font-bold font-headline text-slate-800 uppercase leading-tight">FRESH LINK AGRO COLD STORAGE PVT. LTD.</h1>
-            <p className="text-[10px] text-muted-foreground leading-tight">
-              Address : Gat No.319,Gaud Dara Road,Khed Shivapur,Tal.Haveli,Dist.Pune - 412205
-              <br />
-              MOBILE NO : 9699833995 / 8530818811 / 9423568775
-            </p>
-          </div>
-          <div className="text-right flex flex-col items-end">
-            <div className="w-12 h-12 relative opacity-50 mb-1">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className="w-12 h-12 text-green-600"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" /></svg>
-            </div>
-            <p className="text-[10px] font-bold text-green-700 uppercase">Fresh Link</p>
-          </div>
-        </div>
-
-        <div className="text-center mb-6">
-          <span className="border-2 border-slate-800 px-10 py-1 font-bold text-sm bg-slate-50 uppercase tracking-widest">Goods Receipt Note</span>
-        </div>
+        <PrintHeader
+          documentTitle="Goods Receipt Note"
+        />
 
         <div className="grid grid-cols-12 gap-y-4 text-xs mb-8">
           <div className="col-span-7 space-y-2 pr-8">
@@ -107,23 +108,23 @@ export default function InwardPrintPage() {
               <span className="border-b border-slate-300 flex-1 uppercase">{voucher.clientName}</span>
             </div>
             <div className="flex gap-2">
+              <span className="font-bold w-28 shrink-0">Customer No. :</span>
+              <span className="border-b border-slate-300 flex-1">{client?.phone || client?.optionalPhone || ''}</span>
+            </div>
+            <div className="flex gap-2">
               <span className="font-bold w-28 shrink-0">Address :</span>
               <span className="border-b border-slate-300 flex-1">{client?.address ?? ''}</span>
             </div>
             <div className="flex gap-2">
               <span className="font-bold w-28 shrink-0">Remark :</span>
-              <span className="border-b border-slate-300 flex-1">{voucher.notes || 'N/A'}</span>
-            </div>
-            <div className="flex gap-2">
-              <span className="font-bold w-28 shrink-0">Driver Name :</span>
-              <span className="border-b border-slate-300 flex-1 uppercase">{voucher.driverName}</span>
+              <span className="border-b border-slate-300 flex-1">{voucher.notes || ''}</span>
             </div>
           </div>
 
           <div className="col-span-5 space-y-2 pl-4">
             <div className="flex gap-2">
               <span className="font-bold w-24 shrink-0">Inw.No:</span>
-              <span className="border-b border-slate-300 flex-1 font-mono font-bold text-sm">{voucher.inwardNo}</span>
+              <span className="border-b border-slate-300 flex-1 font-mono text-sm">{voucher.inwardNo}</span>
             </div>
             <div className="flex gap-2">
               <span className="font-bold w-24 shrink-0">Date :</span>
@@ -140,80 +141,111 @@ export default function InwardPrintPage() {
           </div>
         </div>
 
-        <div className="border-2 border-slate-800 mb-20 overflow-hidden">
-          <table className="w-full text-[11px] border-collapse">
-            <thead>
+        <div className="border-2 border-slate-800">
+          <table className="w-full text-[11px] border-collapse" style={{ pageBreakInside: 'avoid' }}>
+            <thead style={{ display: 'table-header-group' }}>
               <tr className="bg-slate-50 border-b-2 border-slate-800">
-                <th className="border-r border-slate-800 p-2 w-[50px]">Sr.No.</th>
-                <th className="border-r border-slate-800 p-2 text-left">Item Description</th>
-                <th className="border-r border-slate-800 p-2 w-[100px]">Brand</th>
-                <th className="border-r border-slate-800 p-2 w-[100px]">Batch #</th>
-                <th className="border-r border-slate-800 p-2 w-[60px]">Unit</th>
-                <th className="border-r border-slate-800 p-2 w-[60px]">Qty</th>
-                <th className="p-2 w-[100px]">Weight</th>
+                <th className="border-r border-slate-800 px-1 py-1 w-[50px]">Sr.No.</th>
+                <th className="border-r border-slate-800 px-1 py-1 text-left">Item Description</th>
+                <th className="border-r border-slate-800 px-1 py-1 w-[100px]">Brand</th>
+                <th className="border-r border-slate-800 px-1 py-1 w-[100px]">Batch #</th>
+                <th className="border-r border-slate-800 px-1 py-1 w-[60px]">Qty</th>
+                <th className="border-r border-slate-800 px-1 py-1 w-[60px]">Unit</th>
+                <th className="border-r border-slate-800 px-1 py-1 w-[80px]">W/Qty</th>
+                <th className="px-1 py-1 w-[100px]">Weight</th>
               </tr>
             </thead>
             <tbody>
               {voucher.items.map((item, idx) => (
-                <tr key={item.id} className="border-b border-slate-300 last:border-b-0 h-10">
-                  <td className="border-r border-slate-800 p-2 text-center">{String(idx + 1).padStart(2, '0')}</td>
-                  <td className="border-r border-slate-800 p-2 uppercase font-medium">{item.itemName}</td>
-                  <td className="border-r border-slate-800 p-2 text-center font-bold uppercase">{item.brand || '-'}</td>
-                  <td className="border-r border-slate-800 p-2 text-center font-mono">{item.batch || '-'}</td>
-                  <td className="border-r border-slate-800 p-2 text-center uppercase">{item.unit}</td>
-                  <td className="border-r border-slate-800 p-2 text-center font-bold">{typeof item.bags === 'number' ? item.bags : ''}</td>
-                  <td className="p-2 text-right font-bold">{(item.totalWeight || 0).toFixed(2)}</td>
+                <tr key={item.id} className="border-b border-slate-300 last:border-b-0" style={{ pageBreakInside: 'avoid' }}>
+                  <td className="border-r border-slate-800 px-1 py-1 text-center">{String(idx + 1).padStart(2, '0')}</td>
+                  <td className="border-r border-slate-800 px-1 py-1 uppercase font-medium">{item.itemName}</td>
+                  <td className="border-r border-slate-800 px-1 py-1 text-center font-bold uppercase">{item.brand || '-'}</td>
+                  <td className="border-r border-slate-800 px-1 py-1 text-center font-mono">{item.batch || '-'}</td>
+                  <td className="border-r border-slate-800 px-1 py-1 text-center font-bold">{typeof item.bags === 'number' ? item.bags : ''}</td>
+                  <td className="border-r border-slate-800 px-1 py-1 text-center uppercase">{item.unit}</td>
+                  <td className="border-r border-slate-800 px-1 py-1 text-right font-bold">{typeof item.bagWeight === 'number' ? item.bagWeight.toFixed(2) : ''}</td>
+                  <td className="px-1 py-1 text-right font-bold">{(item.totalWeight || 0).toFixed(2)}</td>
                 </tr>
               ))}
               {[...Array(Math.max(0, 5 - voucher.items.length))].map((_, i) => (
-                <tr key={`empty-${i}`} className="border-b border-slate-200 h-10">
-                  <td className="border-r border-slate-800" /><td className="border-r border-slate-800" />
-                  <td className="border-r border-slate-800" /><td className="border-r border-slate-800" />
-                  <td className="border-r border-slate-800" /><td className="border-r border-slate-800" />
-                  <td className="p-2" />
+                <tr key={`empty-${i}`} className="border-b border-slate-200">
+                  <td className="border-r border-slate-800 px-1 py-1" /><td className="border-r border-slate-800 px-1 py-1" />
+                  <td className="border-r border-slate-800 px-1 py-1" /><td className="border-r border-slate-800 px-1 py-1" />
+                  <td className="border-r border-slate-800 px-1 py-1" /><td className="border-r border-slate-800 px-1 py-1" />
+                  <td className="border-r border-slate-800 px-1 py-1" /><td className="px-1 py-1" />
                 </tr>
               ))}
-              <tr className="border-t-2 border-slate-800 bg-slate-50 font-bold h-10">
-                <td colSpan={5} className="border-r border-slate-800 p-2 text-right uppercase">Total</td>
-                <td className="border-r border-slate-800 p-2 text-center">{totalQty}</td>
-                <td className="p-2 text-right">{totalWeight.toFixed(2)}</td>
-              </tr>
             </tbody>
+            <tfoot style={{ display: 'table-footer-group' }}>
+              <tr className="border-t-2 border-slate-800 bg-slate-50 font-bold">
+                <td colSpan={4} className="border-r border-slate-800 px-1 py-1 text-right uppercase">Total</td>
+                <td className="border-r border-slate-800 px-1 py-1 text-center">{totalQty}</td>
+                <td className="border-r border-slate-800 px-1 py-1" />
+                <td className="border-r border-slate-800 px-1 py-1" />
+                <td className="px-1 py-1 text-right">{totalWeight.toFixed(2)}</td>
+              </tr>
+            </tfoot>
           </table>
         </div>
 
-        <div className="flex justify-between mt-12 text-xs">
-          <div className="text-center w-40">
-            <div className="pt-8 border-t border-slate-400">
-              <p className="font-bold text-[10px]">Driver Signatory</p>
-            </div>
-          </div>
-          <div className="text-center space-y-12">
-            <p className="font-bold italic">For <span className="uppercase font-bold">FRESH LINK AGRO COLD STORAGE PVT. LTD.</span></p>
-            <div className="pt-8 border-t border-slate-400">
-              <p className="font-bold text-[10px]">Authorised Signatory</p>
-            </div>
-          </div>
-          <div className="text-center w-40" />
-        </div>
+        <PrintFooter
+  customSignatures={[
+    {
+      label: "Driver Signatory",
+      name: voucher.driverName,
+      mobile: voucher.mobile,
+    },
+    {
+      label: "Authorised Signatory",
+    },
+  ]}
+/>
       </div>
 
-      <div className="max-w-4xl mx-auto mt-6 flex justify-center gap-4 print:hidden">
+      {/* <div className="max-w-4xl mx-auto mt-6 flex justify-center gap-4 print:hidden">
         <Button variant="outline" onClick={() => window.print()}>
           <Download className="mr-2 h-4 w-4" /> Download PDF
         </Button>
         <Button onClick={() => window.print()}>
           <Printer className="mr-2 h-4 w-4" /> Print GRN
         </Button>
-      </div>
+      </div> */}
 
       <style jsx global>{`
         @media print {
           body { background: white !important; }
           .print\\:hidden { display: none !important; }
-          header, footer, nav, aside { display: none !important; }
+          
+          /* Only hide application navigation, not print-footer component */
+          header:not(.print-header),
+          footer:not(.print-footer),
+          nav,
+          aside {
+            display: none !important;
+          }
+          
           main { padding: 0 !important; margin: 0 !important; width: 100% !important; }
           @page { margin: 1.5cm; }
+          
+          /* Table print semantics */
+          thead { display: table-header-group; }
+          tfoot { display: table-footer-group; }
+          
+          /* Prevent unwanted page breaks */
+          table { page-break-inside: auto; }
+          tr { page-break-inside: avoid; page-break-after: auto; }
+          td, th { page-break-inside: avoid; }
+          
+          /* Ensure footer stays with table */
+          tfoot tr { page-break-inside: avoid; }
+          
+          /* Ensure print-footer is visible and stays with content */
+          .print-footer {
+            display: block !important;
+            page-break-inside: avoid;
+            break-inside: avoid;
+          }
         }
       `}</style>
     </div>

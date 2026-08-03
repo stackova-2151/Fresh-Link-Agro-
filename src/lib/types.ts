@@ -57,7 +57,7 @@ export type RentalItem = {
   inwardQuantity: number;
   outwardQuantity: number;
   quantityAvailable: number; // Balance Qty
-  unit: 'kg' | 'units' | 'liters' | 'weights' | 'bags' | 'boxes';
+  unit: string;
   inwardWeight: number;
   outwardWeight: number;
   balanceWeight: number;
@@ -215,4 +215,71 @@ export type Invoice = {
   paidAmount: number;
   balance: number;
   status: 'Pending' | 'Paid' | 'Overdue';
+};
+
+export type CustomerRate = {
+  id: string;
+  clientId: string;
+  itemDescription: string;
+  rentPer: string;
+  ratePer: string;
+  rate: number;
+  loadingPer: string;
+  loading: number;
+  loadingRatePer: string;
+  hsnCode: string;
+  gstRate: number;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type GeneratedBill = {
+  id: string;
+  billNumber: string;
+  clientId: string;
+  clientName: string;
+  clientGstNumber?: string;
+  clientAddress?: string;
+  billMonth: string; // Format: "YYYY-MM"
+  monthEndDate: string; // ISO date string
+  gstDate: string; // ISO date string
+  billDate: string; // ISO date string
+  items: {
+    inwardNo: string;
+    inwardDate: string;
+    itemDescription: string;
+    openingQty: number;
+    openingWeight: number;
+    rate: number;
+    issuesQty: number;
+    issuesWeight: number;
+    outDetailDate: string | null;
+    closingQty: number;
+    closingWeight: number;
+    amount: number;
+    hsnCode: string;
+    gstRate: number;
+  }[];
+  grossAmount: number;
+  varai: number;
+  uL: number;
+  taxableAmount: number;
+  cgst: number;
+  sgst: number;
+  roundOff: number;
+  netAmount: number;
+  amountInWords: string;
+  createdAt: string;
+  updatedAt: string;
+  lastCalculatedAt?: string; // Timestamp of last recalculation
+  createdBy: string;
+  // New fields for enhanced charge tracking
+  charges?: Array<{
+    type: string;
+    name: string;
+    amount: number;
+    description: string;
+  }>;
+  hasInwardThisMonth?: boolean;
+  inwardCount?: number;
 };

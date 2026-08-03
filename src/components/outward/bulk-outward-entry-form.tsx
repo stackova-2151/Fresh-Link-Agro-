@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import { format } from 'date-fns';
+import { PortalAutocomplete, type ItemBrandSuggestion } from '@/components/shared/portal-autocomplete';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
@@ -14,6 +15,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
+import { useClientStockAutocomplete } from '@/hooks/use-item-autocomplete';
+import { PrintConfirmationDialog } from '@/components/shared/print-confirmation-dialog';
 
 import type { Chamber, Client, RentalItem, User } from '@/lib/types';
 
@@ -168,6 +171,9 @@ export function BulkOutwardEntryForm({
   const [clientId, setClientId] = useState<string>('');
   const [clientInput, setClientInput] = useState<string>('');
   const [filteredClients, setFilteredClients] = useState<Client[]>([]);
+
+  // Use client-specific autocomplete for outward entry
+  const { filterSuggestionsByClientStock } = useClientStockAutocomplete(clientId, existingItems);
   const [showClientSuggestions, setShowClientSuggestions] = useState(false);
   const [clientHighlightIndex, setClientHighlightIndex] = useState(0);
 
@@ -180,6 +186,16 @@ export function BulkOutwardEntryForm({
   const [clientViewRows, setClientViewRows] = useState<Array<OutwardVoucherItem & { outwardNo: string; date: string }>>([]);
 
   const [rows, setRows] = useState<OutwardVoucherItem[]>(() => [createEmptyRow()]);
+
+  // Item autocomplete state
+  const [filteredItems, setFilteredItems] = useState<ItemBrandSuggestion[]>([]);
+  const [showItemSuggestions, setShowItemSuggestions] = useState(false);
+  const [itemHighlightIndex, setItemHighlightIndex] = useState(0);
+  const [activeItemRowIndex, setActiveItemRowIndex] = useState<number | null>(null);
+
+  // Print confirmation dialog state
+  const [showPrintDialog, setShowPrintDialog] = useState(false);
+  const [savedVoucherNo, setSavedVoucherNo] = useState<string>('');
 
   useEffect(() => {
     onVoucherNoChange?.(outwardNo);
@@ -194,10 +210,24 @@ export function BulkOutwardEntryForm({
   const selectedClient = useMemo(() => clients.find((c) => c.id === clientId) ?? null, [clientId, clients]);
 
   const cellRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const activeInputRef = useRef<HTMLInputElement | null>(null);
 
   const setCellRef = useCallback((key: string, el: HTMLInputElement | null) => {
     cellRefs.current[key] = el;
   }, []);
+
+  // Update activeInputRef when activeItemRowIndex changes
+  useEffect(() => {
+    if (activeItemRowIndex !== null) {
+      const row = rows[activeItemRowIndex];
+      if (row) {
+        const key = `${row.id}:itemName`;
+        activeInputRef.current = cellRefs.current[key] || null;
+      }
+    } else {
+      activeInputRef.current = null;
+    }
+  }, [activeItemRowIndex, rows]);
 
   const focusCell = useCallback(
     (rowIndex: number, field: RowField) => {
@@ -435,7 +465,6 @@ export function BulkOutwardEntryForm({
 
   const handleRowChange = useCallback(
     (rowIndex: number, field: RowField, value: string) => {
-      if (mode === 'edit') return; // Prevent row mutations in view mode
       setRows((prev) => {
         const next = [...prev];
         const row = { ...next[rowIndex] };
@@ -471,7 +500,7 @@ export function BulkOutwardEntryForm({
         return next;
       });
     },
-    [existingItems, mode]
+    [existingItems]
   );
 
   const validateRows = useCallback(() => {
@@ -502,8 +531,54 @@ export function BulkOutwardEntryForm({
     return { ok: true as const };
   }, [clientId, existingItems, rows]);
 
+  const handleItemNameChange = useCallback(
+    (rowIndex: number, value: string) => {
+      handleRowChange(rowIndex, 'itemName', value);
+      setActiveItemRowIndex(rowIndex);
+      
+      if (!value.trim()) {
+        setFilteredItems([]);
+        setShowItemSuggestions(false);
+        return;
+      }
+
+      const results = filterSuggestionsByClientStock(value);
+      setFilteredItems(results);
+      setShowItemSuggestions(results.length > 0);
+      setItemHighlightIndex(0);
+    },
+    [filterSuggestionsByClientStock, handleRowChange]
+  );
+
+  const handleItemSelect = useCallback(
+    (rowIndex: number, suggestion: ItemBrandSuggestion) => {
+      handleRowChange(rowIndex, 'itemName', suggestion.itemName);
+      handleRowChange(rowIndex, 'brand', suggestion.brand);
+      setShowItemSuggestions(false);
+      setFilteredItems([]);
+      setActiveItemRowIndex(null);
+      setItemHighlightIndex(0);
+      activeInputRef.current = null;
+
+      // Focus next field (batch)
+      setTimeout(() => focusCell(rowIndex, 'batch'), 0);
+    },
+    [handleRowChange, focusCell]
+  );
+
+  const handlePrintDialogClose = useCallback(() => {
+    // Clear form for new entry
+    const nextOutwardNo = generateNextOutwardNo(vouchers);
+    clearForNewEntry(nextOutwardNo);
+    
+    // Show success toast
+    toast({
+      title: 'Entry saved successfully',
+      description: `${savedVoucherNo} is ready`,
+    });
+  }, [clearForNewEntry, savedVoucherNo, toast, vouchers]);
+
   const handleSave = useCallback(() => {
-    if (mode === 'edit') return;
     const parsed = parseOutwardSeq(outwardNo);
     if (!parsed) {
       toast({ variant: 'destructive', title: 'Invalid Outward No format', description: 'Use OUT-001' });
@@ -552,18 +627,19 @@ export function BulkOutwardEntryForm({
 
     onUpsert({ mode: nextMode, voucher });
 
-    toast({
-      title: nextMode === 'edit' ? 'Outward voucher updated' : 'Outward voucher saved',
-      description: `${voucher.outwardNo} • ${client.name} • ${nonBlankRows.length} rows • ${grandTotalWeight.toFixed(2)} kg`,
-    });
-
+    // Show print dialog for NEW entries only
     if (nextMode === 'new') {
-      const nextOutwardNo = generateNextOutwardNo([...vouchers, voucher]);
-      clearForNewEntry(nextOutwardNo);
+      setSavedVoucherNo(voucher.outwardNo);
+      setShowPrintDialog(true);
       return;
     }
 
-    setMode('edit');
+    // For edit mode, show toast and reset to new entry
+    toast({
+      title: 'Outward voucher updated',
+      description: `${voucher.outwardNo} • ${client.name} • ${nonBlankRows.length} rows • ${grandTotalWeight.toFixed(2)} kg`,
+    });
+    clearForNewEntry();
   }, [
     clearForNewEntry,
     clientId,
@@ -671,6 +747,7 @@ export function BulkOutwardEntryForm({
   }, [showInwardSuggestions, activeInwardRowId, inwardDropdownPosition, calculateDropdownPosition]);
 
   return (
+    <>
     <Card className="border shadow-sm">
       <CardHeader className="py-3">
         <div className="flex items-start justify-between gap-4">
@@ -694,6 +771,7 @@ export function BulkOutwardEntryForm({
             <Input
               value={outwardNo}
               onChange={(e) => {
+                if (mode === 'edit') return;
                 const next = e.target.value.toUpperCase();
                 setOutwardNo(next);
                 setMode(vouchersByOutwardNo.has(next.trim().toUpperCase()) ? 'edit' : 'new');
@@ -706,6 +784,7 @@ export function BulkOutwardEntryForm({
                   handleOutwardLookup();
                 }
               }}
+              readOnly={isEditMode}
               className="font-mono"
             />
           </div>
@@ -724,6 +803,7 @@ export function BulkOutwardEntryForm({
                 onBlur={() => {
                   setTimeout(() => setShowClientSuggestions(false), 0);
                 }}
+                readOnly={isEditMode}
               />
 
               {showClientSuggestions && filteredClients.length > 0 && (
@@ -745,27 +825,27 @@ export function BulkOutwardEntryForm({
 
           <div className="md:col-span-2">
             <Label>Date</Label>
-            <Input type="date" value={voucherDate} onChange={(e) => { if (mode !== 'edit') setVoucherDate(e.target.value); }} readOnly={isEditMode} />
+            <Input type="date" value={voucherDate} onChange={(e) => setVoucherDate(e.target.value)} />
           </div>
 
           <div className="md:col-span-2">
             <Label>Gate Pass No</Label>
-            <Input value={gatePassNo} onChange={(e) => { if (mode !== 'edit') setGatePassNo(e.target.value); }} readOnly={isEditMode} />
+            <Input value={gatePassNo} onChange={(e) => setGatePassNo(e.target.value)} />
           </div>
 
           <div className="md:col-span-2">
             <Label>Vehicle No</Label>
-            <Input value={vehicleNo} onChange={(e) => { if (mode !== 'edit') setVehicleNo(e.target.value); }} readOnly={isEditMode} />
+            <Input value={vehicleNo} onChange={(e) => setVehicleNo(e.target.value)} />
           </div>
 
           <div className="md:col-span-2">
             <Label>Driver Name</Label>
-            <Input value={driverName} onChange={(e) => { if (mode !== 'edit') setDriverName(e.target.value); }} readOnly={isEditMode} />
+            <Input value={driverName} onChange={(e) => setDriverName(e.target.value)} />
           </div>
 
           <div className="md:col-span-2">
             <Label>Mobile No</Label>
-            <Input value={mobile} onChange={(e) => { if (mode !== 'edit') setMobile(e.target.value); }} readOnly={isEditMode} />
+            <Input value={mobile} onChange={(e) => setMobile(e.target.value)} />
           </div>
         </div>
 
@@ -799,7 +879,7 @@ export function BulkOutwardEntryForm({
             </Table>
           </div>
         ) : (
-          <div className="overflow-x-auto overflow-y-visible rounded-md border">
+          <div className="overflow-x-auto rounded-md border">
             <Table className="text-sm">
               <TableHeader>
                 <TableRow className="bg-muted/30">
@@ -812,7 +892,7 @@ export function BulkOutwardEntryForm({
                   <TableHead className="w-[120px] text-right">Tot Wt</TableHead>
                   <TableHead className="w-[140px]">Inward No</TableHead>
                   <TableHead className="w-[140px]">Exp Date</TableHead>
-                  {mode !== 'edit' && <TableHead className="w-[70px] text-right">Del</TableHead>}
+                  <TableHead className="w-[70px] text-right">Del</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -823,16 +903,55 @@ export function BulkOutwardEntryForm({
                     <TableRow key={rowKey} className="hover:bg-transparent">
                       <TableCell className="p-1">
                         <Input
-                          ref={(el) => setCellRef(`${rowKey}:itemName`, el)}
+                          ref={(el) => {
+                            setCellRef(`${rowKey}:itemName`, el);
+                            if (activeItemRowIndex === idx) {
+                              activeInputRef.current = el;
+                            }
+                          }}
                           value={row.itemName}
-                          onChange={(e) => handleRowChange(idx, 'itemName', e.target.value)}
+                          onChange={(e) => handleItemNameChange(idx, e.target.value)}
                           onKeyDown={(e) => {
+                            if (e.key === 'ArrowDown') {
+                              if (!showItemSuggestions || filteredItems.length === 0) return;
+                              e.preventDefault();
+                              setItemHighlightIndex((prev) => (prev + 1) % filteredItems.length);
+                              return;
+                            }
+                            if (e.key === 'ArrowUp') {
+                              if (!showItemSuggestions || filteredItems.length === 0) return;
+                              e.preventDefault();
+                              setItemHighlightIndex((prev) => (prev === 0 ? filteredItems.length - 1 : prev - 1));
+                              return;
+                            }
+                            if (e.key === 'Escape') {
+                              setShowItemSuggestions(false);
+                              setActiveItemRowIndex(null);
+                              activeInputRef.current = null;
+                              return;
+                            }
                             if (e.key === 'Enter') {
                               e.preventDefault();
+                              if (showItemSuggestions && filteredItems.length > 0) {
+                                handleItemSelect(idx, filteredItems[itemHighlightIndex]);
+                                return;
+                              }
                               tryAdvanceOnEnter(idx, 'itemName');
                             }
                           }}
-                          readOnly={isEditMode}
+                          onFocus={() => {
+                            setActiveItemRowIndex(idx);
+                            activeInputRef.current = cellRefs.current[`${rowKey}:itemName`] || null;
+                          }}
+                          onBlur={() => {
+                            setTimeout(() => {
+                              if (!document.activeElement?.closest("[data-portal-autocomplete]")) {
+                                setShowItemSuggestions(false);
+                                setActiveItemRowIndex(null);
+                                activeInputRef.current = null;
+                              }
+                            }, 200);
+                          }}
                           className="h-8"
                         />
                       </TableCell>
@@ -848,7 +967,6 @@ export function BulkOutwardEntryForm({
                               tryAdvanceOnEnter(idx, 'brand');
                             }
                           }}
-                          readOnly={isEditMode}
                           className="h-8"
                         />
                       </TableCell>
@@ -864,14 +982,13 @@ export function BulkOutwardEntryForm({
                               tryAdvanceOnEnter(idx, 'batch');
                             }
                           }}
-                          readOnly={isEditMode}
                           className="h-8"
                         />
                       </TableCell>
 
                       <TableCell className="p-1">
                         <Select value={row.chamberId} onValueChange={(val) => handleRowChange(idx, 'chamberId', val)}>
-                          <SelectTrigger className={`h-8${isEditMode ? ' pointer-events-none' : ''}`}>
+                          <SelectTrigger className="h-8">
                             <SelectValue placeholder="Select" />
                           </SelectTrigger>
                           <SelectContent>
@@ -896,7 +1013,6 @@ export function BulkOutwardEntryForm({
                               tryAdvanceOnEnter(idx, 'qty');
                             }
                           }}
-                          readOnly={isEditMode}
                           className="h-8 text-right"
                         />
                       </TableCell>
@@ -915,7 +1031,6 @@ export function BulkOutwardEntryForm({
                                   onKeyDown={(e) => {
                                     if (e.key === 'Enter') { e.preventDefault(); tryAdvanceOnEnter(idx, 'bagWeight'); }
                                   }}
-                                  readOnly={isEditMode}
                                   className="h-8 text-right"
                                   list={`bw-opts-${rowKey}`}
                                 />
@@ -934,7 +1049,6 @@ export function BulkOutwardEntryForm({
                               onKeyDown={(e) => {
                                 if (e.key === 'Enter') { e.preventDefault(); tryAdvanceOnEnter(idx, 'bagWeight'); }
                               }}
-                              readOnly={isEditMode}
                               className="h-8 text-right"
                             />
                           );
@@ -951,14 +1065,12 @@ export function BulkOutwardEntryForm({
                             ref={(el) => setCellRef(`${rowKey}:inwardNumber`, el)}
                             value={row.inwardNumber}
                             onChange={(e) => {
-                              if (isEditMode) return;
                               handleRowChange(idx, 'inwardNumber', e.target.value);
                               if (e.target) {
                                 showInwardDropdown(rowKey, e.target);
                               }
                             }}
                             onFocus={(e) => {
-                              if (isEditMode) return;
                               if (e.target) {
                                 showInwardDropdown(rowKey, e.target);
                               }
@@ -967,7 +1079,6 @@ export function BulkOutwardEntryForm({
                               setTimeout(() => hideInwardDropdown(), 150);
                             }}
                             onKeyDown={(e) => {
-                              if (isEditMode) return;
                               if (e.key === 'ArrowDown') {
                                 if (!showInwardSuggestions || activeInwardMatches.length === 0) return;
                                 e.preventDefault();
@@ -1002,7 +1113,6 @@ export function BulkOutwardEntryForm({
                                 tryAdvanceOnEnter(idx, 'inwardNumber');
                               }
                             }}
-                            readOnly={isEditMode}
                             className="h-8 font-mono"
                           />
                         </div>
@@ -1012,24 +1122,22 @@ export function BulkOutwardEntryForm({
                         <Input value={row.expDate} readOnly className="h-8" />
                       </TableCell>
 
-                      {mode !== 'edit' && (
-                        <TableCell className="p-1 text-right">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            className="h-8 px-2"
-                            onClick={() => {
-                              setRows((prev) => {
-                                const next = prev.filter((r) => r.id !== rowKey);
-                                return next.length === 0 ? [createEmptyRow()] : next;
-                              });
-                            }}
-                            disabled={rows.length <= 1}
-                          >
-                            Del
-                          </Button>
-                        </TableCell>
-                      )}
+                      <TableCell className="p-1 text-right">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          className="h-8 px-2"
+                          onClick={() => {
+                            setRows((prev) => {
+                              const next = prev.filter((r) => r.id !== rowKey);
+                              return next.length === 0 ? [createEmptyRow()] : next;
+                            });
+                          }}
+                          disabled={rows.length <= 1}
+                        >
+                          Del
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   );
                 })}
@@ -1041,11 +1149,9 @@ export function BulkOutwardEntryForm({
         {mode !== 'clientView' && (
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div className="flex gap-2">
-              {mode !== 'edit' && (
-                <Button type="button" onClick={handleSave}>
-                  Save Entry
-                </Button>
-              )}
+              <Button type="button" onClick={handleSave}>
+                {mode === 'edit' ? 'Update Entry' : 'Save Entry'}
+              </Button>
             </div>
 
             <div className="text-xs text-muted-foreground">
@@ -1059,7 +1165,7 @@ export function BulkOutwardEntryForm({
           <div className="grid grid-cols-1 gap-3 md:grid-cols-12">
             <div className="md:col-span-8">
               <Label>Notes</Label>
-              <Textarea value={notes} onChange={(e) => { if (mode !== 'edit') setNotes(e.target.value); }} readOnly={isEditMode} />
+              <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} />
             </div>
             <div className="md:col-span-4">
               <div className="rounded-md border p-3 text-xs">
@@ -1110,5 +1216,28 @@ export function BulkOutwardEntryForm({
         )
       }
     </Card>
+
+    <PrintConfirmationDialog
+      open={showPrintDialog}
+      onOpenChange={setShowPrintDialog}
+      voucherNo={savedVoucherNo}
+      voucherType="outward"
+      onClose={handlePrintDialogClose}
+    />
+
+    <PortalAutocomplete
+      isOpen={showItemSuggestions && activeItemRowIndex !== null && filteredItems.length > 0}
+      items={filteredItems}
+      highlightIndex={itemHighlightIndex}
+      onSelect={(item) => {
+        if (activeItemRowIndex !== null) {
+          handleItemSelect(activeItemRowIndex, item);
+        }
+      }}
+      onHighlightChange={setItemHighlightIndex}
+      inputRef={activeInputRef}
+      subtitle="----------------------"
+    />
+    </>
   );
 }

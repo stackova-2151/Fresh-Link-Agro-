@@ -2,7 +2,9 @@
 
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { format } from 'date-fns';
+import { PortalAutocomplete, type ItemBrandSuggestion } from '@/components/shared/portal-autocomplete';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
@@ -12,6 +14,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
+import { useItemAutocomplete } from '@/hooks/use-item-autocomplete';
+import { PrintConfirmationDialog } from '@/components/shared/print-confirmation-dialog';
 
 import type { Chamber, Client, RentalItem, User, Vendor } from '@/lib/types';
 
@@ -24,7 +28,7 @@ export type InwardVoucherItem = {
   batch: string;
   chamberId: string;
   bags: number | '';
-  unit: 'KG' | 'BAGS';
+  unit: string;
   bagWeight: number | '';
   totalWeight: number;
 };
@@ -85,7 +89,7 @@ function createEmptyRow(): InwardVoucherItem {
     batch: '',
     chamberId: '',
     bags: '',
-    unit: 'KG',
+    unit: '',
     bagWeight: '',
     totalWeight: 0,
   };
@@ -155,6 +159,7 @@ export function BulkInwardEntryForm({
   onVoucherNoChange,
 }: Props) {
   const { toast } = useToast();
+  const { filterSuggestions } = useItemAutocomplete();
 
   const todayIso = useMemo(() => {
     const d = new Date();
@@ -184,11 +189,35 @@ export function BulkInwardEntryForm({
     [createEmptyRow()]
   );
 
+  // Item autocomplete state
+  const [filteredItems, setFilteredItems] = useState<ItemBrandSuggestion[]>([]);
+  const [showItemSuggestions, setShowItemSuggestions] = useState(false);
+  const [itemHighlightIndex, setItemHighlightIndex] = useState(0);
+  const [activeItemRowIndex, setActiveItemRowIndex] = useState<number | null>(null);
+
+  // Print confirmation dialog state
+  const [showPrintDialog, setShowPrintDialog] = useState(false);
+  const [savedVoucherNo, setSavedVoucherNo] = useState<string>('');
+
   useEffect(() => {
     onVoucherNoChange?.(inwardNo);
   }, [inwardNo, onVoucherNoChange]);
 
   const cellRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const activeInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Update activeInputRef when activeItemRowIndex changes
+  useEffect(() => {
+    if (activeItemRowIndex !== null) {
+      const row = rows[activeItemRowIndex];
+      if (row) {
+        const key = `${row.id}:itemName`;
+        activeInputRef.current = cellRefs.current[key] || null;
+      }
+    } else {
+      activeInputRef.current = null;
+    }
+  }, [activeItemRowIndex, rows]);
 
   const setCellRef = useCallback((key: string, el: HTMLInputElement | null) => {
     cellRefs.current[key] = el;
@@ -213,21 +242,18 @@ export function BulkInwardEntryForm({
   }, [rows]);
 
   const addNewRow = useCallback(() => {
-    if (mode === 'edit') return;
     setRows((prev) => [...prev, createEmptyRow()]);
-  }, [mode]);
+  }, []);
 
   const removeRow = useCallback((rowId: string) => {
-    if (mode === 'edit') return;
     setRows((prev) => {
       const next = prev.filter((r) => r.id !== rowId);
       return next.length === 0 ? [createEmptyRow()] : next;
     });
-  }, [mode]);
+  }, []);
 
   const handleRowChange = useCallback(
     (rowIndex: number, field: RowField, value: string) => {
-      if (mode === 'edit') return; // Prevent row mutations in view mode
       setRows((prev) => {
         const next = [...prev];
         const row = { ...next[rowIndex] };
@@ -235,8 +261,6 @@ export function BulkInwardEntryForm({
         if (field === 'bags' || field === 'bagWeight') {
           const parsed = value === '' ? '' : Number(value);
           (row as any)[field] = value === '' ? '' : Number.isFinite(parsed) ? parsed : '';
-        } else if (field === 'unit') {
-          row.unit = value === 'BAGS' ? 'BAGS' : 'KG';
         } else {
           (row as any)[field] = value;
         }
@@ -246,7 +270,7 @@ export function BulkInwardEntryForm({
         return next;
       });
     },
-    [mode]
+    []
   );
 
   const tryAdvanceOnEnter = useCallback(
@@ -272,6 +296,53 @@ export function BulkInwardEntryForm({
     },
     [focusCell, rows]
   );
+
+  const handleItemNameChange = useCallback(
+    (rowIndex: number, value: string) => {
+      handleRowChange(rowIndex, 'itemName', value);
+      setActiveItemRowIndex(rowIndex);
+
+      if (!value.trim()) {
+        setFilteredItems([]);
+        setShowItemSuggestions(false);
+        return;
+      }
+
+      const results = filterSuggestions(value);
+      setFilteredItems(results);
+      setShowItemSuggestions(results.length > 0);
+      setItemHighlightIndex(0);
+    },
+    [filterSuggestions, handleRowChange]
+  );
+
+  const handleItemSelect = useCallback(
+    (rowIndex: number, suggestion: ItemBrandSuggestion) => {
+      handleRowChange(rowIndex, 'itemName', suggestion.itemName);
+      handleRowChange(rowIndex, 'brand', suggestion.brand);
+      setShowItemSuggestions(false);
+      setFilteredItems([]);
+      setActiveItemRowIndex(null);
+      setItemHighlightIndex(0);
+      activeInputRef.current = null;
+      
+      // Focus next field (mfgDate)
+      setTimeout(() => focusCell(rowIndex, 'mfgDate'), 0);
+    },
+    [handleRowChange, focusCell]
+  );
+
+  const handlePrintDialogClose = useCallback(() => {
+    // Clear form for new entry
+    const nextInwardNo = generateNextInwardNo(vouchers, existingItems);
+    clearForNewEntry(nextInwardNo);
+    
+    // Show success toast
+    toast({
+      title: 'Entry saved successfully',
+      description: `${savedVoucherNo} is ready`,
+    });
+  }, [savedVoucherNo, toast, vouchers, existingItems]);
 
   const selectedClient = useMemo(() => clients.find((c) => c.id === clientId) ?? null, [clientId, clients]);
 
@@ -415,7 +486,6 @@ export function BulkInwardEntryForm({
   }, [clearForNewEntry, inwardNo, loadVoucher, vouchersByInwardNo]);
 
   const handleSave = useCallback(() => {
-    if (mode === 'edit') return;
     const parsed = parseInwardSeq(inwardNo);
     if (!parsed) {
       toast({ variant: 'destructive', title: 'Invalid Inward No format', description: 'Use INW-001' });
@@ -518,18 +588,19 @@ export function BulkInwardEntryForm({
 
     onUpsert({ mode: nextMode, voucher, createdItems });
 
-    toast({
-      title: nextMode === 'edit' ? 'Inward voucher updated' : 'Inward voucher saved',
-      description: `${voucher.inwardNo} • ${client.name} • ${nonBlankRows.length} rows • ${grandTotalWeight.toFixed(2)} kg`,
-    });
-
+    // Show print dialog for NEW entries only
     if (nextMode === 'new') {
-      const nextInwardNo = generateNextInwardNo([...vouchers, voucher], [...existingItems, ...createdItems]);
-      clearForNewEntry(nextInwardNo);
+      setSavedVoucherNo(voucher.inwardNo);
+      setShowPrintDialog(true);
       return;
     }
 
-    setMode('edit');
+    // For edit mode, show toast and reset to new entry
+    toast({
+      title: 'Inward voucher updated',
+      description: `${voucher.inwardNo} • ${client.name} • ${nonBlankRows.length} rows • ${grandTotalWeight.toFixed(2)} kg`,
+    });
+    clearForNewEntry();
   }, [
     clearForNewEntry,
     clientId,
@@ -556,6 +627,7 @@ export function BulkInwardEntryForm({
   const isEditMode = mode === 'edit';
 
   return (
+    <>
     <Card className="border shadow-sm">
       <CardHeader className="py-3">
         <div className="flex items-start justify-between gap-4">
@@ -581,6 +653,7 @@ export function BulkInwardEntryForm({
             <Input
               value={inwardNo}
               onChange={(e) => {
+                if (mode === 'edit') return;
                 setInwardNo(e.target.value.toUpperCase());
                 setMode(vouchersByInwardNo.has(e.target.value.trim().toUpperCase()) ? 'edit' : 'new');
                 setClientViewRows([]);
@@ -592,6 +665,7 @@ export function BulkInwardEntryForm({
                   handleInwardLookup();
                 }
               }}
+              readOnly={isEditMode}
               className="font-mono"
             />
           </div>
@@ -610,10 +684,11 @@ export function BulkInwardEntryForm({
                 onBlur={() => {
                   setTimeout(() => setShowSuggestions(false), 0);
                 }}
+                readOnly={isEditMode}
               />
 
               {showSuggestions && filteredClients.length > 0 && (
-                <div className="absolute z-[100] mt-1 max-h-64 w-full overflow-auto rounded-md border bg-background shadow-lg">
+                <div className="absolute left-0 top-full z-[9999] mt-1 w-full max-h-64 overflow-y-auto rounded-md border bg-background shadow-xl">
                   {filteredClients.map((client, index) => (
                     <div
                       key={client.id}
@@ -628,35 +703,29 @@ export function BulkInwardEntryForm({
               )}
             </div>
           </div>
-
           <div className="md:col-span-2">
             <Label>Date</Label>
-            <Input
-              type="date"
-              value={voucherDate}
-              onChange={(e) => { if (mode !== 'edit') setVoucherDate(e.target.value); }}
-              readOnly={isEditMode}
-            />
+            <Input type="date" value={voucherDate} onChange={(e) => setVoucherDate(e.target.value)} />
           </div>
 
           <div className="md:col-span-2">
             <Label>Gate Pass No</Label>
-            <Input value={gatePassNo} onChange={(e) => { if (mode !== 'edit') setGatePassNo(e.target.value); }} readOnly={isEditMode} />
+            <Input value={gatePassNo} onChange={(e) => setGatePassNo(e.target.value)} />
           </div>
 
           <div className="md:col-span-2">
             <Label>Vehicle No</Label>
-            <Input value={vehicleNo} onChange={(e) => { if (mode !== 'edit') setVehicleNo(e.target.value); }} readOnly={isEditMode} />
+            <Input value={vehicleNo} onChange={(e) => setVehicleNo(e.target.value)} />
           </div>
 
           <div className="md:col-span-2">
             <Label>Driver Name</Label>
-            <Input value={driverName} onChange={(e) => { if (mode !== 'edit') setDriverName(e.target.value); }} readOnly={isEditMode} />
+            <Input value={driverName} onChange={(e) => setDriverName(e.target.value)} />
           </div>
 
           <div className="md:col-span-2">
             <Label>Mobile No</Label>
-            <Input value={mobile} onChange={(e) => { if (mode !== 'edit') setMobile(e.target.value); }} readOnly={isEditMode} />
+            <Input value={mobile} onChange={(e) => setMobile(e.target.value)} />
           </div>
         </div>
 
@@ -698,7 +767,7 @@ export function BulkInwardEntryForm({
             </Table>
           </div>
         ) : (
-          <div className="overflow-x-auto overflow-y-visible rounded-md border">
+          <div className="overflow-x-auto rounded-md border">
             <Table className="text-sm">
               <TableHeader>
                 <TableRow className="bg-muted/30">
@@ -712,7 +781,7 @@ export function BulkInwardEntryForm({
                   <TableHead className="w-[120px]">Unit</TableHead>
                   <TableHead className="w-[110px] text-right">Bag Wt</TableHead>
                   <TableHead className="w-[120px] text-right">Tot Wt</TableHead>
-                  {mode !== 'edit' && <TableHead className="w-[70px] text-right">Del</TableHead>}
+                  <TableHead className="w-[70px] text-right">Del</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -722,16 +791,55 @@ export function BulkInwardEntryForm({
                     <TableRow key={rowKey} className="hover:bg-transparent">
                       <TableCell className="p-1">
                         <Input
-                          ref={(el) => setCellRef(`${rowKey}:itemName`, el)}
+                          ref={(el) => {
+                            setCellRef(`${rowKey}:itemName`, el);
+                            if (activeItemRowIndex === idx) {
+                              activeInputRef.current = el;
+                            }
+                          }}
                           value={row.itemName}
-                          onChange={(e) => handleRowChange(idx, 'itemName', e.target.value)}
+                          onChange={(e) => handleItemNameChange(idx, e.target.value)}
                           onKeyDown={(e) => {
+                            if (e.key === 'ArrowDown') {
+                              if (!showItemSuggestions || filteredItems.length === 0) return;
+                              e.preventDefault();
+                              setItemHighlightIndex((prev) => (prev + 1) % filteredItems.length);
+                              return;
+                            }
+                            if (e.key === 'ArrowUp') {
+                              if (!showItemSuggestions || filteredItems.length === 0) return;
+                              e.preventDefault();
+                              setItemHighlightIndex((prev) => (prev === 0 ? filteredItems.length - 1 : prev - 1));
+                              return;
+                            }
+                            if (e.key === 'Escape') {
+                              setShowItemSuggestions(false);
+                              setActiveItemRowIndex(null);
+                              activeInputRef.current = null;
+                              return;
+                            }
                             if (e.key === 'Enter') {
                               e.preventDefault();
+                              if (showItemSuggestions && filteredItems.length > 0) {
+                                handleItemSelect(idx, filteredItems[itemHighlightIndex]);
+                                return;
+                              }
                               tryAdvanceOnEnter(idx, 'itemName');
                             }
                           }}
-                          readOnly={isEditMode}
+                          onFocus={() => {
+                            setActiveItemRowIndex(idx);
+                            activeInputRef.current = cellRefs.current[`${rowKey}:itemName`] || null;
+                          }}
+                          onBlur={() => {
+                            setTimeout(() => {
+                              if (!document.activeElement?.closest("[data-portal-autocomplete]")) {
+                                setShowItemSuggestions(false);
+                                setActiveItemRowIndex(null);
+                                activeInputRef.current = null;
+                              }
+                            }, 200);
+                          }}
                           className="h-8"
                         />
                       </TableCell>
@@ -746,7 +854,6 @@ export function BulkInwardEntryForm({
                               tryAdvanceOnEnter(idx, 'brand');
                             }
                           }}
-                          readOnly={isEditMode}
                           className="h-8"
                         />
                       </TableCell>
@@ -762,7 +869,6 @@ export function BulkInwardEntryForm({
                               tryAdvanceOnEnter(idx, 'mfgDate');
                             }
                           }}
-                          readOnly={isEditMode}
                           className="h-8"
                         />
                       </TableCell>
@@ -778,7 +884,6 @@ export function BulkInwardEntryForm({
                               tryAdvanceOnEnter(idx, 'expDate');
                             }
                           }}
-                          readOnly={isEditMode}
                           className="h-8"
                         />
                       </TableCell>
@@ -793,7 +898,6 @@ export function BulkInwardEntryForm({
                               tryAdvanceOnEnter(idx, 'batch');
                             }
                           }}
-                          readOnly={isEditMode}
                           className="h-8"
                         />
                       </TableCell>
@@ -802,7 +906,7 @@ export function BulkInwardEntryForm({
                           value={row.chamberId}
                           onValueChange={(val) => handleRowChange(idx, 'chamberId', val)}
                         >
-                          <SelectTrigger className={`h-8${isEditMode ? ' pointer-events-none' : ''}`}>
+                          <SelectTrigger className="h-8">
                             <SelectValue placeholder="Select" />
                           </SelectTrigger>
                           <SelectContent>
@@ -826,20 +930,24 @@ export function BulkInwardEntryForm({
                               tryAdvanceOnEnter(idx, 'bags');
                             }
                           }}
-                          readOnly={isEditMode}
                           className="h-8 text-right"
                         />
                       </TableCell>
                       <TableCell className="p-1">
-                        <Select value={row.unit} onValueChange={(val) => handleRowChange(idx, 'unit', val)}>
-                          <SelectTrigger className={`h-8${isEditMode ? ' pointer-events-none' : ''}`}>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="KG">KG</SelectItem>
-                            <SelectItem value="BAGS">BAGS</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        <Input
+                          ref={(el) => setCellRef(`${rowKey}:unit`, el)}
+                          value={row.unit}
+                          onChange={(e) => handleRowChange(idx, 'unit', e.target.value.toUpperCase())}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              tryAdvanceOnEnter(idx, 'unit');
+                            }
+                          }}
+                          readOnly={isEditMode}
+                          className="h-8 uppercase"
+                          placeholder="UNIT"
+                        />
                       </TableCell>
                       <TableCell className="p-1">
                         <Input
@@ -853,26 +961,23 @@ export function BulkInwardEntryForm({
                               tryAdvanceOnEnter(idx, 'bagWeight');
                             }
                           }}
-                          readOnly={isEditMode}
                           className="h-8 text-right"
                         />
                       </TableCell>
                       <TableCell className="p-1">
                         <Input value={row.totalWeight ? row.totalWeight.toFixed(2) : ''} readOnly className="h-8 text-right" />
                       </TableCell>
-                      {mode !== 'edit' && (
-                        <TableCell className="p-1 text-right">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            className="h-8 px-2"
-                            onClick={() => removeRow(row.id)}
-                            disabled={rows.length <= 1}
-                          >
-                            Del
-                          </Button>
-                        </TableCell>
-                      )}
+                      <TableCell className="p-1 text-right">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          className="h-8 px-2"
+                          onClick={() => removeRow(row.id)}
+                          disabled={rows.length <= 1}
+                        >
+                          Del
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   );
                 })}
@@ -884,11 +989,9 @@ export function BulkInwardEntryForm({
         {mode !== 'clientView' && (
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div className="flex gap-2">
-              {mode !== 'edit' && (
-                <Button type="button" onClick={handleSave}>
-                  Save Entry
-                </Button>
-              )}
+              <Button type="button" onClick={handleSave}>
+                {mode === 'edit' ? 'Update Entry' : 'Save Entry'}
+              </Button>
             </div>
 
             <div className="text-xs text-muted-foreground">
@@ -902,7 +1005,7 @@ export function BulkInwardEntryForm({
           <div className="grid grid-cols-1 gap-3 md:grid-cols-12">
             <div className="md:col-span-8">
               <Label>Notes</Label>
-              <Textarea value={notes} onChange={(e) => { if (mode !== 'edit') setNotes(e.target.value); }} readOnly={isEditMode} />
+              <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} />
             </div>
             <div className="md:col-span-4">
               <div className="rounded-md border p-3 text-xs">
@@ -917,5 +1020,28 @@ export function BulkInwardEntryForm({
         )}
       </CardContent>
     </Card>
+
+    <PrintConfirmationDialog
+      open={showPrintDialog}
+      onOpenChange={setShowPrintDialog}
+      voucherNo={savedVoucherNo}
+      voucherType="inward"
+      onClose={handlePrintDialogClose}
+    />
+
+    <PortalAutocomplete
+      isOpen={showItemSuggestions && activeItemRowIndex !== null && filteredItems.length > 0}
+      items={filteredItems}
+      highlightIndex={itemHighlightIndex}
+      onSelect={(item) => {
+        if (activeItemRowIndex !== null) {
+          handleItemSelect(activeItemRowIndex, item);
+        }
+      }}
+      onHighlightChange={setItemHighlightIndex}
+      inputRef={activeInputRef}
+      subtitle="--------------"
+    />
+    </>
   );
 }

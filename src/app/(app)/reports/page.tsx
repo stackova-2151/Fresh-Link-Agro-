@@ -70,7 +70,7 @@ export default function ReportsPage() {
                 <PageHeader title="Stock Report" description="Comprehensive operational and financial reporting as per requirements.">
                     <div className="flex gap-2">
                         <Button variant="outline" onClick={() => window.print()}><FileText className="mr-2 h-4 w-4" /> Print PDF</Button>
-                        <Button variant="outline"><Download className="mr-2 h-4 w-4" /> Export CSV</Button>
+                        {/* <Button variant="outline"><Download className="mr-2 h-4 w-4" /> Export CSV</Button> */}
                     </div>
                 </PageHeader>
             

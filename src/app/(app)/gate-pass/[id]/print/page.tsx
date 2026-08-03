@@ -9,6 +9,8 @@ import { Button } from '@/components/ui/button';
 import { Printer } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { GatePass } from '@/lib/types';
+import { PrintHeader } from '@/components/print/PrintHeader';
+import { PrintFooter } from '@/components/print/PrintFooter';
 
 const DetailRow = ({ label, value }: { label: string; value: string | number | undefined }) => (
     <div className="flex justify-between py-2 border-b">
@@ -33,17 +35,20 @@ export default function PrintGatePassPage() {
     }
 
     return (
-        <div className="bg-gray-100 min-h-screen p-4 sm:p-8">
-            <div className="max-w-2xl mx-auto bg-white p-6 sm:p-8 rounded-lg shadow-lg">
-                <header className="flex justify-between items-center mb-6">
-                    <div>
-                        <h1 className="text-3xl font-bold text-primary">GATE PASS</h1>
-                        <p className="text-muted-foreground">{gatePass.gatePassNumber}</p>
-                    </div>
-                    <Badge variant={gatePass.type === 'IN' ? 'default' : 'destructive'} className={`text-lg px-4 py-1 ${gatePass.type === 'IN' ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}>
-                        {gatePass.type}
-                    </Badge>
-                </header>
+        <div className="bg-gray-100 min-h-screen p-4 sm:p-8 print:bg-white print:p-0">
+            <div className="max-w-2xl mx-auto bg-white p-6 sm:p-8 rounded-lg shadow-lg print:shadow-none print:rounded-none">
+                <PrintHeader
+                    documentTitle="GATE PASS"
+                    documentNumber={gatePass.gatePassNumber}
+                    documentDate={new Date(gatePass.entryTime).toLocaleDateString()}
+                    additionalInfo={
+                        <div className="flex justify-center mt-2">
+                            <Badge variant={gatePass.type === 'IN' ? 'default' : 'destructive'} className={`text-lg px-4 py-1 ${gatePass.type === 'IN' ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}>
+                                {gatePass.type}
+                            </Badge>
+                        </div>
+                    }
+                />
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4 mb-6">
                     <DetailRow label="Client / Vendor" value={gatePass.clientName} />
@@ -84,17 +89,10 @@ export default function PrintGatePassPage() {
                     </div>
                 )}
                 
-                <footer className="mt-8 pt-6 border-t text-center">
-                    <div className="grid grid-cols-2 gap-8">
-                        <div className="border-t-2 border-gray-300 pt-2">
-                           <p className="text-sm text-muted-foreground">Driver's Signature</p>
-                        </div>
-                         <div className="border-t-2 border-gray-300 pt-2">
-                           <p className="text-sm text-muted-foreground">Security Signature</p>
-                        </div>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-8">This is a computer-generated document.</p>
-                </footer>
+                <PrintFooter
+                    showDriverSignature={true}
+                    showSecuritySignature={true}
+                />
             </div>
              <div className="max-w-2xl mx-auto mt-4 text-center">
                 <Button onClick={() => window.print()} className="print:hidden">

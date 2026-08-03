@@ -36,27 +36,35 @@ const UserContext = createContext<UserContextType | undefined>(undefined);
 
 async function fetchFirestoreUser(uid: string): Promise<User | null> {
   try {
-    const snap = await getDoc(doc(db, 'users', uid));
-    if (!snap.exists()) return null;
+    console.log("========== FETCH FIRESTORE USER ==========");
+    console.log("UID:", uid);
 
-    const data = snap.data() as {
-      name: string;
-      email: string;
-      username?: string;
-      mobile?: string;
-      role: UserRole;
-      status: UserStatus;
-      createdBy?: string;
-      createdAt?: { toDate?: () => Date } | string;
-      updatedAt?: { toDate?: () => Date } | string;
-    };
+    const ref = doc(db, "users", uid);
+    console.log("Document Path:", ref.path);
 
-    if (data.status === 'INACTIVE') return null;
+    const snap = await getDoc(ref);
+
+    console.log("Document Exists:", snap.exists());
+
+    if (!snap.exists()) {
+      console.log("❌ Firestore document not found");
+      return null;
+    }
+
+    const data = snap.data();
+
+    console.log("Firestore Data:", data);
+    console.log("Status:", data.status);
+
+    if (data.status === "INACTIVE") {
+      console.log("❌ User is INACTIVE");
+      return null;
+    }
 
     const toIso = (v: unknown): string | undefined => {
       if (!v) return undefined;
-      if (typeof v === 'string') return v;
-      if (typeof v === 'object' && v !== null && 'toDate' in v) {
+      if (typeof v === "string") return v;
+      if (typeof v === "object" && v !== null && "toDate" in v) {
         return (v as { toDate: () => Date }).toDate().toISOString();
       }
       return undefined;
@@ -75,15 +83,11 @@ async function fetchFirestoreUser(uid: string): Promise<User | null> {
       createdAt: toIso(data.createdAt),
       updatedAt: toIso(data.updatedAt),
     };
-  } catch {
+  } catch (e) {
+    console.error("🔥 Firestore Error:", e);
     return null;
   }
 }
-
-// ─── Provider ─────────────────────────────────────────────────────────────────
-// KEY CHANGE: isLoading no longer blocks rendering of the entire app.
-// The app shell renders immediately. Pages that need auth use useUser() and
-// handle their own loading state, or rely on ProtectedRoute.
 
 export const UserProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -91,6 +95,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
   const router = useRouter();
   const pathname = usePathname();
 
+  
   // ── Session restore via onAuthStateChanged ──────────────────────────────────
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(

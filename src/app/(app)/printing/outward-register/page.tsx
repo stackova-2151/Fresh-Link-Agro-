@@ -32,8 +32,17 @@ export default function OutwardRegisterFilterPage() {
   const [customerId, setCustomerId] = useState<string>('');
   const [customerInput, setCustomerInput] = useState<string>('');
 
+  // Initialize toDate with today's date
+  const todayIso = useMemo(() => {
+    const d = new Date();
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  }, []);
+
   const [fromDate, setFromDate] = useState<string>('');
-  const [toDate, setToDate] = useState<string>('');
+  const [toDate, setToDate] = useState<string>(todayIso);
 
   const [filteredCustomers, setFilteredCustomers] = useState<Client[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);

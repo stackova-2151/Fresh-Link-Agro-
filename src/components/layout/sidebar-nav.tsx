@@ -42,11 +42,7 @@ type NavGroupItem = {
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   roles: UserRole[];
-  children: Array<{
-    href: string;
-    label: string;
-    roles: UserRole[];
-  }>;
+  children: Array<NavLinkItem | NavGroupItem>;
 };
 
 type NavItem = NavLinkItem | NavGroupItem;
@@ -65,11 +61,12 @@ const allMenuItems: NavItem[] = [
     icon: FileText,
     roles: ['SUB_ADMIN'],
     children: [
-      { href: '/inventory', label: 'Inward Entry', roles: ['SUB_ADMIN'] },
-      { href: '/outward', label: 'Outward Entry', roles: ['SUB_ADMIN'] },
-      { href: '/bill-processing', label: 'Bill Processing', roles: ['SUB_ADMIN'] },
-      { href: '/clients', label: 'Customer Rate', roles: ['SUB_ADMIN'] },
-      { href: '/clients', label: 'Clients', roles: ['SUB_ADMIN'] },
+      { type: 'link', href: '/inventory', label: 'Inward Entry', roles: ['SUB_ADMIN'], icon: Warehouse },
+      { type: 'link', href: '/outward', label: 'Outward Entry', roles: ['SUB_ADMIN'], icon: Warehouse },
+      { type: 'link', href: '/bill-processing', label: 'Bill Processing', roles: ['SUB_ADMIN'], icon: FileText },
+      { type: 'link', href: '/printing/sale-bill', label: 'Sale Bill Printing', roles: ['SUB_ADMIN'], icon: Printer },
+      { type: 'link', href: '/customer-rate-master', label: 'Customer Rate', roles: ['SUB_ADMIN'], icon: FileText },
+      { type: 'link', href: '/clients', label: 'Clients', roles: ['SUB_ADMIN'], icon: FileText },
     ],
   },
   {
@@ -78,9 +75,19 @@ const allMenuItems: NavItem[] = [
     icon: Printer,
     roles: ['SUB_ADMIN'],
     children: [
-      { href: '/printing/inward-register', label: 'Inward Register', roles: ['SUB_ADMIN'] },
-      { href: '/printing/outward-register', label: 'Outward Register', roles: ['SUB_ADMIN'] },
-      { href: '/reports', label: 'Stock Report', roles: ['SUB_ADMIN'] },
+      { type: 'link', href: '/printing/inward-register', label: 'Inward Register', roles: ['SUB_ADMIN'], icon: Printer },
+      { type: 'link', href: '/printing/outward-register', label: 'Outward Register', roles: ['SUB_ADMIN'], icon: Printer },
+      {
+        type: 'group',  
+        label: 'Stock Report',
+        icon: Receipt,
+        roles: ['SUB_ADMIN'],
+        children: [
+          { type: 'link', href: '/printing/stock-report/item-wise', label: 'Item Wise', roles: ['SUB_ADMIN'], icon: Receipt },
+          { type: 'link', href: '/printing/stock-report/chamber-wise', label: 'Chamber Wise', roles: ['SUB_ADMIN'], icon: Receipt },
+          { type: 'link', href: '/printing/stock-report/all-customer-wise', label: 'All Customer Wise', roles: ['SUB_ADMIN'], icon: Receipt },
+        ],
+      },
     ],
   },
   {
@@ -149,7 +156,8 @@ export function SidebarNav() {
       pathname.startsWith('/outward') ||
       pathname.startsWith('/invoices') ||
       pathname.startsWith('/clients') ||
-      pathname.startsWith('/bill-processing'),
+      pathname.startsWith('/bill-processing') ||
+      pathname.startsWith('/customer-rate-master'),
     [pathname]
   );
 
@@ -205,9 +213,20 @@ export function SidebarNav() {
               : isPrintingGroup
               ? defaultPrintingOpen
               : false;
-            const groupIsActive = item.children.some((child) =>
-              isChildActive(pathname, child.href)
-            );
+            const groupIsActive = item.children.some((child) => {
+              if (child.type === 'group' && child.children) {
+                return child.children.some((subChild) => {
+                  if (subChild.type === 'link') {
+                    return isChildActive(pathname, subChild.href);
+                  }
+                  return false;
+                });
+              }
+              if (child.type === 'link') {
+                return isChildActive(pathname, child.href);
+              }
+              return false;
+            });
 
             return (
               <Collapsible key={item.label} defaultOpen={groupDefaultOpen} className="w-full">
@@ -226,19 +245,92 @@ export function SidebarNav() {
                   <CollapsibleContent>
                     <SidebarMenuSub>
                       {item.children
-                        .filter((child) => (role ? child.roles.includes(role) : false))
-                        .map((child) => (
-                          <SidebarMenuSubItem key={`${item.label}:${child.label}:${child.href}`}>
-                            <SidebarMenuSubButton
-                              asChild
-                              isActive={isChildActive(pathname, child.href)}
-                            >
-                              <Link href={child.href}>
-                                <span>{child.label}</span>
-                              </Link>
-                            </SidebarMenuSubButton>
-                          </SidebarMenuSubItem>
-                        ))}
+                        .filter((child) => {
+                          if (child.type === 'link') {
+                            return role ? child.roles.includes(role) : true;
+                          }
+                          if (child.type === 'group') {
+                            return role ? child.roles.includes(role) : true;
+                          }
+                          return false;
+                        })
+                        .map((child) => {
+                          if (child.type === 'group' && child.children && child.icon) {
+                            const subGroupIsActive = child.children.some((subChild) => {
+                              if (subChild.type === 'link') {
+                                return isChildActive(pathname, subChild.href);
+                              }
+                              return false;
+                            });
+                            const subGroupDefaultOpen = pathname.startsWith('/printing/stock-report');
+
+                            return (
+                              <Collapsible key={child.label} defaultOpen={subGroupDefaultOpen} className="w-full">
+                                <SidebarMenuSubItem>
+                                  <CollapsibleTrigger asChild>
+                                    <SidebarMenuSubButton
+  className="group"
+  isActive={subGroupIsActive}
+>
+  <span className="mr-2 h-2 w-2 rounded-full bg-current flex-shrink-0"></span>
+
+  <span>{child.label}</span>
+
+  <ChevronDown className="ml-auto h-4 w-4 transition-transform group-data-[state=open]:rotate-180" />
+</SidebarMenuSubButton>
+                                  </CollapsibleTrigger>
+                                  <CollapsibleContent>
+                                    <SidebarMenuSub className="ml-4">
+                                      {child.children
+                                        .filter((subChild) => {
+                                          if (subChild.type === 'link') {
+                                            return role ? subChild.roles.includes(role) : true;
+                                          }
+                                          return false;
+                                        })
+                                        .map((subChild) => {
+                                          if (subChild.type === 'link') {
+                                            return (
+                                              <SidebarMenuSubItem key={`${child.label}:${subChild.label}:${subChild.href}`}>
+                                                <SidebarMenuSubButton
+                                                  asChild
+                                                  isActive={isChildActive(pathname, subChild.href)}
+                                                >
+                                                 <Link href={subChild.href} className="flex items-center gap-2"> <span className="h-1.5 w-1.5 rounded-full bg-current"></span>
+                                                 <span>{subChild.label}</span>
+</Link>
+                                                </SidebarMenuSubButton>
+                                              </SidebarMenuSubItem>
+                                            );
+                                          }
+                                          return null;
+                                        })}
+                                    </SidebarMenuSub>
+                                  </CollapsibleContent>
+                                </SidebarMenuSubItem>
+                              </Collapsible>
+                            );
+                          }
+
+                          // Regular link item
+                          if (child.type === 'link') {
+                            return (
+                              <SidebarMenuSubItem key={`${item.label}:${child.label}:${child.href}`}>
+                                <SidebarMenuSubButton
+                                  asChild
+                                  isActive={isChildActive(pathname, child.href)}
+                                >
+                                  <Link href={child.href} className="flex items-center gap-2">
+                                    <span className="h-1.5 w-1.5 rounded-full bg-current"></span>
+                                    <span>{child.label}</span>
+                                  </Link>
+                                </SidebarMenuSubButton>
+                              </SidebarMenuSubItem>
+                            );
+                          }
+
+                          return null;
+                        })}
                     </SidebarMenuSub>
                   </CollapsibleContent>
                 </SidebarMenuItem>

@@ -115,7 +115,6 @@ export default function GatePassPage() {
         <CardHeader>
           <div className="flex justify-between items-center">
             <div><CardTitle>All Gate Pass Records</CardTitle><CardDescription>Complete history of vehicle movements</CardDescription></div>
-            <Input placeholder="Search..." className="w-[300px]" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
           </div>
         </CardHeader>
         <CardContent>

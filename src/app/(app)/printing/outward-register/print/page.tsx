@@ -3,7 +3,7 @@
 export const dynamic = 'force-dynamic';
 
 import { Suspense, useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
 
@@ -11,6 +11,7 @@ import { db } from '@/lib/firebase';
 import { clientsService } from '@/lib/firestore';
 import type { Client } from '@/lib/types';
 import type { OutwardVoucher } from '@/components/outward/bulk-outward-entry-form';
+import { PrintHeader } from '@/components/print/PrintHeader';
 
 type RegisterRow = {
   outwardNo: string;
@@ -43,6 +44,7 @@ function parseNumberOrZero(v: unknown) {
 
 function OutwardRegisterPrintContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
 
   const customerId = isoOrEmpty(searchParams.get('customerId'));
   const from = isoOrEmpty(searchParams.get('from'));
@@ -104,10 +106,22 @@ function OutwardRegisterPrintContent() {
   }), [rows]);
 
   useEffect(() => {
-    if (!loaded || vouchers.length === 0) return;
-    const t = window.setTimeout(() => window.print(), 50);
-    return () => window.clearTimeout(t);
+    if (!loaded) return;
+    if (vouchers.length === 0) return;
+    requestAnimationFrame(() => {
+      window.print();
+    });
   }, [loaded, vouchers.length]);
+
+  // Return to previous page after print dialog closes
+  useEffect(() => {
+    const handleAfterPrint = () => {
+      router.back();
+    };
+
+    window.addEventListener('afterprint', handleAfterPrint);
+    return () => window.removeEventListener('afterprint', handleAfterPrint);
+  }, [router]);
 
   const headerFromTo = useMemo(() => ({
     fromText: from ? format(new Date(from), 'dd.MM.yyyy') : 'ALL',
@@ -118,62 +132,80 @@ function OutwardRegisterPrintContent() {
 
   return (
     <div className="bg-slate-50 min-h-screen p-4 sm:p-8 print:bg-white print:p-0">
-      <div className="max-w-6xl mx-auto bg-white p-8 border shadow-sm print:shadow-none print:border-none">
-        <div className="text-center border-b-2 border-slate-800 pb-4 mb-6">
-          <div className="text-2xl font-bold font-headline text-slate-800 uppercase leading-tight">
-            FRESH LINK AGRO COLD STORAGE PVT. LTD.
+      <div className="w-full max-w-[1400px] mx-auto bg-white p-4 print:p-2 border shadow-sm print:shadow-none print:border-none">
+        <PrintHeader
+          documentTitle="OUTWARD REGISTER"
+          additionalInfo={
+             <div className="flex justify-center items-center gap-20 text-xs mt-3">
+             <div className="flex items-center gap-2">
+                <span className="font-bold">FROM DATE:</span>
+                <span className=" border-slate-300">
+                    {headerFromTo.fromText}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="font-bold">TO DATE:</span>
+                <span className="">
+                    {headerFromTo.toText}
+                </span>
+              </div>
+            </div>
+          }
+        />
+        {selectedClient && (
+          <div className="text-center mb-4">
+            <span className="text-xs font-bold">CUSTOMER: {selectedClient.name}</span>
           </div>
-          <div className="mt-2 text-sm font-bold uppercase tracking-widest">OUTWARD REGISTER</div>
-          <div className="mt-2 text-xs">
-            FROM DATE : {headerFromTo.fromText} &nbsp; TO &nbsp; {headerFromTo.toText}
-          </div>
-          {selectedClient && <div className="mt-1 text-xs">CUSTOMER : {selectedClient.name}</div>}
-        </div>
+        )}
 
         {rows.length === 0 ? (
           <div className="p-8 text-center">No outward entries found for selected filters.</div>
         ) : (
-          <div className="border-2 border-slate-800 overflow-hidden">
-            <table className="w-full text-[11px] border-collapse">
-              <thead>
-                <tr className="bg-slate-50 border-b-2 border-slate-800">
-                  <th className="border-r border-slate-800 p-2 w-[90px]">OutNo</th>
-                  <th className="border-r border-slate-800 p-2 w-[100px]">Out Date</th>
-                  <th className="border-r border-slate-800 p-2">Customer Name</th>
-                  <th className="border-r border-slate-800 p-2 w-[90px]">InwNo</th>
-                  <th className="border-r border-slate-800 p-2">Item Description</th>
-                  <th className="border-r border-slate-800 p-2 w-[120px]">Brand</th>
-                  <th className="border-r border-slate-800 p-2 w-[70px]">OutQty</th>
-                  <th className="border-r border-slate-800 p-2 w-[90px]">OutWt</th>
-                  <th className="border-r border-slate-800 p-2 w-[130px]">Driver Name</th>
-                  <th className="p-2 w-[120px]">Vehicle No</th>
+          <table className="w-full text-[11px] border-collapse border-2 border-slate-800 print-table">
+            <thead className="bg-slate-50">
+              <tr className="border-b-2 border-slate-800">
+                <th className="border-r border-slate-800 p-2">Out No</th>
+                <th className="border-r border-slate-800 p-2">Out Date</th>
+                <th className="border-r border-slate-800 p-2">Customer Name</th>
+                <th className="border-r border-slate-800 p-2">Inw No</th>
+                <th className="border-r border-slate-800 p-2">Item Description</th>
+                <th className="border-r border-slate-800 p-2">Brand</th>
+                <th className="border-r border-slate-800 p-2">Out Qty</th>
+                <th className="border-r border-slate-800 p-2">Out Weight</th>
+                <th className="border-r border-slate-800 p-2">Driver Name</th>
+                <th className="p-2">Vehicle No</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r, idx) => (
+                <tr key={`${r.outwardNo}:${idx}`} className="border-b border-slate-500">
+                  <td className="border-r border-slate-800 p-2 font-mono">{r.outwardNo}</td>
+                  <td className="border-r border-slate-800 p-2">{format(new Date(r.outDate), 'dd.MM.yyyy')}</td>
+                  <td className="border-r border-slate-800 p-2 uppercase">{r.customerName}</td>
+                  <td className="border-r border-slate-800 p-2 font-mono">{r.inwardNo}</td>
+                  <td className="border-r border-slate-800 p-2 uppercase">{r.itemDescription}</td>
+                  <td className="border-r border-slate-800 p-2 uppercase">{r.brand || '-'}</td>
+                  <td className="border-r border-slate-800 p-2 text-right font-mono">{r.outQty}</td>
+                  <td className="border-r border-slate-800 p-2 text-right font-mono">{r.outWeight.toFixed(2)}</td>
+                  <td className="border-r border-slate-800 p-2 uppercase">{r.driverName || ''}</td>
+                  <td className="p-2 uppercase font-mono">{r.vehicleNo || ''}</td>
                 </tr>
-              </thead>
-              <tbody>
-                {rows.map((r, idx) => (
-                  <tr key={`${r.outwardNo}:${idx}`} className="border-b border-slate-300 last:border-b-0">
-                    <td className="border-r border-slate-800 p-2 font-mono">{r.outwardNo}</td>
-                    <td className="border-r border-slate-800 p-2">{format(new Date(r.outDate), 'dd.MM.yyyy')}</td>
-                    <td className="border-r border-slate-800 p-2 uppercase">{r.customerName}</td>
-                    <td className="border-r border-slate-800 p-2 font-mono">{r.inwardNo}</td>
-                    <td className="border-r border-slate-800 p-2 uppercase">{r.itemDescription}</td>
-                    <td className="border-r border-slate-800 p-2 uppercase">{r.brand || '-'}</td>
-                    <td className="border-r border-slate-800 p-2 text-right font-mono">{r.outQty}</td>
-                    <td className="border-r border-slate-800 p-2 text-right font-mono">{r.outWeight.toFixed(2)}</td>
-                    <td className="border-r border-slate-800 p-2 uppercase">{r.driverName || ''}</td>
-                    <td className="p-2 uppercase font-mono">{r.vehicleNo || ''}</td>
-                  </tr>
-                ))}
-                <tr className="border-t-2 border-slate-800 bg-slate-50 font-bold">
-                  <td colSpan={6} className="border-r border-slate-800 p-2 text-right uppercase">Total</td>
-                  <td className="border-r border-slate-800 p-2 text-right font-mono">{totals.totalQty}</td>
-                  <td className="border-r border-slate-800 p-2 text-right font-mono">{totals.totalWeight.toFixed(2)}</td>
-                  <td className="border-r border-slate-800 p-2" />
-                  <td className="p-2" />
-                </tr>
-              </tbody>
-            </table>
-          </div>
+              ))}
+             <tr className="border-t-2 border-slate-800 bg-slate-50 font-bold">
+                <td className="text-right uppercase">Total</td>
+                <td className=""/>
+                <td className="" />
+                <td className="" />
+                <td className="" />
+                <td className="border-r border-slate-800 p-2" />
+                <td className="border-r border-slate-800 p-2 text-right font-mono">{totals.totalQty}</td>
+                <td className="border-r border-slate-800 p-2 text-right font-mono">{totals.totalWeight.toFixed(2)}</td>
+                <td className="border-r border-slate-800 p-2" />
+                <td className="p-2" />
+              </tr>
+            </tbody>
+          </table>
         )}
       </div>
 
@@ -182,7 +214,19 @@ function OutwardRegisterPrintContent() {
           body { background: white !important; }
           header, footer, nav, aside { display: none !important; }
           main { padding: 0 !important; margin: 0 !important; width: 100% !important; }
-          @page { margin: 1.5cm; }
+          @page {
+            size: A4 landscape;
+            margin: 8mm;
+          }
+
+          .print-table tr {
+            break-inside: avoid;
+          }
+
+          .print-table td,
+          .print-table th {
+            break-inside: avoid;
+          }
         }
       `}</style>
     </div>
