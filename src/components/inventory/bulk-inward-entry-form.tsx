@@ -4,7 +4,7 @@ import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { format } from 'date-fns';
-import { PortalAutocomplete, type ItemBrandSuggestion } from '@/components/shared/portal-autocomplete';
+import { PortalAutocomplete, type ItemBrandSuggestion, type AutocompleteSuggestion } from '@/components/shared/portal-autocomplete';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
@@ -15,6 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { useItemAutocomplete } from '@/hooks/use-item-autocomplete';
+import { useUnitAutocomplete, type UnitSuggestion } from '@/hooks/use-unit-autocomplete';
 import { PrintConfirmationDialog } from '@/components/shared/print-confirmation-dialog';
 
 import type { Chamber, Client, RentalItem, User, Vendor } from '@/lib/types';
@@ -195,6 +196,13 @@ export function BulkInwardEntryForm({
   const [itemHighlightIndex, setItemHighlightIndex] = useState(0);
   const [activeItemRowIndex, setActiveItemRowIndex] = useState<number | null>(null);
 
+  // Unit autocomplete state
+  const { filterUnits } = useUnitAutocomplete(existingItems);
+  const [filteredUnits, setFilteredUnits] = useState<UnitSuggestion[]>([]);
+  const [showUnitSuggestions, setShowUnitSuggestions] = useState(false);
+  const [unitHighlightIndex, setUnitHighlightIndex] = useState(0);
+  const [activeUnitRowIndex, setActiveUnitRowIndex] = useState<number | null>(null);
+
   // Print confirmation dialog state
   const [showPrintDialog, setShowPrintDialog] = useState(false);
   const [savedVoucherNo, setSavedVoucherNo] = useState<string>('');
@@ -205,6 +213,7 @@ export function BulkInwardEntryForm({
 
   const cellRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const activeInputRef = useRef<HTMLInputElement | null>(null);
+  const activeUnitInputRef = useRef<HTMLInputElement | null>(null);
 
   // Update activeInputRef when activeItemRowIndex changes
   useEffect(() => {
@@ -218,6 +227,19 @@ export function BulkInwardEntryForm({
       activeInputRef.current = null;
     }
   }, [activeItemRowIndex, rows]);
+
+  // Update activeUnitInputRef when activeUnitRowIndex changes
+  useEffect(() => {
+    if (activeUnitRowIndex !== null) {
+      const row = rows[activeUnitRowIndex];
+      if (row) {
+        const key = `${row.id}:unit`;
+        activeUnitInputRef.current = cellRefs.current[key] || null;
+      }
+    } else {
+      activeUnitInputRef.current = null;
+    }
+  }, [activeUnitRowIndex, rows]);
 
   const setCellRef = useCallback((key: string, el: HTMLInputElement | null) => {
     cellRefs.current[key] = el;
@@ -328,6 +350,40 @@ export function BulkInwardEntryForm({
       
       // Focus next field (mfgDate)
       setTimeout(() => focusCell(rowIndex, 'mfgDate'), 0);
+    },
+    [handleRowChange, focusCell]
+  );
+
+  const handleUnitChange = useCallback(
+    (rowIndex: number, value: string) => {
+      handleRowChange(rowIndex, 'unit', value.toUpperCase());
+      setActiveUnitRowIndex(rowIndex);
+
+      if (!value.trim()) {
+        setFilteredUnits([]);
+        setShowUnitSuggestions(false);
+        return;
+      }
+
+      const results = filterUnits(value);
+      setFilteredUnits(results);
+      setShowUnitSuggestions(results.length > 0);
+      setUnitHighlightIndex(0);
+    },
+    [filterUnits, handleRowChange]
+  );
+
+  const handleUnitSelect = useCallback(
+    (rowIndex: number, suggestion: UnitSuggestion) => {
+      handleRowChange(rowIndex, 'unit', suggestion.unit);
+      setShowUnitSuggestions(false);
+      setFilteredUnits([]);
+      setActiveUnitRowIndex(null);
+      setUnitHighlightIndex(0);
+      activeUnitInputRef.current = null;
+
+      // Focus next field (bagWeight)
+      setTimeout(() => focusCell(rowIndex, 'bagWeight'), 0);
     },
     [handleRowChange, focusCell]
   );
@@ -567,7 +623,7 @@ export function BulkInwardEntryForm({
         inwardQuantity: qty,
         outwardQuantity: 0,
         quantityAvailable: qty,
-        unit: 'kg',
+        unit: r.unit.trim().toUpperCase() || 'KG',
         inwardWeight: wt,
         outwardWeight: 0,
         balanceWeight: wt,
@@ -935,14 +991,56 @@ export function BulkInwardEntryForm({
                       </TableCell>
                       <TableCell className="p-1">
                         <Input
-                          ref={(el) => setCellRef(`${rowKey}:unit`, el)}
+                          ref={(el) => {
+                            setCellRef(`${rowKey}:unit`, el);
+                            if (activeUnitRowIndex === idx) {
+                              activeUnitInputRef.current = el;
+                            }
+                          }}
                           value={row.unit}
-                          onChange={(e) => handleRowChange(idx, 'unit', e.target.value.toUpperCase())}
+                          onChange={(e) => handleUnitChange(idx, e.target.value)}
                           onKeyDown={(e) => {
+                            if (e.key === 'ArrowDown') {
+                              if (!showUnitSuggestions || filteredUnits.length === 0) return;
+                              e.preventDefault();
+                              setUnitHighlightIndex((prev) => (prev + 1) % filteredUnits.length);
+                              return;
+                            }
+                            if (e.key === 'ArrowUp') {
+                              if (!showUnitSuggestions || filteredUnits.length === 0) return;
+                              e.preventDefault();
+                              setUnitHighlightIndex((prev) => 
+                                prev === 0 ? filteredUnits.length - 1 : prev - 1
+                              );
+                              return;
+                            }
+                            if (e.key === 'Escape') {
+                              setShowUnitSuggestions(false);
+                              setActiveUnitRowIndex(null);
+                              activeUnitInputRef.current = null;
+                              return;
+                            }
                             if (e.key === 'Enter') {
                               e.preventDefault();
+                              if (showUnitSuggestions && filteredUnits.length > 0) {
+                                handleUnitSelect(idx, filteredUnits[unitHighlightIndex]);
+                                return;
+                              }
                               tryAdvanceOnEnter(idx, 'unit');
                             }
+                          }}
+                          onFocus={() => {
+                            setActiveUnitRowIndex(idx);
+                            activeUnitInputRef.current = cellRefs.current[`${rowKey}:unit`] || null;
+                          }}
+                          onBlur={() => {
+                            setTimeout(() => {
+                              if (!document.activeElement?.closest("[data-portal-autocomplete]")) {
+                                setShowUnitSuggestions(false);
+                                setActiveUnitRowIndex(null);
+                                activeUnitInputRef.current = null;
+                              }
+                            }, 200);
                           }}
                           readOnly={isEditMode}
                           className="h-8 uppercase"
@@ -1041,6 +1139,19 @@ export function BulkInwardEntryForm({
       onHighlightChange={setItemHighlightIndex}
       inputRef={activeInputRef}
       subtitle="--------------"
+    />
+
+    <PortalAutocomplete
+      isOpen={showUnitSuggestions && activeUnitRowIndex !== null && filteredUnits.length > 0}
+      items={filteredUnits}
+      highlightIndex={unitHighlightIndex}
+      onSelect={(item) => {
+        if (activeUnitRowIndex !== null) {
+          handleUnitSelect(activeUnitRowIndex, item);
+        }
+      }}
+      onHighlightChange={setUnitHighlightIndex}
+      inputRef={activeUnitInputRef}
     />
     </>
   );

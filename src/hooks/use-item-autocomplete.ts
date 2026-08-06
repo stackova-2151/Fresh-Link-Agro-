@@ -154,3 +154,85 @@ export function useClientStockAutocomplete(clientId: string | null, existingItem
 
   return { filterSuggestionsByClientStock };
 }
+
+/**
+ * Enhanced suggestion type for Inward Stock (Outward Entry)
+ * Shows Item | Brand | Inward# with full stock details
+ */
+export type InwardStockSuggestion = {
+  id: string;
+  displayText: string;
+  itemName: string;
+  brand: string;
+  inwardNumber: string;
+  batchNumber: string;
+  chamberId: string;
+  bagWeight: number;
+  expiryDate: Date;
+  quantityAvailable: number;
+  sourceRentalItemId: string;
+  subtitle?: string;
+};
+
+/**
+ * Hook for Inward Stock autocomplete in Outward Entry
+ * Shows Item | Brand | Inward# format with FEFO ordering
+ * Each inward batch appears separately
+ */
+export function useInwardStockAutocomplete(
+  clientId: string | null,
+  existingItems: RentalItem[]
+) {
+  const filterByInwardStock = useCallback(
+    (searchTerm: string): InwardStockSuggestion[] => {
+      if (!searchTerm.trim() || !clientId) return [];
+
+      // Filter client's available stock (FEFO applied later)
+      const clientStock = existingItems.filter(
+        (item) => item.clientId === clientId && item.quantityAvailable > 0
+      );
+
+      const lower = searchTerm.toLowerCase();
+
+      // Filter by item name, brand, or inward number
+      const matches = clientStock.filter(
+        (item) =>
+          item.name.toLowerCase().includes(lower) ||
+          item.brand.toLowerCase().includes(lower) ||
+          item.inwardNumber.toLowerCase().includes(lower)
+      );
+
+      // Sort by FEFO (earliest expiry first)
+      matches.sort((a, b) => a.expiryDate.getTime() - b.expiryDate.getTime());
+
+      // Map to suggestion format (each rentalItem becomes one suggestion)
+      return matches.slice(0, 10).map((item) => {
+        const bagWeight = item.inwardQuantity > 0 
+          ? item.inwardWeight / item.inwardQuantity 
+          : 0;
+
+        return {
+          id: item.id,
+          displayText: `${item.name} | ${item.brand} | ${item.inwardNumber}`,
+          itemName: item.name,
+          brand: item.brand,
+          inwardNumber: item.inwardNumber,
+          batchNumber: item.batchNumber,
+          chamberId: item.chamberId ?? '',
+          bagWeight: parseFloat(bagWeight.toFixed(2)),
+          expiryDate: item.expiryDate,
+          quantityAvailable: item.quantityAvailable,
+          sourceRentalItemId: item.id,
+          subtitle: `Stock: ${item.quantityAvailable} | Exp: ${
+            item.expiryDate instanceof Date
+              ? item.expiryDate.toLocaleDateString('en-GB')
+              : new Date(item.expiryDate).toLocaleDateString('en-GB')
+          }`,
+        };
+      });
+    },
+    [clientId, existingItems]
+  );
+
+  return { filterByInwardStock };
+}

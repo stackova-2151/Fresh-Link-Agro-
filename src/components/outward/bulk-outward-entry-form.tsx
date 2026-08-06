@@ -15,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { useClientStockAutocomplete } from '@/hooks/use-item-autocomplete';
+import { useInwardStockAutocomplete, type InwardStockSuggestion } from '@/hooks/use-item-autocomplete';
 import { PrintConfirmationDialog } from '@/components/shared/print-confirmation-dialog';
 
 import type { Chamber, Client, RentalItem, User } from '@/lib/types';
@@ -173,7 +173,7 @@ export function BulkOutwardEntryForm({
   const [filteredClients, setFilteredClients] = useState<Client[]>([]);
 
   // Use client-specific autocomplete for outward entry
-  const { filterSuggestionsByClientStock } = useClientStockAutocomplete(clientId, existingItems);
+  const { filterByInwardStock } = useInwardStockAutocomplete(clientId, existingItems);
   const [showClientSuggestions, setShowClientSuggestions] = useState(false);
   const [clientHighlightIndex, setClientHighlightIndex] = useState(0);
 
@@ -188,7 +188,7 @@ export function BulkOutwardEntryForm({
   const [rows, setRows] = useState<OutwardVoucherItem[]>(() => [createEmptyRow()]);
 
   // Item autocomplete state
-  const [filteredItems, setFilteredItems] = useState<ItemBrandSuggestion[]>([]);
+  const [filteredItems, setFilteredItems] = useState<InwardStockSuggestion[]>([]);
   const [showItemSuggestions, setShowItemSuggestions] = useState(false);
   const [itemHighlightIndex, setItemHighlightIndex] = useState(0);
   const [activeItemRowIndex, setActiveItemRowIndex] = useState<number | null>(null);
@@ -542,28 +542,50 @@ export function BulkOutwardEntryForm({
         return;
       }
 
-      const results = filterSuggestionsByClientStock(value);
+      const results = filterByInwardStock(value);
       setFilteredItems(results);
       setShowItemSuggestions(results.length > 0);
       setItemHighlightIndex(0);
     },
-    [filterSuggestionsByClientStock, handleRowChange]
+    [filterByInwardStock, handleRowChange]
   );
 
   const handleItemSelect = useCallback(
-    (rowIndex: number, suggestion: ItemBrandSuggestion) => {
-      handleRowChange(rowIndex, 'itemName', suggestion.itemName);
-      handleRowChange(rowIndex, 'brand', suggestion.brand);
+    (rowIndex: number, suggestion: InwardStockSuggestion) => {
+      setRows((prev) => {
+        const next = [...prev];
+        const row = { ...next[rowIndex] };
+
+        // Auto-fill all fields from inward stock suggestion
+        row.itemName = suggestion.itemName;
+        row.brand = suggestion.brand;
+        row.batch = suggestion.batchNumber;
+        row.chamberId = suggestion.chamberId;
+        row.inwardNumber = suggestion.inwardNumber;
+        row.expDate = suggestion.expiryDate instanceof Date 
+          ? suggestion.expiryDate.toISOString().split('T')[0]
+          : new Date(suggestion.expiryDate).toISOString().split('T')[0];
+        row.sourceRentalItemId = suggestion.sourceRentalItemId;
+        row.bagWeight = suggestion.bagWeight;
+
+        // Recalculate total weight
+        row.totalWeight = calcTotalWeight(row.qty, row.bagWeight);
+        row.bags = row.qty; // Sync bags with qty
+
+        next[rowIndex] = row;
+        return next;
+      });
+
       setShowItemSuggestions(false);
       setFilteredItems([]);
       setActiveItemRowIndex(null);
       setItemHighlightIndex(0);
       activeInputRef.current = null;
 
-      // Focus next field (batch)
-      setTimeout(() => focusCell(rowIndex, 'batch'), 0);
+      // Focus next editable field (qty)
+      setTimeout(() => focusCell(rowIndex, 'qty'), 0);
     },
-    [handleRowChange, focusCell]
+    [focusCell]
   );
 
   const handlePrintDialogClose = useCallback(() => {

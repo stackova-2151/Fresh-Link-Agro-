@@ -29,11 +29,14 @@ if (typeof document !== 'undefined' && !document.getElementById('portal-autocomp
   document.head.appendChild(style);
 }
 
-export interface ItemBrandSuggestion {
-  id: string;
-  displayText: string;
+export interface ItemBrandSuggestion extends AutocompleteSuggestion {
   itemName: string;
   brand: string;
+}
+
+export interface AutocompleteSuggestion {
+  id: string;
+  displayText: string;
   frequency?: number;
 }
 
@@ -78,18 +81,18 @@ export function useDropdownPosition(inputRef: React.RefObject<HTMLInputElement |
   return position;
 }
 
-// Portal-based Autocomplete Dropdown Component
-interface PortalAutocompleteProps {
+// Portal-based Autocomplete Dropdown Component (Generic)
+interface PortalAutocompleteProps<T extends AutocompleteSuggestion> {
   isOpen: boolean;
-  items: ItemBrandSuggestion[];
+  items: T[];
   highlightIndex: number;
-  onSelect: (item: ItemBrandSuggestion) => void;
+  onSelect: (item: T) => void;
   onHighlightChange: (index: number) => void;
   inputRef: React.RefObject<HTMLInputElement | null>;
   subtitle?: string;
 }
 
-export function PortalAutocomplete({
+export function PortalAutocomplete<T extends AutocompleteSuggestion>({
   isOpen,
   items,
   highlightIndex,
@@ -97,7 +100,7 @@ export function PortalAutocomplete({
   onHighlightChange,
   inputRef,
   subtitle
-}: PortalAutocompleteProps) {
+}: PortalAutocompleteProps<T>) {
   const position = useDropdownPosition(inputRef, isOpen);
   const highlightedItemRef = useRef<HTMLDivElement>(null);
 
@@ -145,11 +148,11 @@ export function PortalAutocomplete({
               {subtitle}
             </div>
           )}
-          {!subtitle && item.frequency !== undefined && (
+          {/* {!subtitle && item.frequency !== undefined && (
             <div className={`text-xs ${index === highlightIndex ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}>
               Used {item.frequency} times
             </div>
-          )}
+          )} */}
         </div>
       ))}
     </div>,
