@@ -105,13 +105,13 @@ const allMenuItems: NavItem[] = [
     icon: Settings,
     roles: ['ADMIN'],
   },
-  {
-    type: 'link',
-    href: '/reports',
-    label: 'Reports',
-    icon: Receipt,
-    roles: ['MASTER_ADMIN', 'ADMIN'],
-  },
+  // {
+  //   type: 'link',
+  //   href: '/reports',
+  //   label: 'Reports',
+  //   icon: Receipt,
+  //   roles: ['MASTER_ADMIN', 'ADMIN'],
+  // },
   {
     type: 'link',
     href: '/chambers',
