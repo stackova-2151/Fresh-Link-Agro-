@@ -167,6 +167,8 @@ export type InwardStockSuggestion = {
   inwardNumber: string;
   batchNumber: string;
   chamberId: string;
+  roomId?: string;
+  blockId?: string;
   bagWeight: number;
   expiryDate: Date;
   quantityAvailable: number;
@@ -219,6 +221,8 @@ export function useInwardStockAutocomplete(
           inwardNumber: item.inwardNumber,
           batchNumber: item.batchNumber,
           chamberId: item.chamberId ?? '',
+          roomId: item.roomId,
+          blockId: item.blockId,
           bagWeight: parseFloat(bagWeight.toFixed(2)),
           expiryDate: item.expiryDate,
           quantityAvailable: item.quantityAvailable,

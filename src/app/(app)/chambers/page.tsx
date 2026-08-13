@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { PageHeader } from '@/components/page-header';
 import { AddChamberDialog } from '@/components/chambers/add-chamber-dialog';
 import { ChamberCard } from '@/components/chambers/chamber-card';
-import type { Chamber } from '@/lib/types';
+import type { Chamber, RentalItem } from '@/lib/types';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -16,18 +16,24 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
-import { chambersService } from '@/lib/firestore';
+import { chambersService, rentalItemsService } from '@/lib/firestore';
 
 export default function ChambersPage() {
   const [chambers, setChambers] = useState<Chamber[]>([]);
+  const [rentalItems, setRentalItems] = useState<RentalItem[]>([]);
   const [chamberToDelete, setChamberToDelete] = useState<Chamber | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isDeleting, setIsDeleting] = useState(false);
   const { toast } = useToast();
 
   const load = async () => {
     try {
-      const data = await chambersService.getAll();
-      setChambers(data);
+      const [chambersData, itemsData] = await Promise.all([
+        chambersService.getAll(),
+        rentalItemsService.getAll(),
+      ]);
+      setChambers(chambersData);
+      setRentalItems(itemsData);
     } catch {
       toast({ title: 'Error', description: 'Failed to load chambers.', variant: 'destructive' });
     } finally {
@@ -54,14 +60,36 @@ export default function ChambersPage() {
 
   const handleConfirmDelete = async () => {
     if (!chamberToDelete) return;
+
+    // Check for active stock before allowing deletion
+    const hasActiveStock = rentalItems.some(item => item.chamberId === chamberToDelete.id);
+    if (hasActiveStock) {
+      toast({ 
+        title: 'Cannot delete chamber', 
+        description: 'Chamber contains active stock. Move or remove the stock first.', 
+        variant: 'destructive' 
+      });
+      setChamberToDelete(null);
+      return;
+    }
+
+    // Capture chamber info before closing dialog
+    const chamberId = chamberToDelete.id;
+    const chamberName = chamberToDelete.name;
+
+    // Close dialog immediately to prevent overlay freeze
+    setChamberToDelete(null);
+    setIsDeleting(true);
+
     try {
-      await chambersService.delete(chamberToDelete.id);
+      await chambersService.delete(chamberId);
       await load();
-      toast({ title: 'Chamber deleted', description: chamberToDelete.name });
-    } catch {
+      toast({ title: 'Chamber deleted', description: chamberName });
+    } catch (error) {
+      console.error('Delete chamber error:', error);
       toast({ title: 'Error', description: 'Failed to delete chamber.', variant: 'destructive' });
     } finally {
-      setChamberToDelete(null);
+      setIsDeleting(false);
     }
   };
 
@@ -80,10 +108,15 @@ export default function ChambersPage() {
             onEdit={() => {}}
             onDelete={() => setChamberToDelete(chamber)}
             onChamberUpdated={handleChamberAdded}
+            rentalItems={rentalItems}
           />
         ))}
       </div>
-      <AlertDialog open={!!chamberToDelete} onOpenChange={(open) => !open && setChamberToDelete(null)}>
+      <AlertDialog open={!!chamberToDelete} onOpenChange={(open) => {
+        if (!open && !isDeleting) {
+          setChamberToDelete(null);
+        }
+      }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
@@ -92,8 +125,10 @@ export default function ChambersPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setChamberToDelete(null)}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmDelete}>Delete</AlertDialogAction>
+            <AlertDialogCancel onClick={() => setChamberToDelete(null)} disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmDelete} disabled={isDeleting}>
+              {isDeleting ? 'Deleting...' : 'Delete'}
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

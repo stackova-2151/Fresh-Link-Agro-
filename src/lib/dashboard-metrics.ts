@@ -1,6 +1,8 @@
 /**
  * Dashboard metrics — Firestore-only, async.
  * All functions return Promises. Call from useEffect with loading state.
+ * 
+ * Updated to use occupancy.service.ts for MT-based Room/Block occupancy calculations.
  */
 import {
   collection,
@@ -9,6 +11,8 @@ import {
   where,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { occupancyService } from '@/lib/services/occupancy.service';
+import type { ChamberOccupancy, WarehouseOccupancy } from '@/lib/types/room-block';
 
 export type TodayCounts = {
   todayInwardCount: number;
@@ -40,6 +44,18 @@ export type ChamberOccupancyRow = {
   occupiedPercent: number;
   emptyPercent: number;
   occupancyStatus: OccupancyStatus;
+};
+
+// NEW: MT-based occupancy types
+export type WarehouseMetrics = {
+  totalChambers: number;
+  totalRooms: number;
+  totalBlocks: number;
+  totalCapacityMT: number;
+  occupiedMT: number;
+  availableMT: number;
+  occupancyPercent: number;
+  chambers: ChamberOccupancy[];
 };
 
 function toIsoDate(d: Date) {
@@ -177,4 +193,39 @@ export async function getChamberOccupancy(): Promise<ChamberOccupancyRow[]> {
       occupancyStatus: statusFromOccupiedPercent(occupiedPercent),
     };
   });
+}
+
+/**
+ * NEW: Get warehouse metrics using occupancy.service.ts
+ * Returns MT-based occupancy with Room/Block breakdown
+ */
+export async function getWarehouseMetrics(): Promise<WarehouseMetrics> {
+  const [chambersSnap, itemsSnap] = await Promise.all([
+    getDocs(collection(db, 'chambers')),
+    getDocs(collection(db, 'rentalItems')),
+  ]);
+
+  const chambers = chambersSnap.docs.map((d) => ({
+    ...d.data(),
+    id: d.id,
+  })) as any[];
+
+  const rentalItems = itemsSnap.docs.map((d) => ({
+    ...d.data(),
+    id: d.id,
+  })) as any[];
+
+  // Use occupancy service for MT-based calculations
+  const warehouseOccupancy = occupancyService.calculateWarehouseOccupancy(chambers, rentalItems);
+
+  return {
+    totalChambers: warehouseOccupancy.totalChambers,
+    totalRooms: warehouseOccupancy.totalRooms,
+    totalBlocks: warehouseOccupancy.totalBlocks,
+    totalCapacityMT: warehouseOccupancy.totalCapacityMT,
+    occupiedMT: warehouseOccupancy.occupiedMT,
+    availableMT: warehouseOccupancy.availableMT,
+    occupancyPercent: warehouseOccupancy.occupancyPercent,
+    chambers: warehouseOccupancy.chambers,
+  };
 }

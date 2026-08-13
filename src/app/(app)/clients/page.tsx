@@ -71,7 +71,7 @@ export default function ClientsPage() {
     <div className="space-y-6">
       <PageHeader title="Clients" description="Manage your clients and their rental agreements.">
         <div className="flex gap-2">
-          <Button variant="outline"><FileDown className="mr-2 h-4 w-4" /> Export</Button>
+          {/* <Button variant="outline"><FileDown className="mr-2 h-4 w-4" /> Export</Button> */}
           <AddClientDialog onClientAdded={handleClientAdded} />
         </div>
       </PageHeader>
@@ -140,9 +140,9 @@ export default function ClientsPage() {
                         <AddClientDialog client={client} onClientAdded={handleClientAdded} trigger={
                           <DropdownMenuItem onSelect={(e) => e.preventDefault()}><Edit className="mr-2 h-4 w-4" />Edit Profile</DropdownMenuItem>
                         } />
-                        <DropdownMenuItem asChild>
+                        {/* <DropdownMenuItem asChild>
                           <Link href={`/invoices/${client.id}/create`}><FileText className="mr-2 h-4 w-4" />Generate Invoice</Link>
-                        </DropdownMenuItem>
+                        </DropdownMenuItem> */}
                         <DropdownMenuSeparator />
                         <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(client.id)}>
                           <Trash2 className="mr-2 h-4 w-4" />Delete

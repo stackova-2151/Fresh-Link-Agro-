@@ -42,7 +42,7 @@ export function AddClientDialog({ onClientAdded, client, trigger }: AddClientDia
   const [accountNo, setAccountNo] = useState('');
   const [ifsc, setIfsc] = useState('');
 
-  const [billingCycle, setBillingCycle] = useState<'weekly' | 'monthly'>('monthly');
+  const [billingCycle, setBillingCycle] = useState<'monthly'>('monthly');
   const [rentAmount, setRentAmount] = useState('');
   const [pendingPayment, setPendingPayment] = useState('');
 
@@ -224,12 +224,11 @@ export function AddClientDialog({ onClientAdded, client, trigger }: AddClientDia
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <Label htmlFor="billingCycle">Billing Cycle</Label>
-                            <Select value={billingCycle} onValueChange={(v) => setBillingCycle(v as 'weekly' | 'monthly')}>
+                            <Select value={billingCycle} onValueChange={(v) => setBillingCycle('monthly')}>
                                 <SelectTrigger id="billingCycle">
                                     <SelectValue placeholder="Select cycle" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="weekly">Weekly</SelectItem>
                                     <SelectItem value="monthly">Monthly</SelectItem>
                                 </SelectContent>
                             </Select>

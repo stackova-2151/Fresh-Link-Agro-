@@ -16,6 +16,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Chamber } from '@/lib/types';
 import { PlusCircle } from 'lucide-react';
+import { RoomConfig } from './room-config';
+import type { Room } from '@/lib/types/room-block';
 
 interface AddChamberDialogProps {
   onChamberAdded: (chamber: Chamber) => void;
@@ -31,6 +33,7 @@ export function AddChamberDialog({ onChamberAdded, chamber, trigger }: AddChambe
   const [boxLength, setBoxLength] = useState('');
   const [boxWidth, setBoxWidth] = useState('');
   const [boxHeight, setBoxHeight] = useState('');
+  const [rooms, setRooms] = useState<Room[]>([]);
 
   useEffect(() => {
     if (chamber && open) {
@@ -40,6 +43,7 @@ export function AddChamberDialog({ onChamberAdded, chamber, trigger }: AddChambe
         setBoxLength(chamber.boxDimensions?.length.toString() || '');
         setBoxWidth(chamber.boxDimensions?.width.toString() || '');
         setBoxHeight(chamber.boxDimensions?.height.toString() || '');
+        setRooms(chamber.rooms || []);
     }
   }, [chamber, open]);
 
@@ -50,6 +54,7 @@ export function AddChamberDialog({ onChamberAdded, chamber, trigger }: AddChambe
     setBoxLength('');
     setBoxWidth('');
     setBoxHeight('');
+    setRooms([]);
   };
 
   const handleOpenChange = (isOpen: boolean) => {
@@ -75,7 +80,8 @@ export function AddChamberDialog({ onChamberAdded, chamber, trigger }: AddChambe
         length: parseFloat(boxLength) || 0,
         width: parseFloat(boxWidth) || 0,
         height: parseFloat(boxHeight) || 0,
-      }
+      },
+      rooms: rooms.length > 0 ? rooms : undefined,
     };
 
     onChamberAdded(newChamber);
@@ -96,7 +102,7 @@ export function AddChamberDialog({ onChamberAdded, chamber, trigger }: AddChambe
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       {dialogTrigger}
-      <DialogContent className="sm:max-w-[480px]">
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh]">
         <DialogHeader>
           <DialogTitle className="font-headline">{chamber ? 'Edit Chamber' : 'Add New Chamber'}</DialogTitle>
           <DialogDescription>
@@ -104,26 +110,29 @@ export function AddChamberDialog({ onChamberAdded, chamber, trigger }: AddChambe
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
-            <div className="grid gap-4 py-4">
+            <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto">
                 <div className="grid grid-cols-4 items-center gap-4">
                     <Label htmlFor="name" className="text-right">Name</Label>
                     <Input id="name" value={name} onChange={(e) => setName(e.target.value)} className="col-span-3" placeholder="e.g., Chiller A-2" required />
                 </div>
-                <div className="grid grid-cols-4 items-center gap-4">
+                {/* <div className="grid grid-cols-4 items-center gap-4">
                     <Label htmlFor="dailyRate" className="text-right">Daily Rate (₹)</Label>
                     <Input id="dailyRate" type="number" value={dailyRate} onChange={(e) => setDailyRate(e.target.value)} className="col-span-3" placeholder="e.g., 500" />
-                </div>
-                 <div className="col-span-2 space-y-2">
+                </div> */}
+                 {/* <div className="col-span-2 space-y-2">
                     <Label>Dimensions (cm)</Label>
                     <div className="grid grid-cols-3 gap-2">
                         <Input id="boxLength" value={boxLength} onChange={e => setBoxLength(e.target.value)} placeholder="Length" type="number" />
                         <Input id="boxWidth" value={boxWidth} onChange={e => setBoxWidth(e.target.value)} placeholder="Width" type="number" />
                         <Input id="boxHeight" value={boxHeight} onChange={e => setBoxHeight(e.target.value)} placeholder="Height" type="number" />
                     </div>
-                </div>
+                </div> */}
                 <div className="grid grid-cols-4 items-center gap-4">
                     <Label htmlFor="temperature" className="text-right">Temp. Range</Label>
                     <Input id="temperature" value={temperature} onChange={(e) => setTemperature(e.target.value)} className="col-span-3" placeholder="e.g., 2-8°C or -18°C" />
+                </div>
+                <div className="col-span-4 pt-4 border-t">
+                    <RoomConfig rooms={rooms} onRoomsChange={setRooms} />
                 </div>
             </div>
             <DialogFooter>

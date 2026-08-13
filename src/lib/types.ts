@@ -1,4 +1,5 @@
 import type { StaticImageData } from 'next/image';
+import type { Room } from './types/room-block';
 
 export type UserRole = 'MASTER_ADMIN' | 'ADMIN' | 'SUB_ADMIN';
 export type UserStatus = 'ACTIVE' | 'INACTIVE';
@@ -39,7 +40,7 @@ export type Client = {
     accountNo: string;
     ifsc: string;
   };
-  billingCycle: 'weekly' | 'monthly';
+  billingCycle: 'monthly';
   rentAmount: number;
   pendingPayment: number;
 };
@@ -58,17 +59,19 @@ export type RentalItem = {
   outwardQuantity: number;
   quantityAvailable: number; // Balance Qty
   unit: string;
-  inwardWeight: number;
-  outwardWeight: number;
-  balanceWeight: number;
+  inwardWeight: number;        // KG - UNCHANGED
+  outwardWeight: number;       // KG - UNCHANGED
+  balanceWeight: number;        // KG - UNCHANGED
   expiryDate: Date;
   storageDate: Date;
   temperatureRange: string;
   vendorId: string;
   clientId: string;
   chamberId?: string;
-  block?: string;
-  zone?: string;
+  block?: string;              // LEGACY: Keep for backward compatibility
+  zone?: string;               // LEGACY: Keep for backward compatibility
+  roomId?: string;             // Optional room reference for Chamber → Room → Block structure
+  blockId?: string;            // Optional block reference for Chamber → Room → Block structure
   driverName?: string;
   vehicleNumber?: string;
   boxDimensions?: {
@@ -170,6 +173,7 @@ export type Chamber = {
     width: number;
     height: number;
   };
+  rooms?: Room[];              // Optional rooms array for Chamber → Room → Block structure
 };
 
 export type GatePass = {

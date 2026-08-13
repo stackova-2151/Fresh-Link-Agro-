@@ -26,6 +26,8 @@ export type OutwardVoucherItem = {
   brand: string;
   batch: string;
   chamberId: string;
+  roomId?: string;
+  blockId?: string;
   qty: number | '';
   bags: number | '';
   bagWeight: number | '';
@@ -48,6 +50,14 @@ export type OutwardVoucher = {
   enteredBy: string;
   notes: string;
   items: OutwardVoucherItem[];
+  // Audit fields
+  createdById?: string;
+  createdByName?: string;
+  createdAt?: string;
+  updatedById?: string;
+  updatedByName?: string;
+  updatedAt?: string;
+  updateReason?: string;
 };
 
 export type OutwardConsoleMode = 'new' | 'edit' | 'clientView';
@@ -58,13 +68,13 @@ type Props = {
   user: User | null;
   existingItems: RentalItem[];
   vouchers: OutwardVoucher[];
-  onUpsert: (result: { mode: OutwardConsoleMode; voucher: OutwardVoucher }) => void;
+  onUpsert: (result: { mode: OutwardConsoleMode; voucher: OutwardVoucher }) => Promise<void>;
   onVoucherNoChange?: (outwardNo: string) => void;
 };
 
 type RowField = keyof Omit<OutwardVoucherItem, 'id' | 'totalWeight' | 'expDate' | 'sourceRentalItemId'>;
 
-const GRID_FIELDS: RowField[] = ['itemName', 'brand', 'batch', 'chamberId', 'qty', 'bagWeight', 'inwardNumber'];
+const GRID_FIELDS: RowField[] = ['itemName', 'brand', 'batch', 'chamberId', 'roomId', 'blockId', 'qty', 'bagWeight', 'inwardNumber'];
 
 function createId(prefix: string) {
   return `${prefix}_${Math.random().toString(16).slice(2)}_${Date.now()}`;
@@ -77,6 +87,8 @@ function createEmptyRow(): OutwardVoucherItem {
     brand: '',
     batch: '',
     chamberId: '',
+    roomId: undefined,
+    blockId: undefined,
     qty: '',
     bags: '',
     bagWeight: '',
@@ -182,6 +194,7 @@ export function BulkOutwardEntryForm({
   const [driverName, setDriverName] = useState<string>('');
   const [mobile, setMobile] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
+  const [updateReason, setUpdateReason] = useState<string>('');
 
   const [clientViewRows, setClientViewRows] = useState<Array<OutwardVoucherItem & { outwardNo: string; date: string }>>([]);
 
@@ -206,6 +219,10 @@ export function BulkOutwardEntryForm({
     vouchers.forEach((v) => map.set(v.outwardNo.toUpperCase(), v));
     return map;
   }, [vouchers]);
+
+  const currentVoucher = useMemo(() => {
+    return vouchersByOutwardNo.get(outwardNo.trim().toUpperCase());
+  }, [vouchersByOutwardNo, outwardNo]);
 
   const selectedClient = useMemo(() => clients.find((c) => c.id === clientId) ?? null, [clientId, clients]);
 
@@ -363,6 +380,7 @@ export function BulkOutwardEntryForm({
       setDriverName(voucher.driverName);
       setMobile(voucher.mobile);
       setNotes(voucher.notes);
+      setUpdateReason('');
 
       setRows(voucher.items.length ? voucher.items.map((i) => ({ ...i })) : [createEmptyRow()]);
       setTimeout(() => focusCell(0, 'itemName'), 0);
@@ -387,6 +405,7 @@ export function BulkOutwardEntryForm({
       setDriverName('');
       setMobile('');
       setNotes('');
+      setUpdateReason('');
 
       setRows([createEmptyRow()]);
       setClientViewRows([]);
@@ -469,6 +488,14 @@ export function BulkOutwardEntryForm({
         const next = [...prev];
         const row = { ...next[rowIndex] };
 
+        // Cascading selection: reset dependent fields
+        if (field === 'chamberId') {
+          row.roomId = undefined;
+          row.blockId = undefined;
+        } else if (field === 'roomId') {
+          row.blockId = undefined;
+        }
+
         if (field === 'qty' || field === 'bags' || field === 'bagWeight') {
           (row as any)[field] = parseNumberValue(value);
         } else if (field === 'inwardNumber') {
@@ -533,6 +560,27 @@ export function BulkOutwardEntryForm({
 
   const handleItemNameChange = useCallback(
     (rowIndex: number, value: string) => {
+      // First, clear stale location data when item name changes
+      setRows((prev) => {
+        const next = [...prev];
+        const row = { ...next[rowIndex] };
+        
+        // Clear location and inward-related fields when item name changes
+        row.chamberId = '';
+        row.roomId = undefined;
+        row.blockId = undefined;
+        row.inwardNumber = '';
+        row.expDate = '';
+        row.sourceRentalItemId = '';
+        row.brand = '';
+        row.batch = '';
+        row.bagWeight = '';
+        
+        next[rowIndex] = row;
+        return next;
+      });
+
+      // Update the item name field
       handleRowChange(rowIndex, 'itemName', value);
       setActiveItemRowIndex(rowIndex);
       
@@ -561,6 +609,8 @@ export function BulkOutwardEntryForm({
         row.brand = suggestion.brand;
         row.batch = suggestion.batchNumber;
         row.chamberId = suggestion.chamberId;
+        row.roomId = suggestion.roomId; // Preserve roomId from inward stock
+        row.blockId = suggestion.blockId; // Preserve blockId from inward stock
         row.inwardNumber = suggestion.inwardNumber;
         row.expDate = suggestion.expiryDate instanceof Date 
           ? suggestion.expiryDate.toISOString().split('T')[0]
@@ -600,7 +650,7 @@ export function BulkOutwardEntryForm({
     });
   }, [clearForNewEntry, savedVoucherNo, toast, vouchers]);
 
-  const handleSave = useCallback(() => {
+  const handleSave = useCallback(async () => {
     const parsed = parseOutwardSeq(outwardNo);
     if (!parsed) {
       toast({ variant: 'destructive', title: 'Invalid Outward No format', description: 'Use OUT-001' });
@@ -631,6 +681,16 @@ export function BulkOutwardEntryForm({
     const existingVoucher = vouchersByOutwardNo.get(outwardNo.trim().toUpperCase());
     const nextMode: OutwardConsoleMode = existingVoucher ? 'edit' : 'new';
 
+    // Validate update reason for edit mode
+    if (nextMode === 'edit' && !updateReason.trim()) {
+      toast({
+        variant: 'destructive',
+        title: 'Update Reason Required',
+        description: 'Please provide a reason for updating this voucher.',
+      });
+      return;
+    }
+
     const voucherId = existingVoucher?.id ?? createId('outward_voucher');
     const voucher: OutwardVoucher = {
       id: voucherId,
@@ -645,23 +705,39 @@ export function BulkOutwardEntryForm({
       enteredBy,
       notes,
       items: nonBlankRows,
+      // Audit fields - creator fields for both create and update
+      createdById: existingVoucher?.createdById ?? user?.id ?? '',
+      createdByName: existingVoucher?.createdByName ?? user?.name ?? 'Unknown',
+      createdAt: existingVoucher?.createdAt ?? new Date().toISOString(),
+      // Audit fields - updater fields only for edit mode
+      ...(nextMode === 'edit' ? {
+        updatedById: user?.id ?? '',
+        updatedByName: user?.name ?? 'Unknown',
+        updatedAt: new Date().toISOString(),
+        updateReason: updateReason.trim(),
+      } : {}),
     };
 
-    onUpsert({ mode: nextMode, voucher });
+    try {
+      await onUpsert({ mode: nextMode, voucher });
 
-    // Show print dialog for NEW entries only
-    if (nextMode === 'new') {
-      setSavedVoucherNo(voucher.outwardNo);
-      setShowPrintDialog(true);
-      return;
+      // Show print dialog for NEW entries only
+      if (nextMode === 'new') {
+        setSavedVoucherNo(voucher.outwardNo);
+        setShowPrintDialog(true);
+        return;
+      }
+
+      // For edit mode, show toast and reset to new entry
+      toast({
+        title: 'Outward voucher updated',
+        description: `${voucher.outwardNo} • ${client.name} • ${nonBlankRows.length} rows • ${grandTotalWeight.toFixed(2)} kg`,
+      });
+      clearForNewEntry();
+    } catch (error) {
+      // Error is already handled by parent component's toast
+      console.error('Failed to save voucher:', error);
     }
-
-    // For edit mode, show toast and reset to new entry
-    toast({
-      title: 'Outward voucher updated',
-      description: `${voucher.outwardNo} • ${client.name} • ${nonBlankRows.length} rows • ${grandTotalWeight.toFixed(2)} kg`,
-    });
-    clearForNewEntry();
   }, [
     clearForNewEntry,
     clientId,
@@ -676,6 +752,7 @@ export function BulkOutwardEntryForm({
     outwardNo,
     rows,
     toast,
+    updateReason,
     user?.name,
     validateRows,
     vehicleNo,
@@ -879,6 +956,8 @@ export function BulkOutwardEntryForm({
                   <TableHead className="w-[110px]">Outward No</TableHead>
                   <TableHead className="w-[110px]">Inward No</TableHead>
                   <TableHead className="w-[220px]">Item Name</TableHead>
+                  <TableHead className="w-[150px]">Room</TableHead>
+                  <TableHead className="w-[100px]">Block</TableHead>
                   <TableHead className="w-[90px] text-right">Qty</TableHead>
                   <TableHead className="w-[100px] text-right">Bag Wt</TableHead>
                   <TableHead className="w-[130px] text-right">Tot Wt</TableHead>
@@ -891,6 +970,29 @@ export function BulkOutwardEntryForm({
                     <TableCell className="font-mono text-xs">{row.outwardNo}</TableCell>
                     <TableCell className="font-mono text-xs">{row.inwardNumber}</TableCell>
                     <TableCell>{row.itemName}</TableCell>
+                    <TableCell>
+                      {row.roomId ? (
+                        (() => {
+                          const chamber = chambers.find((c) => c.id === row.chamberId);
+                          const room = chamber?.rooms?.find((r) => r.roomId === row.roomId);
+                          return room?.roomName ?? '';
+                        })()
+                      ) : (
+                        <span className="text-muted-foreground text-xs">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {row.blockId ? (
+                        (() => {
+                          const chamber = chambers.find((c) => c.id === row.chamberId);
+                          const room = chamber?.rooms?.find((r) => r.roomId === row.roomId);
+                          const block = room?.blocks?.find((b) => b.blockId === row.blockId);
+                          return block?.blockName ?? '';
+                        })()
+                      ) : (
+                        <span className="text-muted-foreground text-xs">-</span>
+                      )}
+                    </TableCell>
                     <TableCell className="text-right">{row.qty}</TableCell>
                     <TableCell className="text-right">{typeof row.bagWeight === 'number' ? row.bagWeight : ''}</TableCell>
                     <TableCell className="text-right">{row.totalWeight ? row.totalWeight.toFixed(2) : ''}</TableCell>
@@ -909,6 +1011,8 @@ export function BulkOutwardEntryForm({
                   <TableHead className="w-[160px]">Brand</TableHead>
                   <TableHead className="w-[140px]">Batch</TableHead>
                   <TableHead className="w-[200px]">Chamber</TableHead>
+                  <TableHead className="w-[150px]">Room</TableHead>
+                  <TableHead className="w-[100px]">Block</TableHead>
                   <TableHead className="w-[90px] text-right">Qty</TableHead>
                   <TableHead className="w-[110px] text-right">Bag Wt</TableHead>
                   <TableHead className="w-[120px] text-right">Tot Wt</TableHead>
@@ -1021,6 +1125,39 @@ export function BulkOutwardEntryForm({
                             ))}
                           </SelectContent>
                         </Select>
+                      </TableCell>
+
+                      <TableCell className="p-1">
+                        {(() => {
+                          const selectedChamber = chambers.find(c => c.id === row.chamberId);
+                          const selectedRoom = selectedChamber?.rooms?.find(r => r.roomId === row.roomId);
+                          
+                          return (
+                            <Input 
+                              value={selectedRoom?.roomName || ''} 
+                              readOnly 
+                              className="h-8" 
+                              placeholder="-"
+                            />
+                          );
+                        })()}
+                      </TableCell>
+
+                      <TableCell className="p-1">
+                        {(() => {
+                          const selectedChamber = chambers.find(c => c.id === row.chamberId);
+                          const selectedRoom = selectedChamber?.rooms?.find(r => r.roomId === row.roomId);
+                          const selectedBlock = selectedRoom?.blocks?.find(b => b.blockId === row.blockId);
+                          
+                          return (
+                            <Input 
+                              value={selectedBlock?.blockName || ''} 
+                              readOnly 
+                              className="h-8" 
+                              placeholder="-"
+                            />
+                          );
+                        })()}
                       </TableCell>
 
                       <TableCell className="p-1">
@@ -1174,6 +1311,11 @@ export function BulkOutwardEntryForm({
               <Button type="button" onClick={handleSave}>
                 {mode === 'edit' ? 'Update Entry' : 'Save Entry'}
               </Button>
+              {mode === 'edit' && (
+                <Button type="button" variant="outline" onClick={() => clearForNewEntry()}>
+                  Cancel
+                </Button>
+              )}
             </div>
 
             <div className="text-xs text-muted-foreground">
@@ -1184,18 +1326,36 @@ export function BulkOutwardEntryForm({
         )}
 
         {mode !== 'clientView' && (
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-12">
-            <div className="md:col-span-8">
+          <div className={`grid gap-4 ${mode === 'edit' ? 'grid-cols-1 lg:grid-cols-[2fr_1.75fr_1.25fr]' : 'grid-cols-1 lg:grid-cols-[2fr_1fr]'}`}>
+            <div className="flex flex-col gap-2">
               <Label>Notes</Label>
-              <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} />
+              <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} className="min-h-[100px]" />
             </div>
-            <div className="md:col-span-4">
-              <div className="rounded-md border p-3 text-xs">
-                <div className="font-semibold">Summary</div>
-                <div className="mt-2 space-y-1 text-muted-foreground">
-                  <div>Date: {voucherDate}</div>
-                  <div>Entered By: {user?.name ?? '—'}</div>
-                </div>
+            
+            {mode === 'edit' && (
+              <div className="flex flex-col gap-2">
+                <Label>Update Reason *</Label>
+                <Textarea 
+                  value={updateReason} 
+                  onChange={(e) => setUpdateReason(e.target.value)}
+                  placeholder="Please provide a reason for this update..."
+                  className="min-h-[100px]"
+                />
+              </div>
+            )}
+            
+            <div className="rounded-md border p-3 text-xs h-full">
+              <div className="font-semibold">Summary</div>
+              <div className="mt-2 space-y-1 text-muted-foreground">
+                <div>Date: {voucherDate}</div>
+                <div>Entered By: {currentVoucher?.createdByName ?? currentVoucher?.enteredBy ?? '—'}</div>
+                {currentVoucher?.updatedByName && (
+                  <>
+                    <div>Last Updated By: {currentVoucher.updatedByName}</div>
+                    <div>Updated At: {currentVoucher.updatedAt ? new Date(currentVoucher.updatedAt).toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}</div>
+                    {currentVoucher.updateReason && <div>Reason: {currentVoucher.updateReason}</div>}
+                  </>
+                )}
               </div>
             </div>
           </div>

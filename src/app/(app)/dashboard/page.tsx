@@ -7,17 +7,21 @@ import { StatCard } from '@/components/stat-card';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useUser } from '@/context/user-context';
 import {
-  getChamberOccupancy,
   getTodayCounts,
   getTotalStock,
   getUserCounts,
+  getWarehouseMetrics,
   type TodayCounts,
   type TotalStock,
   type UserCounts,
-  type ChamberOccupancyRow,
+  type WarehouseMetrics,
 } from '@/lib/dashboard-metrics';
 
 import { Archive, ArrowDownRight, ArrowUpRight, Users, Warehouse, Loader2 } from 'lucide-react';
+import { WarehouseSummary } from '@/components/dashboard/warehouse-summary';
+import { ChamberOccupancyCard } from '@/components/dashboard/chamber-occupancy-card';
+import { BlockDetailPanel } from '@/components/dashboard/block-detail-panel';
+import type { BlockOccupancy } from '@/lib/types/room-block';
 
 export default function DashboardPage() {
   const { user } = useUser();
@@ -25,22 +29,55 @@ export default function DashboardPage() {
   const [todayCounts, setTodayCounts] = useState<TodayCounts>({ todayInwardCount: 0, todayOutwardCount: 0 });
   const [stock, setStock] = useState<TotalStock>({ totalQuantity: 0, totalWeight: 0 });
   const [userCounts, setUserCounts] = useState<UserCounts>({ totalAdmins: 0, activeAdmins: 0, inactiveAdmins: 0, totalSubAdmins: 0, activeSubAdmins: 0, inactiveSubAdmins: 0 });
-  const [chamberRows, setChamberRows] = useState<ChamberOccupancyRow[]>([]);
+  const [warehouseMetrics, setWarehouseMetrics] = useState<WarehouseMetrics | null>(null);
   const [loading, setLoading] = useState(true);
+  const [expandedChambers, setExpandedChambers] = useState<Set<string>>(new Set());
+  const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
+  const [selectedBlock, setSelectedBlock] = useState<{ block: BlockOccupancy; roomName: string } | null>(null);
+
+  const toggleChamber = (chamberId: string) => {
+    setExpandedChambers((prev) => {
+      const next = new Set(prev);
+      if (next.has(chamberId)) {
+        next.delete(chamberId);
+        // Also reset room selection when collapsing chamber
+        setSelectedRoomId(null);
+      } else {
+        next.add(chamberId);
+      }
+      return next;
+    });
+  };
+
+  const handleSelectRoom = (roomId: string) => {
+    setSelectedRoomId(roomId);
+  };
+
+  const handleBackToRooms = () => {
+    setSelectedRoomId(null);
+  };
+
+  const handleBlockClick = (block: BlockOccupancy, roomName: string) => {
+    setSelectedBlock({ block, roomName });
+  };
+
+  const handleCloseBlockDetail = () => {
+    setSelectedBlock(null);
+  };
 
   useEffect(() => {
     async function loadMetrics() {
       try {
-        const [tc, st, uc, cr] = await Promise.all([
+        const [tc, st, uc, wm] = await Promise.all([
           getTodayCounts(),
           getTotalStock(),
           getUserCounts(),
-          getChamberOccupancy(),
+          getWarehouseMetrics(),
         ]);
         setTodayCounts(tc);
         setStock(st);
         setUserCounts(uc);
-        setChamberRows(cr);
+        setWarehouseMetrics(wm);
       } catch (err) {
         console.error('Failed to load dashboard metrics:', err);
       } finally {
@@ -49,13 +86,6 @@ export default function DashboardPage() {
     }
     loadMetrics();
   }, []);
-
-  const occupancyTotals = (() => {
-    const capacityVolume = chamberRows.reduce((acc, row) => acc + row.capacityVolume, 0);
-    const usedVolume = chamberRows.reduce((acc, row) => acc + row.usedVolume, 0);
-    const occupiedPercent = capacityVolume > 0 ? Math.round((usedVolume / capacityVolume) * 1000) / 10 : 0;
-    return { capacityVolume, usedVolume, occupiedPercent };
-  })();
 
   const role = user?.role;
   const isMaster = role === 'MASTER_ADMIN';
@@ -74,14 +104,13 @@ export default function DashboardPage() {
     <div className="space-y-6">
       <PageHeader title="Dashboard" description="Welcome back! Here's what's happening today." />
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          title="Warehouse Occupancy"
-          value={`${occupancyTotals.occupiedPercent}%`}
-          description={`${Math.round(occupancyTotals.usedVolume).toLocaleString()} / ${Math.round(occupancyTotals.capacityVolume).toLocaleString()} vol occupied`}
-          icon={<Warehouse className="h-4 w-4 text-muted-foreground" />}
-        />
+      {/* Warehouse Summary */}
+      {warehouseMetrics && (
+        <WarehouseSummary metrics={warehouseMetrics} />
+      )}
 
+      {/* Additional Stats */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {isMaster && (
           <StatCard
             title="Total Admins"
@@ -120,72 +149,41 @@ export default function DashboardPage() {
           description={`${Math.round(stock.totalWeight).toLocaleString()} kg weight`}
           icon={<Archive className="h-4 w-4 text-muted-foreground" />}
         />
-
-        {isMaster && (
-          <StatCard
-            title="Active Admins"
-            value={userCounts.activeAdmins.toString()}
-            description="Enabled admin accounts"
-            icon={<Users className="h-4 w-4 text-muted-foreground" />}
-          />
-        )}
-
-        {isAdmin && (
-          <StatCard
-            title="Active Sub Admins"
-            value={userCounts.activeSubAdmins.toString()}
-            description="Enabled sub admin accounts"
-            icon={<Users className="h-4 w-4 text-muted-foreground" />}
-          />
-        )}
       </div>
 
+      {/* Block Detail Panel */}
+      {selectedBlock && (
+        <BlockDetailPanel
+          block={selectedBlock.block}
+          roomName={selectedBlock.roomName}
+          onClose={handleCloseBlockDetail}
+        />
+      )}
+
+      {/* Chamber Occupancy */}
       <Card>
         <CardHeader>
-          <CardTitle>Chamber Occupancy Overview</CardTitle>
+          <CardTitle>Chamber Occupancy (MT-based)</CardTitle>
         </CardHeader>
         <CardContent>
-          {chamberRows.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No chambers found.</p>
+          {!warehouseMetrics || warehouseMetrics.chambers.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              {warehouseMetrics ? 'No chambers found.' : 'Room configuration required for MT-based occupancy.'}
+            </p>
           ) : (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {chamberRows.map((row) => {
-                const barClass =
-                  row.occupancyStatus === 'LOW'
-                    ? 'bg-green-500'
-                    : row.occupancyStatus === 'MEDIUM'
-                    ? 'bg-yellow-500'
-                    : 'bg-red-500';
-
-                return (
-                  <Card key={row.chamberId} className="shadow-none">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-base">{row.chamberName}</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      <div className="flex items-center justify-between text-sm text-muted-foreground">
-                        <span>Used</span>
-                        <span className="font-mono">{Math.round(row.usedVolume).toLocaleString()}</span>
-                      </div>
-                      <div className="flex items-center justify-between text-sm text-muted-foreground">
-                        <span>Capacity</span>
-                        <span className="font-mono">{Math.round(row.capacityVolume).toLocaleString()}</span>
-                      </div>
-                      <div className="h-2 w-full rounded bg-slate-100 overflow-hidden">
-                        <div className={`h-full ${barClass}`} style={{ width: `${row.occupiedPercent}%` }} />
-                      </div>
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-muted-foreground">Occupied</span>
-                        <span className="font-semibold">{Math.round(row.occupiedPercent)}%</span>
-                      </div>
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-muted-foreground">Empty</span>
-                        <span className="font-semibold">{Math.round(row.emptyPercent)}%</span>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
+            <div className="space-y-4">
+              {warehouseMetrics.chambers.map((chamber) => (
+                <ChamberOccupancyCard
+                  key={chamber.chamberId}
+                  chamber={chamber}
+                  isExpanded={expandedChambers.has(chamber.chamberId)}
+                  onToggle={() => toggleChamber(chamber.chamberId)}
+                  selectedRoomId={selectedRoomId}
+                  onSelectRoom={handleSelectRoom}
+                  onBackToRooms={handleBackToRooms}
+                  onBlockClick={handleBlockClick}
+                />
+              ))}
             </div>
           )}
         </CardContent>

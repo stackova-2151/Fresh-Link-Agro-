@@ -19,6 +19,8 @@ import { useUnitAutocomplete, type UnitSuggestion } from '@/hooks/use-unit-autoc
 import { PrintConfirmationDialog } from '@/components/shared/print-confirmation-dialog';
 
 import type { Chamber, Client, RentalItem, User, Vendor } from '@/lib/types';
+import type { Room, Block } from '@/lib/types/room-block';
+import { occupancyService } from '@/lib/services/occupancy.service';
 
 export type InwardVoucherItem = {
   id: string;
@@ -28,6 +30,8 @@ export type InwardVoucherItem = {
   expDate: string;
   batch: string;
   chamberId: string;
+  roomId?: string;
+  blockId?: string;
   bags: number | '';
   unit: string;
   bagWeight: number | '';
@@ -47,6 +51,14 @@ export type InwardVoucher = {
   enteredBy: string;
   notes: string;
   items: InwardVoucherItem[];
+  // Audit fields
+  createdById?: string;
+  createdByName?: string;
+  createdAt?: string;
+  updatedById?: string;
+  updatedByName?: string;
+  updatedAt?: string;
+  updateReason?: string;
 };
 
 export type InwardConsoleMode = 'new' | 'edit' | 'clientView';
@@ -58,7 +70,7 @@ type Props = {
   vendors: Vendor[];
   existingItems: RentalItem[];
   vouchers: InwardVoucher[];
-  onUpsert: (result: { mode: InwardConsoleMode; voucher: InwardVoucher; createdItems: RentalItem[] }) => void;
+  onUpsert: (result: { mode: InwardConsoleMode; voucher: InwardVoucher; createdItems: RentalItem[] }) => Promise<void>;
   onVoucherNoChange?: (inwardNo: string) => void;
 };
 
@@ -71,6 +83,8 @@ const GRID_FIELDS: RowField[] = [
   'expDate',
   'batch',
   'chamberId',
+  'roomId',
+  'blockId',
   'bags',
   'unit',
   'bagWeight',
@@ -89,6 +103,8 @@ function createEmptyRow(): InwardVoucherItem {
     expDate: '',
     batch: '',
     chamberId: '',
+    roomId: undefined,
+    blockId: undefined,
     bags: '',
     unit: '',
     bagWeight: '',
@@ -115,12 +131,70 @@ function isRowBlank(row: InwardVoucherItem) {
   );
 }
 
-function validateRow(row: InwardVoucherItem) {
+function validateRow(row: InwardVoucherItem, chambers: Chamber[]) {
   if (!row.itemName.trim()) return 'Item Name is required';
   if (!row.chamberId) return 'Chamber is required';
+  
+  // Check if chamber has rooms configured
+  const selectedChamber = chambers.find(c => c.id === row.chamberId);
+  const hasRooms = selectedChamber?.rooms && selectedChamber.rooms.length > 0;
+  
+  if (hasRooms) {
+    if (!row.roomId) return 'Room is required (chamber has rooms configured)';
+    if (!row.blockId) return 'Block is required';
+  }
+  
   if (typeof row.bags !== 'number' || row.bags <= 0) return 'Bags must be > 0';
   if (typeof row.bagWeight !== 'number' || row.bagWeight <= 0) return 'Bag Wt must be > 0';
   return null;
+}
+
+function validateCapacity(
+  row: InwardVoucherItem,
+  chambers: Chamber[],
+  existingItems: RentalItem[],
+  editingItem?: RentalItem
+): { valid: boolean; message?: string } {
+  // Only validate if room/block are selected
+  if (!row.roomId || !row.blockId) return { valid: true };
+  
+  const selectedChamber = chambers.find(c => c.id === row.chamberId);
+  if (!selectedChamber?.rooms) return { valid: true };
+  
+  const selectedRoom = selectedChamber.rooms.find(r => r.roomId === row.roomId);
+  if (!selectedRoom) return { valid: true };
+  
+  const selectedBlock = selectedRoom.blocks.find(b => b.blockId === row.blockId);
+  if (!selectedBlock) return { valid: true };
+  
+  // Calculate required storage in MT
+  const requiredWeightKG = row.totalWeight;
+  const requiredWeightMT = requiredWeightKG / 1000;
+  
+  // Calculate current occupancy of the block
+  const blockOccupancy = occupancyService.calculateBlockOccupancy(
+    selectedBlock,
+    selectedChamber.id,
+    selectedRoom.roomId,
+    existingItems
+  );
+  
+  // If editing an existing item, subtract its current weight from occupied
+  let occupiedMT = blockOccupancy.occupiedMT;
+  if (editingItem && editingItem.blockId === row.blockId) {
+    occupiedMT -= editingItem.balanceWeight / 1000;
+  }
+  
+  const availableMT = Math.max(0, blockOccupancy.capacityMT - occupiedMT);
+  
+  if (requiredWeightMT > availableMT) {
+    return {
+      valid: false,
+      message: `Insufficient block capacity. Available: ${availableMT.toFixed(2)} MT, Required: ${requiredWeightMT.toFixed(2)} MT`,
+    };
+  }
+  
+  return { valid: true };
 }
 
 function parseInwardSeq(inwardNo: string) {
@@ -132,6 +206,53 @@ function parseInwardSeq(inwardNo: string) {
 
 function formatInwardNo(seq: number) {
   return `INW-${String(seq).padStart(3, '0')}`;
+}
+
+// Date format conversion helpers
+// UI format: dd-mm-yyyy
+// Internal/Firestore format: yyyy-MM-dd
+
+function uiDateToIsoDate(uiDate: string): string {
+  if (!uiDate || uiDate.trim() === '') return '';
+  
+  const parts = uiDate.split('-');
+  if (parts.length !== 3) return uiDate; // Return as-is if not expected format
+  
+  const [day, month, year] = parts;
+  
+  // Validate parts are numeric
+  if (!/^\d+$/.test(day) || !/^\d+$/.test(month) || !/^\d+$/.test(year)) {
+    return uiDate;
+  }
+  
+  // Validate ranges
+  const dayNum = parseInt(day, 10);
+  const monthNum = parseInt(month, 10);
+  const yearNum = parseInt(year, 10);
+  
+  if (dayNum < 1 || dayNum > 31 || monthNum < 1 || monthNum > 12 || yearNum < 1900 || yearNum > 2100) {
+    return uiDate;
+  }
+  
+  // Convert to yyyy-MM-dd
+  return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+}
+
+function isoDateToUiDate(isoDate: string): string {
+  if (!isoDate || isoDate.trim() === '') return '';
+  
+  const parts = isoDate.split('-');
+  if (parts.length !== 3) return isoDate;
+  
+  const [year, month, day] = parts;
+  
+  // Validate parts are numeric
+  if (!/^\d+$/.test(year) || !/^\d+$/.test(month) || !/^\d+$/.test(day)) {
+    return isoDate;
+  }
+  
+  // Convert to dd-mm-yyyy
+  return `${day}-${month}-${year}`;
 }
 
 function generateNextInwardNo(vouchers: InwardVoucher[], existingItems: RentalItem[]) {
@@ -183,6 +304,7 @@ export function BulkInwardEntryForm({
   const [vehicleNo, setVehicleNo] = useState<string>('');
   const [gatePassNo, setGatePassNo] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
+  const [updateReason, setUpdateReason] = useState<string>('');
 
   const [clientViewRows, setClientViewRows] = useState<Array<InwardVoucherItem & { inwardNo: string }>>([]);
 
@@ -280,11 +402,25 @@ export function BulkInwardEntryForm({
         const next = [...prev];
         const row = { ...next[rowIndex] };
 
+        // Cascading selection: reset dependent fields
+        if (field === 'chamberId') {
+          row.roomId = undefined;
+          row.blockId = undefined;
+        } else if (field === 'roomId') {
+          row.blockId = undefined;
+        }
+
+        // Convert UI date format (dd-mm-yyyy) to ISO format (yyyy-MM-dd) for date fields
+        let processedValue = value;
+        if (field === 'mfgDate' || field === 'expDate') {
+          processedValue = uiDateToIsoDate(value);
+        }
+
         if (field === 'bags' || field === 'bagWeight') {
-          const parsed = value === '' ? '' : Number(value);
-          (row as any)[field] = value === '' ? '' : Number.isFinite(parsed) ? parsed : '';
+          const parsed = processedValue === '' ? '' : Number(processedValue);
+          (row as any)[field] = processedValue === '' ? '' : Number.isFinite(parsed) ? parsed : '';
         } else {
-          (row as any)[field] = value;
+          (row as any)[field] = processedValue;
         }
 
         row.totalWeight = calcRowTotal(row.bags, row.bagWeight);
@@ -408,6 +544,10 @@ export function BulkInwardEntryForm({
     return map;
   }, [vouchers]);
 
+  const currentVoucher = useMemo(() => {
+    return vouchersByInwardNo.get(inwardNo.trim().toUpperCase());
+  }, [vouchersByInwardNo, inwardNo]);
+
   const handleClientInputChange = useCallback(
     (value: string) => {
       setClientInput(value);
@@ -500,6 +640,7 @@ export function BulkInwardEntryForm({
       setGatePassNo(voucher.gatePassNo);
       setVoucherDate(voucher.date);
       setNotes(voucher.notes);
+      setUpdateReason('');
       setRows(voucher.items.length ? voucher.items.map((i) => ({ ...i })) : [createEmptyRow()]);
       setTimeout(() => focusCell(0, 'itemName'), 0);
     },
@@ -521,6 +662,7 @@ export function BulkInwardEntryForm({
       setVehicleNo('');
       setGatePassNo('');
       setNotes('');
+      setUpdateReason('');
       setRows([createEmptyRow()]);
       setClientViewRows([]);
     },
@@ -541,7 +683,7 @@ export function BulkInwardEntryForm({
     clearForNewEntry(key);
   }, [clearForNewEntry, inwardNo, loadVoucher, vouchersByInwardNo]);
 
-  const handleSave = useCallback(() => {
+  const handleSave = useCallback(async () => {
     const parsed = parseInwardSeq(inwardNo);
     if (!parsed) {
       toast({ variant: 'destructive', title: 'Invalid Inward No format', description: 'Use INW-001' });
@@ -569,7 +711,7 @@ export function BulkInwardEntryForm({
 
     const rowErrors: Array<{ index: number; message: string }> = [];
     nonBlankRows.forEach((r) => {
-      const msg = validateRow(r);
+      const msg = validateRow(r, chambers);
       if (msg) rowErrors.push({ index: rows.findIndex((x) => x.id === r.id), message: msg });
     });
 
@@ -583,9 +725,41 @@ export function BulkInwardEntryForm({
       return;
     }
 
+    // Capacity validation
+    const capacityErrors: Array<{ index: number; message: string }> = [];
+    nonBlankRows.forEach((r) => {
+      const capacityCheck = validateCapacity(r, chambers, existingItems);
+      if (!capacityCheck.valid) {
+        capacityErrors.push({ 
+          index: rows.findIndex((x) => x.id === r.id), 
+          message: capacityCheck.message || 'Capacity validation failed' 
+        });
+      }
+    });
+
+    if (capacityErrors.length > 0) {
+      const first = capacityErrors[0];
+      toast({
+        variant: 'destructive',
+        title: `Row ${first.index + 1}: ${first.message}`,
+      });
+      focusCell(first.index, 'chamberId');
+      return;
+    }
+
     const existingVoucher = vouchersByInwardNo.get(inwardNo.trim().toUpperCase());
     const nextMode: InwardConsoleMode = existingVoucher ? 'edit' : 'new';
     const voucherId = existingVoucher?.id ?? createId('inward_voucher');
+
+    // Validate update reason for edit mode
+    if (nextMode === 'edit' && !updateReason.trim()) {
+      toast({
+        variant: 'destructive',
+        title: 'Update Reason Required',
+        description: 'Please provide a reason for updating this voucher.',
+      });
+      return;
+    }
 
     const voucher: InwardVoucher = {
       id: voucherId,
@@ -600,6 +774,17 @@ export function BulkInwardEntryForm({
       enteredBy,
       notes,
       items: nonBlankRows,
+      // Audit fields - creator fields for both create and update
+      createdById: existingVoucher?.createdById ?? user?.id ?? '',
+      createdByName: existingVoucher?.createdByName ?? user?.name ?? 'Unknown',
+      createdAt: existingVoucher?.createdAt ?? new Date().toISOString(),
+      // Audit fields - updater fields only for edit mode
+      ...(nextMode === 'edit' ? {
+        updatedById: user?.id ?? '',
+        updatedByName: user?.name ?? 'Unknown',
+        updatedAt: new Date().toISOString(),
+        updateReason: updateReason.trim(),
+      } : {}),
     };
 
     const vendorId = vendors[0]?.id ?? 'vendor_01';
@@ -609,6 +794,15 @@ export function BulkInwardEntryForm({
       const wt = r.totalWeight;
       const exp = r.expDate ? new Date(r.expDate) : new Date(voucherDate);
       const storage = new Date(voucherDate);
+
+      // Get block name for legacy field
+      let legacyBlock = '';
+      if (r.blockId) {
+        const selectedChamber = chambers.find(c => c.id === r.chamberId);
+        const selectedRoom = selectedChamber?.rooms?.find(room => room.roomId === r.roomId);
+        const selectedBlock = selectedRoom?.blocks.find(block => block.blockId === r.blockId);
+        legacyBlock = selectedBlock?.blockName || '';
+      }
 
       return {
         id: createId('rental_item'),
@@ -633,8 +827,10 @@ export function BulkInwardEntryForm({
         vendorId,
         clientId: client.id,
         chamberId: r.chamberId,
-        block: '',
+        block: legacyBlock, // Legacy field: set from block name for backward compatibility
         zone: '',
+        roomId: r.roomId, // New field
+        blockId: r.blockId, // New field
         driverName,
         vehicleNumber: vehicleNo,
         images: [],
@@ -642,21 +838,26 @@ export function BulkInwardEntryForm({
       };
     });
 
-    onUpsert({ mode: nextMode, voucher, createdItems });
+    try {
+      await onUpsert({ mode: nextMode, voucher, createdItems });
 
-    // Show print dialog for NEW entries only
-    if (nextMode === 'new') {
-      setSavedVoucherNo(voucher.inwardNo);
-      setShowPrintDialog(true);
-      return;
+      // Show print dialog for NEW entries only
+      if (nextMode === 'new') {
+        setSavedVoucherNo(voucher.inwardNo);
+        setShowPrintDialog(true);
+        return;
+      }
+
+      // For edit mode, show toast and reset to new entry
+      toast({
+        title: 'Inward voucher updated',
+        description: `${voucher.inwardNo} • ${client.name} • ${nonBlankRows.length} rows • ${grandTotalWeight.toFixed(2)} kg`,
+      });
+      clearForNewEntry();
+    } catch (error) {
+      // Error is already handled by parent component's toast
+      console.error('Failed to save voucher:', error);
     }
-
-    // For edit mode, show toast and reset to new entry
-    toast({
-      title: 'Inward voucher updated',
-      description: `${voucher.inwardNo} • ${client.name} • ${nonBlankRows.length} rows • ${grandTotalWeight.toFixed(2)} kg`,
-    });
-    clearForNewEntry();
   }, [
     clearForNewEntry,
     clientId,
@@ -672,6 +873,7 @@ export function BulkInwardEntryForm({
     onUpsert,
     rows,
     toast,
+    updateReason,
     user?.name,
     vehicleNo,
     vouchers,
@@ -791,16 +993,18 @@ export function BulkInwardEntryForm({
               <TableHeader>
                 <TableRow className="bg-muted/30">
                   <TableHead className="w-[90px]">Inward No</TableHead>
-                  <TableHead className="w-[220px]">Item Name</TableHead>
+                  <TableHead className="w-[300px]">Item Name</TableHead>
                   <TableHead className="w-[160px]">Brand</TableHead>
-                  <TableHead className="w-[140px]">Mfg Date</TableHead>
-                  <TableHead className="w-[140px]">Exp Date</TableHead>
+                  <TableHead className="w-[110px]">Mfg Date</TableHead>
+                  <TableHead className="w-[110px]">Exp Date</TableHead>
                   <TableHead className="w-[140px]">Batch</TableHead>
-                  <TableHead className="w-[200px]">Chamber</TableHead>
+                  <TableHead className="w-[170px]">Chamber</TableHead>
+                  <TableHead className="w-[90px]">Room</TableHead>
+                  <TableHead className="w-[40px]">Block</TableHead>
                   <TableHead className="w-[90px] text-right">Bags</TableHead>
                   <TableHead className="w-[120px]">Unit</TableHead>
-                  <TableHead className="w-[110px] text-right">Bag Wt</TableHead>
-                  <TableHead className="w-[120px] text-right">Tot Wt</TableHead>
+                  <TableHead className="w-[40px] text-right">Bag Wt</TableHead>
+                  <TableHead className="w-[160px] text-right">Tot Wt</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -809,10 +1013,34 @@ export function BulkInwardEntryForm({
                     <TableCell className="font-mono text-xs">{row.inwardNo}</TableCell>
                     <TableCell>{row.itemName}</TableCell>
                     <TableCell>{row.brand}</TableCell>
-                    <TableCell>{row.mfgDate}</TableCell>
-                    <TableCell>{row.expDate}</TableCell>
+                    <TableCell>{isoDateToUiDate(row.mfgDate)}</TableCell>
+                    <TableCell>{isoDateToUiDate(row.expDate)}</TableCell>
                     <TableCell>{row.batch}</TableCell>
                     <TableCell>{chambers.find((c) => c.id === row.chamberId)?.name ?? ''}</TableCell>
+                    <TableCell>
+                      <Input 
+                        value={row.roomId ? (
+                          chambers.find((c) => c.id === row.chamberId)?.rooms?.find((r) => r.roomId === row.roomId)?.roomName ?? ''
+                        ) : 'Legacy'}
+                        readOnly 
+                        className="h-8" 
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Input 
+                        value={row.blockId ? (
+                          (() => {
+                            const chamber = chambers.find((c) => c.id === row.chamberId);
+                            const room = chamber?.rooms?.find((r) => r.roomId === row.roomId);
+                            const block = room?.blocks.find((b) => b.blockId === row.blockId);
+                            return block?.blockName ?? '';
+                          })()
+                        ) : ''}
+                        readOnly 
+                        className="h-8" 
+                        placeholder="-"
+                      />
+                    </TableCell>
                     <TableCell className="text-right">{row.bags}</TableCell>
                     <TableCell>{row.unit}</TableCell>
                     <TableCell className="text-right">{row.bagWeight}</TableCell>
@@ -827,16 +1055,18 @@ export function BulkInwardEntryForm({
             <Table className="text-sm">
               <TableHeader>
                 <TableRow className="bg-muted/30">
-                  <TableHead className="w-[220px]">Item Name</TableHead>
+                  <TableHead className="w-[300px]">Item Name</TableHead>
                   <TableHead className="w-[160px]">Brand</TableHead>
-                  <TableHead className="w-[140px]">Mfg Date</TableHead>
-                  <TableHead className="w-[140px]">Exp Date</TableHead>
+                  <TableHead className="w-[110px]">Mfg Date</TableHead>
+                  <TableHead className="w-[110px]">Exp Date</TableHead>
                   <TableHead className="w-[140px]">Batch</TableHead>
-                  <TableHead className="w-[200px]">Chamber</TableHead>
+                  <TableHead className="w-[170px]">Chamber</TableHead>
+                  <TableHead className="w-[90px]">Room</TableHead>
+                  <TableHead className="w-[40px]">Block</TableHead>
                   <TableHead className="w-[90px] text-right">Bags</TableHead>
                   <TableHead className="w-[120px]">Unit</TableHead>
-                  <TableHead className="w-[110px] text-right">Bag Wt</TableHead>
-                  <TableHead className="w-[120px] text-right">Tot Wt</TableHead>
+                  <TableHead className="w-[40px] text-right">Bag Wt</TableHead>
+                  <TableHead className="w-[160px] text-right">Tot Wt</TableHead>
                   <TableHead className="w-[70px] text-right">Del</TableHead>
                 </TableRow>
               </TableHeader>
@@ -896,7 +1126,7 @@ export function BulkInwardEntryForm({
                               }
                             }, 200);
                           }}
-                          className="h-8"
+                          className="h-8 w-full"
                         />
                       </TableCell>
                       <TableCell className="p-1">
@@ -916,8 +1146,9 @@ export function BulkInwardEntryForm({
                       <TableCell className="p-1">
                         <Input
                           ref={(el) => setCellRef(`${rowKey}:mfgDate`, el)}
-                          type="date"
-                          value={row.mfgDate}
+                          type="text"
+                          placeholder="dd-mm-yyyy"
+                          value={isoDateToUiDate(row.mfgDate)}
                           onChange={(e) => handleRowChange(idx, 'mfgDate', e.target.value)}
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') {
@@ -925,14 +1156,15 @@ export function BulkInwardEntryForm({
                               tryAdvanceOnEnter(idx, 'mfgDate');
                             }
                           }}
-                          className="h-8"
+                          className="h-8 w-full"
                         />
                       </TableCell>
                       <TableCell className="p-1">
                         <Input
                           ref={(el) => setCellRef(`${rowKey}:expDate`, el)}
-                          type="date"
-                          value={row.expDate}
+                          type="text"
+                          placeholder="dd-mm-yyyy"
+                          value={isoDateToUiDate(row.expDate)}
                           onChange={(e) => handleRowChange(idx, 'expDate', e.target.value)}
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') {
@@ -940,7 +1172,7 @@ export function BulkInwardEntryForm({
                               tryAdvanceOnEnter(idx, 'expDate');
                             }
                           }}
-                          className="h-8"
+                          className="h-8 w-full"
                         />
                       </TableCell>
                       <TableCell className="p-1">
@@ -973,6 +1205,62 @@ export function BulkInwardEntryForm({
                             ))}
                           </SelectContent>
                         </Select>
+                      </TableCell>
+                      <TableCell className="p-1">
+                        {(() => {
+                          const selectedChamber = chambers.find(c => c.id === row.chamberId);
+                          const hasRooms = selectedChamber?.rooms && selectedChamber.rooms.length > 0;
+                          
+                          if (!hasRooms) {
+                            return <Input value="" readOnly className="h-8" />;
+                          }
+                          
+                          return (
+                            <Select
+                              value={row.roomId || ''}
+                              onValueChange={(val) => handleRowChange(idx, 'roomId', val)}
+                            >
+                              <SelectTrigger className="h-8">
+                                <SelectValue placeholder="Select" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {selectedChamber.rooms?.map((room) => (
+                                  <SelectItem key={room.roomId} value={room.roomId}>
+                                    {room.roomName}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          );
+                        })()}
+                      </TableCell>
+                      <TableCell className="p-1">
+                        {(() => {
+                          const selectedChamber = chambers.find(c => c.id === row.chamberId);
+                          const selectedRoom = selectedChamber?.rooms?.find(r => r.roomId === row.roomId);
+                          
+                          if (!selectedRoom) {
+                            return <Input value="" readOnly className="h-8" placeholder="" />;
+                          }
+                          
+                          return (
+                            <Select
+                              value={row.blockId || ''}
+                              onValueChange={(val) => handleRowChange(idx, 'blockId', val)}
+                            >
+                              <SelectTrigger className="h-8">
+                                <SelectValue placeholder="Select" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {selectedRoom.blocks.map((block) => (
+                                  <SelectItem key={block.blockId} value={block.blockId}>
+                                    {block.blockName}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          );
+                        })()}
                       </TableCell>
                       <TableCell className="p-1">
                         <Input
@@ -1090,6 +1378,11 @@ export function BulkInwardEntryForm({
               <Button type="button" onClick={handleSave}>
                 {mode === 'edit' ? 'Update Entry' : 'Save Entry'}
               </Button>
+              {mode === 'edit' && (
+                <Button type="button" variant="outline" onClick={() => clearForNewEntry()}>
+                  Cancel
+                </Button>
+              )}
             </div>
 
             <div className="text-xs text-muted-foreground">
@@ -1100,18 +1393,36 @@ export function BulkInwardEntryForm({
         )}
 
         {mode !== 'clientView' && (
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-12">
-            <div className="md:col-span-8">
+          <div className={`grid gap-4 ${mode === 'edit' ? 'grid-cols-1 lg:grid-cols-[2fr_1.75fr_1.25fr]' : 'grid-cols-1 lg:grid-cols-[2fr_1fr]'}`}>
+            <div className="flex flex-col gap-2">
               <Label>Notes</Label>
-              <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} />
+              <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} className="min-h-[100px]" />
             </div>
-            <div className="md:col-span-4">
-              <div className="rounded-md border p-3 text-xs">
-                <div className="font-semibold">Summary</div>
-                <div className="mt-2 space-y-1 text-muted-foreground">
-                  <div>Date: {voucherDate}</div>
-                  <div>Entered By: {user?.name ?? '—'}</div>
-                </div>
+            
+            {mode === 'edit' && (
+              <div className="flex flex-col gap-2">
+                <Label>Update Reason *</Label>
+                <Textarea 
+                  value={updateReason} 
+                  onChange={(e) => setUpdateReason(e.target.value)}
+                  placeholder="Please provide a reason for this update..."
+                  className="min-h-[100px]"
+                />
+              </div>
+            )}
+            
+            <div className="rounded-md border p-3 text-xs h-full">
+              <div className="font-semibold">Summary</div>
+              <div className="mt-2 space-y-1 text-muted-foreground">
+                <div>Date: {voucherDate}</div>
+                <div>Entered By: {currentVoucher?.createdByName ?? currentVoucher?.enteredBy ?? '—'}</div>
+                {currentVoucher?.updatedByName && (
+                  <>
+                    <div>Last Updated By: {currentVoucher.updatedByName}</div>
+                    <div>Updated At: {currentVoucher.updatedAt ? new Date(currentVoucher.updatedAt).toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}</div>
+                    {currentVoucher.updateReason && <div>Reason: {currentVoucher.updateReason}</div>}
+                  </>
+                )}
               </div>
             </div>
           </div>

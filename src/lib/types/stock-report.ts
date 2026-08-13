@@ -112,6 +112,8 @@ export interface InwardVoucherItem {
   brand: string;
   batch: string;
   chamberId: string;
+  roomId?: string;             // Optional room reference for Chamber → Room → Block structure
+  blockId?: string;            // Optional block reference for Chamber → Room → Block structure
   bags: number | '';
   unit: string;
   bagWeight: number | '';
@@ -125,6 +127,14 @@ export interface InwardVoucher {
   clientName: string;
   date: string;
   items: InwardVoucherItem[];
+  // Audit fields
+  createdById?: string;
+  createdByName?: string;
+  createdAt?: string;
+  updatedById?: string;
+  updatedByName?: string;
+  updatedAt?: string;
+  updateReason?: string;
 }
 
 export interface OutwardVoucherItem {
@@ -133,6 +143,8 @@ export interface OutwardVoucherItem {
   brand: string;
   batch: string;
   chamberId: string;
+  roomId?: string;             // Optional room reference for Chamber → Room → Block structure
+  blockId?: string;            // Optional block reference for Chamber → Room → Block structure
   qty: number | '';
   bags: number | '';
   bagWeight: number | '';
@@ -149,4 +161,12 @@ export interface OutwardVoucher {
   clientName: string;
   date: string;
   items: OutwardVoucherItem[];
+  // Audit fields
+  createdById?: string;
+  createdByName?: string;
+  createdAt?: string;
+  updatedById?: string;
+  updatedByName?: string;
+  updatedAt?: string;
+  updateReason?: string;
 }
