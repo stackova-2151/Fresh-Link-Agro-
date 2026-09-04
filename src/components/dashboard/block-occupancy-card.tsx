@@ -7,66 +7,53 @@ interface BlockOccupancyCardProps {
   onClick?: () => void;
 }
 
+/** Dot color class — kept in sync with status thresholds below. */
+export function getBlockDotColor(percent: number): string {
+  if (percent === 0)   return 'bg-gray-300';
+  if (percent < 50)    return 'bg-teal-400';
+  if (percent <= 85)   return 'bg-amber-400';
+  return 'bg-red-500';
+}
+
+/** Returns { cardClass, textColor } driven by the same thresholds as the dot. */
+function getBlockStatus(percent: number): { cardClass: string; textColor: string } {
+  if (percent === 0)   return { cardClass: 'status-card--empty',    textColor: 'hsl(var(--muted-foreground))' };
+  if (percent < 50)    return { cardClass: 'status-card--normal',   textColor: '#0F6E56' };
+  if (percent <= 85)   return { cardClass: 'status-card--near-full', textColor: '#B87503' };
+  return               { cardClass: 'status-card--full',    textColor: '#B42318' };
+}
+
 export function BlockOccupancyCard({ block, onClick }: BlockOccupancyCardProps) {
-  const isEmpty = block.occupiedMT === 0;
-  const isFull = block.occupancyPercent >= 95;
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'Empty': return 'bg-green-500';
-      case 'Available': return 'bg-green-400';
-      case 'Moderate': return 'bg-yellow-400';
-      case 'High': return 'bg-orange-400';
-      case 'Near Full': return 'bg-red-400';
-      case 'Full': return 'bg-red-600';
-      default: return 'bg-gray-400';
-    }
-  };
-
-  const getOccupancyColor = (percent: number) => {
-    if (percent < 25) return 'bg-green-500';
-    if (percent < 50) return 'bg-yellow-500';
-    if (percent < 75) return 'bg-orange-500';
-    return 'bg-red-500';
-  };
+  const isEmpty  = block.occupiedMT === 0;
+  const dotColor = getBlockDotColor(block.occupancyPercent);
+  const { cardClass, textColor } = getBlockStatus(block.occupancyPercent);
 
   return (
-    <Card 
-      className={`hover:shadow-md transition-shadow cursor-pointer ${isEmpty ? 'bg-muted/30' : ''}`}
+    <Card
+      className={`cursor-pointer ${cardClass}`}
       onClick={onClick}
     >
-      <CardContent className="p-3 space-y-2">
+      <CardContent className="p-4 space-y-2">
+        {/* Header row */}
         <div className="flex items-center justify-between">
           <span className="font-mono text-sm font-semibold">{block.blockName}</span>
-          <div className={`w-2 h-2 rounded-full ${getStatusColor(block.status)}`} />
+          <div className={`w-2.5 h-2.5 rounded-full ${dotColor}`} />
         </div>
 
-        <div className="space-y-1">
-          <div className="text-xs text-muted-foreground">
-            {block.occupiedMT.toFixed(2)} MT
-          </div>
-          <div className="text-xs text-muted-foreground">
-            / {block.capacityMT.toFixed(2)} MT
-          </div>
+        {/* MT values */}
+        <div className="text-xs text-muted-foreground leading-relaxed">
+          <span>{block.occupiedMT.toFixed(2)} MT</span>
+          <span className="mx-1">/</span>
+          <span>{block.capacityMT.toFixed(2)} MT</span>
         </div>
 
-        {!isEmpty && (
-          <>
-            <Progress 
-              value={Math.min(block.occupancyPercent, 100)} 
-              className="h-1"
-            />
-            <div className="text-xs font-medium text-muted-foreground">
-              {block.occupancyPercent.toFixed(1)}%
-            </div>
-          </>
-        )}
+        {/* Progress bar — always rendered for visual rhythm */}
+        <Progress value={Math.min(block.occupancyPercent, 100)} />
 
-        {isEmpty && (
-          <div className="text-xs font-medium text-muted-foreground">
-            Empty
-          </div>
-        )}
+        {/* Percentage / Empty label — status-colored */}
+        <div className="text-xs font-medium" style={{ color: textColor }}>
+          {isEmpty ? 'Empty' : `${block.occupancyPercent.toFixed(1)}%`}
+        </div>
       </CardContent>
     </Card>
   );

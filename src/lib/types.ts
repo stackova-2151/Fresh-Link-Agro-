@@ -4,6 +4,13 @@ import type { Room } from './types/room-block';
 export type UserRole = 'MASTER_ADMIN' | 'ADMIN' | 'SUB_ADMIN';
 export type UserStatus = 'ACTIVE' | 'INACTIVE';
 
+// Permission constants
+export const PERMISSIONS = {
+  ENTRY_APPROVALS: 'entryApprovals',
+} as const;
+
+export type PermissionKey = typeof PERMISSIONS[keyof typeof PERMISSIONS];
+
 export type User = {
   id: string;          // Firestore document ID (= Firebase Auth UID after migration)
   uid?: string;        // Firebase Auth UID — same as id after migration
@@ -15,6 +22,7 @@ export type User = {
   avatar?: string;
   role: UserRole;
   status?: UserStatus;
+  permissions?: string[]; // Optional array of permission keys
   createdBy?: string;
   createdAt?: string;
   updatedAt?: string;
@@ -59,9 +67,9 @@ export type RentalItem = {
   outwardQuantity: number;
   quantityAvailable: number; // Balance Qty
   unit: string;
-  inwardWeight: number;        // KG - UNCHANGED
-  outwardWeight: number;       // KG - UNCHANGED
-  balanceWeight: number;        // KG - UNCHANGED
+  inwardWeight: number;        
+  outwardWeight: number;       
+  balanceWeight: number;      
   expiryDate: Date;
   storageDate: Date;
   temperatureRange: string;
@@ -74,6 +82,7 @@ export type RentalItem = {
   blockId?: string;            // Optional block reference for Chamber → Room → Block structure
   driverName?: string;
   vehicleNumber?: string;
+  stockAppliedApprovalRequestId?: string; // Idempotency marker for outward stock deduction
   boxDimensions?: {
     length: number;
     width: number;

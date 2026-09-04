@@ -4,39 +4,63 @@
 
 @layer base {
   :root {
-    --background: 240deg 5% 96.1%; /* #F0F0F0 - very light gray */
+    /* Motion tokens */
+    --dur-fast:  0.15s;
+    --dur-base:  0.18s;
+    --dur-slow:  0.25s;
+    --dur-progress: 0.9s;
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+
+    /* Teal palette tokens */
+    --teal-900: #04342C;
+    --teal-800: #085041;
+    --teal-600: #0F6E56;
+    --teal-400: #1D9E75;
+    --teal-200: #5DCAA5;
+    --teal-100: #9FE1CB;
+    --teal-50:  #E1F5EE;
+
+    --background: 240deg 5% 96.1%;
     --foreground: 224deg 71.4% 4.1%;
     --card: 0deg 0% 100%;
     --card-foreground: 224deg 71.4% 4.1%;
     --popover: 0deg 0% 100%;
     --popover-foreground: 224deg 71.4% 4.1%;
-    --primary: 210deg 40% 50%; /* #6699CC - muted blue */
-    --primary-foreground: 355.7deg 100% 97.3%;
+    --primary: 161deg 74% 24%;   /* teal-600 #0F6E56 */
+    --primary-foreground: 0deg 0% 100%;
     --secondary: 220deg 14.3% 95.9%;
     --secondary-foreground: 220.9deg 39.3% 11%;
     --muted: 220deg 14.3% 95.9%;
     --muted-foreground: 220deg 8.9% 46.1%;
-    --accent: 28deg 80% 65%; /* #E6A866 - soft orange */
-    --accent-foreground: 24deg 9.8% 10%;
+    --accent: 161deg 57% 93%;    /* teal-50 #E1F5EE */
+    --accent-foreground: 161deg 74% 17%; /* teal-800 #085041 */
     --destructive: 0deg 84.2% 60.2%;
     --destructive-foreground: 0deg 0% 98%;
     --border: 220deg 13% 91%;
     --input: 220deg 13% 91%;
-    --ring: 224deg 71.4% 4.1%;
+    --ring: 161deg 74% 24%;      /* teal-600 */
     --radius: 0.5rem;
-    --chart-1: 210deg 40% 50%;
-    --chart-2: 28deg 80% 65%;
-    --chart-3: 173deg 58% 39%;
+    --chart-1: 161deg 74% 24%;   /* teal-600 */
+    --chart-2: 161deg 67% 37%;   /* teal-400 */
+    --chart-3: 161deg 57% 56%;   /* teal-200 */
     --chart-4: 43deg 74% 66%;
     --chart-5: 27deg 87% 67%;
-    --sidebar-background: 0deg 0% 98%;
-    --sidebar-foreground: 240deg 5.3% 26.1%;
-    --sidebar-primary: 240deg 5.9% 10%;
-    --sidebar-primary-foreground: 0deg 0% 98%;
-    --sidebar-accent: 240deg 4.8% 95.9%;
-    --sidebar-accent-foreground: 240deg 5.9% 10%;
-    --sidebar-border: 220deg 13% 91%;
-    --sidebar-ring: 217.2deg 91.2% 59.8%;
+    /* Sidebar — deep teal */
+    --sidebar-background: 161deg 82% 11%;  /* teal-900 #04342C */
+    --sidebar-foreground: 161deg 57% 75%;  /* teal-200 #5DCAA5 */
+    --sidebar-primary: 161deg 74% 24%;     /* teal-600 — active item bg */
+    --sidebar-primary-foreground: 161deg 57% 93%; /* teal-50 */
+    --sidebar-accent: 161deg 74% 17%;      /* teal-800 — hover */
+    --sidebar-accent-foreground: 161deg 57% 93%; /* teal-50 */
+    --sidebar-border: 161deg 74% 17%;      /* teal-800 */
+    --sidebar-ring: 161deg 74% 24%;        /* teal-600 */
+
+    /* Semantic surface / text tokens */
+    --surface-1:      220deg 14% 96%;   /* page bg — same as --background */
+    --surface-2:      220deg 13% 91%;   /* subtle card bg — same as --border */
+    --border-strong:  220deg 13% 78%;   /* stronger neutral border */
+    --text-muted:     220deg 9% 46%;    /* same as --muted-foreground */
+    --text-secondary: 220deg 9% 46%;    /* alias for --muted-foreground */
   }
 
   .dark {
@@ -46,32 +70,32 @@
     --card-foreground: 210deg 40% 98%;
     --popover: 222.2deg 84% 4.9%;
     --popover-foreground: 210deg 40% 98%;
-    --primary: 210deg 40% 60%;
-    --primary-foreground: 210deg 40% 98%;
+    --primary: 161deg 74% 37%;   /* teal-400 */
+    --primary-foreground: 0deg 0% 100%;
     --secondary: 217.2deg 32.6% 17.5%;
     --secondary-foreground: 210deg 40% 98%;
     --muted: 217.2deg 32.6% 17.5%;
     --muted-foreground: 215deg 20.2% 65.1%;
-    --accent: 28deg 80% 70%;
-    --accent-foreground: 24deg 9.8% 10%;
+    --accent: 161deg 74% 17%;    /* teal-800 */
+    --accent-foreground: 161deg 57% 93%; /* teal-50 */
     --destructive: 0deg 62.8% 30.6%;
     --destructive-foreground: 0deg 0% 98%;
     --border: 217.2deg 32.6% 17.5%;
     --input: 217.2deg 32.6% 17.5%;
-    --ring: 212.7deg 26.8% 83.9%;
-    --chart-1: 210deg 40% 60%;
-    --chart-2: 28deg 80% 70%;
-    --chart-3: 173deg 58% 49%;
+    --ring: 161deg 74% 37%;
+    --chart-1: 161deg 74% 37%;
+    --chart-2: 161deg 67% 50%;
+    --chart-3: 161deg 57% 65%;
     --chart-4: 43deg 74% 56%;
     --chart-5: 27deg 87% 57%;
-    --sidebar-background: 240deg 5.9% 10%;
-    --sidebar-foreground: 240deg 4.8% 95.9%;
-    --sidebar-primary: 224.3deg 76.3% 48%;
-    --sidebar-primary-foreground: 0deg 0% 100%;
-    --sidebar-accent: 240deg 3.7% 15.9%;
-    --sidebar-accent-foreground: 240deg 4.8% 95.9%;
-    --sidebar-border: 240deg 3.7% 15.9%;
-    --sidebar-ring: 217.2deg 91.2% 59.8%;
+    --sidebar-background: 161deg 82% 11%;  /* teal-900 */
+    --sidebar-foreground: 161deg 57% 75%;  /* teal-200 */
+    --sidebar-primary: 161deg 74% 24%;     /* teal-600 */
+    --sidebar-primary-foreground: 161deg 57% 93%;
+    --sidebar-accent: 161deg 74% 17%;      /* teal-800 */
+    --sidebar-accent-foreground: 161deg 57% 93%;
+    --sidebar-border: 161deg 74% 17%;
+    --sidebar-ring: 161deg 74% 24%;
   }
 }
 
@@ -81,5 +105,366 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+
+  /* Sidebar submenu inactive items — teal-100 for legibility on dark bg */
+  [data-sidebar="menu-sub-button"]:not([data-active="true"]) {
+    color: #9FE1CB; /* teal-100 */
+  }
+}
+
+/* ─── Shared motion utilities ─────────────────────────────────────────────── */
+@layer components {
+  /*
+   * .card-interactive
+   * Apply to any card that is clickable or expandable.
+   * Gives: lift on hover, soft shadow, border accent, smooth transition.
+   */
+  .card-interactive {
+    transition:
+      transform  var(--dur-base) var(--ease-out),
+      box-shadow var(--dur-base) var(--ease-out),
+      border-color var(--dur-base) var(--ease-out);
+    cursor: pointer;
+  }
+  .card-interactive:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    border-color: #0F6E56; /* teal-600 */
+  }
+
+  /*
+   * .btn-motion
+   * Added to every Button — smooth bg/color fill transition + pressed scale.
+   */
+  .btn-motion {
+    transition:
+      background-color var(--dur-base) ease,
+      color           var(--dur-base) ease,
+      border-color    var(--dur-base) ease,
+      transform       var(--dur-fast) ease;
+  }
+  .btn-motion:active {
+    transform: scale(0.98);
+  }
+
+  /*
+   * .icon-nudge
+   * Wrap a trailing arrow/chevron icon in this to get a 3px rightward nudge
+   * when the parent button is hovered. Use on the icon element itself.
+   */
+  .icon-nudge {
+    transition: transform var(--dur-base) ease;
+  }
+  *:hover > .icon-nudge,
+  button:hover .icon-nudge,
+  a:hover .icon-nudge {
+    transform: translateX(3px);
+  }
+
+  /*
+   * .chevron-rotate
+   * Single chevron that rotates 180° when data-open="true" is set on it.
+   */
+  .chevron-rotate {
+    transition: transform var(--dur-slow) ease;
+  }
+  .chevron-rotate[data-open="true"] {
+    transform: rotate(180deg);
+  }
+
+  /*
+   * .progress-animated
+   * Applied to the Radix Progress indicator — animates width on mount/change.
+   * Uses width instead of translateX so the fill visually grows from left.
+   */
+  .progress-animated {
+    transition: width var(--dur-progress) var(--ease-out);
+  }
+
+  /*
+   * Sidebar nav item hover — smooth bg fade on inactive items.
+   * Targets the shadcn sidebar menu button data attribute.
+   */
+  [data-sidebar="menu-button"]:not([data-active="true"]),
+  [data-sidebar="menu-sub-button"]:not([data-active="true"]) {
+    transition: background-color var(--dur-fast) ease, color var(--dur-fast) ease;
+  }
+
+  /* ─── Form field shared styles ─────────────────────────────────────────────── */
+
+  /*
+   * .form-field
+   * Shared resting + focus styles for every text input, select trigger,
+   * and textarea. Apply alongside existing Tailwind classes.
+   * Resting: neutral border (--border token).
+   * Focus:   teal-600 border + soft teal glow ring.
+   */
+  .form-field {
+    border-color: hsl(var(--border));
+    transition:
+      border-color var(--dur-fast) ease,
+      box-shadow   var(--dur-fast) ease;
+  }
+  .form-field:focus,
+  .form-field:focus-visible,
+  .form-field[data-state="open"] {
+    outline: none;
+    border-color: #0F6E56;                          /* teal-600 */
+    box-shadow: 0 0 0 3px rgba(15, 110, 86, 0.15);  /* teal-600 @ 15% */
+  }
+
+  /*
+   * .form-label
+   * Consistent label style: 14px / medium weight / 6px bottom gap.
+   */
+  .form-label {
+    font-size: 0.875rem;   /* 14px */
+    font-weight: 500;
+    color: hsl(var(--foreground));
+    margin-bottom: 0.375rem; /* 6px */
+    display: block;
+  }
+
+  /*
+   * .required-star
+   * Red asterisk for required field labels.
+   */
+  .required-star {
+    color: #E24B4A;
+    margin-left: 0.2em;
+  }
+
+  /*
+   * .form-stack
+   * Consistent vertical gap between stacked form fields.
+   */
+  .form-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem; /* 20px */
+  }
+
+  /* Calendar/date icon inside date pickers — teal-600 at rest */
+  [data-date-icon] {
+    color: #0F6E56; /* teal-600 */
+  }
+
+  /* ─── Read-only / display-only value badge ──────────────────────────────── */
+  /*
+   * .display-badge
+   * Replaces input-box styling for read-only values so they don't look
+   * like empty editable fields.
+   */
+  .display-badge {
+    display: inline-block;
+    background: hsl(var(--secondary));
+    border-radius: var(--radius);
+    padding: 4px 10px;
+    font-size: 12px;
+    line-height: 1.4;
+    color: hsl(var(--foreground));
+  }
+  /* Missing / "NOT PROVIDED" variant — muted so it reads as "no data" */
+  .display-badge-empty {
+    display: inline-block;
+    background: hsl(var(--secondary));
+    border-radius: var(--radius);
+    padding: 4px 10px;
+    font-size: 12px;
+    line-height: 1.4;
+    color: hsl(var(--muted-foreground));
+  }
+
+  /* ─── Data table shared styles ───────────────────────────────────────────── */
+  /*
+   * .table-row-hover
+   * Apply to <TableRow> elements that are interactive (clickable / have inputs).
+   * Reuses v3 motion token for the transition.
+   */
+  .table-row-hover {
+    transition: background-color var(--dur-fast) ease;
+  }
+  .table-row-hover:hover {
+    background-color: #E1F5EE; /* teal-50 */
+  }
+
+  /*
+   * .cell-editable
+   * Editable table cell input — white bg, visible border, normal text.
+   */
+  .cell-editable input {
+    background: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+    color: hsl(var(--foreground));
+  }
+
+  /*
+   * .cell-readonly
+   * Calculated / non-editable table cell — muted bg, no active border.
+   */
+  .cell-readonly {
+    background: hsl(var(--secondary));
+    color: hsl(var(--muted-foreground));
+    border-radius: calc(var(--radius) - 2px);
+    padding: 4px 8px;
+    font-size: 0.875rem;
+  }
+
+  /* ─── Kebab / overflow menu icon ─────────────────────────────────────────── */
+  /*
+   * .kebab-btn
+   * Ghost button wrapping the ⋯ icon — teal-600 icon at rest,
+   * teal-50 circle on hover.
+   *
+   * Global fallback: any ghost-variant icon-only button (h-8 w-8)
+   * also inherits teal-600 so all kebab menus stay consistent.
+   */
+  .kebab-btn {
+    color: #0F6E56; /* teal-600 */
+    transition: background-color var(--dur-fast) ease;
+  }
+  .kebab-btn:hover {
+    background-color: #E1F5EE; /* teal-50 */
+    border-radius: 50%;
+  }
+  /* Catch-all for ghost h-8 w-8 kebab buttons not yet given .kebab-btn */
+  [data-kebab-trigger] {
+    color: #0F6E56;
+    transition: background-color var(--dur-fast) ease;
+  }
+  [data-kebab-trigger]:hover {
+    background-color: #E1F5EE;
+    border-radius: 50%;
+  }
+
+  /* ─── Native date input calendar icon — teal-600 (A3) ─────────────────────────── */
+  /*
+   * .date-input-teal
+   * Applied to <input type="date"> fields. Tints the browser-native
+   * calendar picker indicator to teal-600 via filter (works in Chromium;
+   * Firefox/Safari ignore the pseudo-element but degrade gracefully).
+   */
+  .date-input-teal::-webkit-calendar-picker-indicator {
+    filter: invert(28%) sepia(60%) saturate(600%) hue-rotate(130deg) brightness(85%);
+    cursor: pointer;
+  }
+
+  /* ─── Room config card — consistent border ───────────────────────────────── */
+  /*
+   * .room-card
+   * All room cards in the Add Chamber modal get the same neutral resting style.
+   * Focus-within applies the teal border dynamically to whichever card is active.
+   */
+  .room-card {
+    border: 1px solid hsl(var(--border));
+    border-radius: 12px;
+    transition: border-color var(--dur-fast) ease;
+  }
+  .room-card:focus-within {
+    border-color: #0F6E56; /* teal-600 */
+  }
+
+  /* ─── Block status cards ──────────────────────────────────────────────────── */
+  /*
+   * Four variants driven by occupancy %.
+   * Each applies a light background tint + 1.5px full-perimeter border in the
+   * matching status color, replacing the card's neutral border entirely.
+   * Corner radius (12px from base Card) is preserved.
+   * The :hover override below prevents .card-interactive from clobbering
+   * the status border color when the user hovers.
+   */
+  .status-card--empty {
+    background-color: hsl(var(--surface-2));
+    border: 1.5px solid hsl(var(--border-strong));
+  }
+  .status-card--empty.card-interactive:hover {
+    border-color: hsl(var(--border-strong));
+  }
+
+  .status-card--normal {
+    background-color: #F0FAF6;
+    border: 1.5px solid #1D9E75; /* teal-400 */
+  }
+  .status-card--normal.card-interactive:hover {
+    border-color: #1D9E75;
+  }
+
+  .status-card--near-full {
+    background-color: #FFF9EC;
+    border: 1.5px solid #EF9F27; /* amber */
+  }
+  .status-card--near-full.card-interactive:hover {
+    border-color: #EF9F27;
+  }
+
+  .status-card--full {
+    background-color: #FEF2F2;
+    border: 1.5px solid #E24B4A; /* red */
+  }
+  .status-card--full.card-interactive:hover {
+    border-color: #E24B4A;
+  }
+
+  /* ─── Modal backdrop ────────────────────────────────────────────────────────
+   * Replaces the default black/80 scrim on every Dialog and AlertDialog.
+   * Teal-tinted dark overlay at moderate opacity — lighter and on-brand
+   * vs. a generic black scrim. Applied via the [data-radix-dialog-overlay]
+   * and [data-radix-alert-dialog-overlay] attribute selectors so it catches
+   * every current and future modal without per-instance class additions.
+   */
+  [data-radix-dialog-overlay],
+  [data-radix-alert-dialog-overlay] {
+    background: rgba(4, 52, 44, 0.45); /* teal-900 @ 45% */
+  }
+
+  /* ─── Pill tab switcher ───────────────────────────────────────────────────── */
+  /*
+   * .tab-switcher — apply to <TabsList>.
+   * Overrides shadcn defaults; tab-switch logic is untouched.
+   */
+  .tab-switcher {
+    background-color: hsl(var(--secondary));
+    border-radius: 10px;
+    padding: 4px;
+    display: inline-flex;
+    gap: 4px;
+    height: auto;
+  }
+  .tab-switcher [role="tab"] {
+    background: transparent;
+    color: hsl(var(--muted-foreground));
+    font-weight: 500;
+    font-size: 0.875rem;
+    padding: 8px 20px;
+    border-radius: 7px;
+    border: none;
+    cursor: pointer;
+    box-shadow: none;
+    transition:
+      background-color var(--dur-base) ease,
+      color            var(--dur-base) ease;
+  }
+  .tab-switcher [role="tab"]:not([data-state="active"]):hover {
+    background-color: rgba(15, 110, 86, 0.08);
+    color: #0F6E56;
+  }
+  .tab-switcher [role="tab"][data-state="active"] {
+    background-color: #0F6E56;
+    color: #FFFFFF;
+    font-weight: 600;
+    box-shadow: none;
+  }
+}
+
+/* ─── Reduced-motion override ─────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

@@ -15,13 +15,52 @@ import {
     getDocs,
     doc,
     setDoc,
+    getDoc,
 } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
+import { hasEntryApprovalsPermission } from "@/lib/utils";
+import { approvalService } from "@/lib/services/approval.service";
+import { executeInwardUpdate } from "@/lib/services/inward-update.service";
+import type { InwardVoucher as StockReportInwardVoucher } from "@/lib/types/stock-report";
 
 const VOUCHERS_COLLECTION = "inwardVouchers";
 
 function createId(prefix: string) {
     return `${prefix}_${Math.random().toString(16).slice(2)}_${Date.now()}`;
+}
+
+/**
+ * Convert form InwardVoucher to stock-report InwardVoucher for approval requests
+ */
+function convertToStockReportVoucher(voucher: InwardVoucher): StockReportInwardVoucher {
+    return {
+        id: voucher.id,
+        inwardNo: voucher.inwardNo,
+        clientId: voucher.clientId,
+        clientName: voucher.clientName,
+        date: voucher.date,
+        items: voucher.items.map(item => ({
+            id: item.id,
+            itemName: item.itemName,
+            brand: item.brand,
+            batch: item.batch,
+            chamberId: item.chamberId,
+            roomId: item.roomId,
+            blockId: item.blockId,
+            bags: item.bags,
+            unit: item.unit,
+            bagWeight: item.bagWeight,
+            totalWeight: item.totalWeight,
+            rentalItemId: item.rentalItemId,
+        })),
+        createdById: voucher.createdById,
+        createdByName: voucher.createdByName,
+        createdAt: voucher.createdAt,
+        updatedById: voucher.updatedById,
+        updatedByName: voucher.updatedByName,
+        updatedAt: voucher.updatedAt,
+        updateReason: voucher.updateReason,
+    };
 }
 
 async function loadVouchersFromFirestore(): Promise<InwardVoucher[]> {
@@ -35,9 +74,17 @@ async function loadVouchersFromFirestore(): Promise<InwardVoucher[]> {
     }
 }
 
-async function saveVoucherToFirestore(voucher: InwardVoucher): Promise<void> {
+async function saveVoucherToFirestore(voucher: InwardVoucher, currentVersion?: number): Promise<void> {
     const { id, ...rest } = voucher;
-    await setDoc(doc(db, VOUCHERS_COLLECTION, id), rest);
+    
+    // Calculate next version
+    const effectiveCurrentVersion = typeof currentVersion === 'number' ? currentVersion : 0;
+    const nextVersion = effectiveCurrentVersion + 1;
+    
+    await setDoc(doc(db, VOUCHERS_COLLECTION, id), {
+        ...rest,
+        version: nextVersion,
+    });
 }
 
 export default function InventoryPage() {
@@ -51,6 +98,9 @@ export default function InventoryPage() {
     const { user } = useUser();
     const router = useRouter();
     const { toast } = useToast();
+
+    // Check if user has direct update permission
+    const canDirectlyUpdate = hasEntryApprovalsPermission(user);
 
     useEffect(() => {
         async function fetchAll() {
@@ -86,117 +136,67 @@ export default function InventoryPage() {
         createdItems: RentalItem[];
     }) => {
         try {
-            console.log('Saving voucher to Firestore:', voucher.inwardNo);
+            // Check if user has direct update permission
+            const canDirectlyUpdate = hasEntryApprovalsPermission(user);
 
-            await saveVoucherToFirestore(voucher);
-            console.log('Voucher saved successfully');
+            // For edit mode without approval permission, create approval request
+            if (mode === 'edit' && !canDirectlyUpdate) {
+                const originalVoucherId = vouchers.find(
+                    (v) => v.inwardNo.toUpperCase() === voucher.inwardNo.toUpperCase()
+                )?.id;
+
+                if (!originalVoucherId) {
+                    toast({ variant: "destructive", title: "Original voucher not found", description: "Cannot create approval request without original voucher data" });
+                    return;
+                }
+
+                const voucherSnap = await getDoc(doc(db, VOUCHERS_COLLECTION, originalVoucherId));
+                if (!voucherSnap.exists()) {
+                    toast({ variant: "destructive", title: "Original voucher not found", description: "Cannot create approval request without original voucher data" });
+                    return;
+                }
+
+                const originalVoucherData = { id: voucherSnap.id, ...voucherSnap.data() } as InwardVoucher;
+
+                const result = await approvalService.createApprovalRequest({
+                    entryType: 'INWARD',
+                    entryId: originalVoucherData.id,
+                    entryNumber: originalVoucherData.inwardNo,
+                    originalData: convertToStockReportVoucher(originalVoucherData),
+                    requestedData: convertToStockReportVoucher(voucher),
+                    requestReason: voucher.updateReason || '',
+                    requester: { id: user?.id || '', name: user?.name || 'Unknown', role: user?.role || 'SUB_ADMIN' },
+                });
+
+                if (!result.success) {
+                    toast({ variant: "destructive", title: "Failed to create approval request", description: result.error || 'Unknown error' });
+                    return;
+                }
+
+                toast({ title: "Update request submitted successfully", description: "Your request is pending approval." });
+                setVouchers((prev) => {
+                    const idx = prev.findIndex((v) => v.inwardNo.toUpperCase() === voucher.inwardNo.toUpperCase());
+                    if (idx === -1) return prev;
+                    const next = [...prev];
+                    next[idx] = voucher;
+                    return next;
+                });
+                return;
+            }
+
+            const currentVersion = mode === 'edit'
+                ? vouchers.find((v) => v.inwardNo.toUpperCase() === voucher.inwardNo.toUpperCase())?.version
+                : undefined;
+            await saveVoucherToFirestore(voucher, currentVersion);
 
             if (mode === 'edit') {
-                const inwardNoUpper = voucher.inwardNo.toUpperCase();
-                const existingRentalItems = rentalItems.filter(
-                    (i) => i.inwardNumber.toUpperCase() === inwardNoUpper
-                );
-
-                const findMatchingRentalItem = (row: typeof voucher.items[0]) => {
-                    return existingRentalItems.find(
-                        (item) =>
-                            item.name.trim().toLowerCase() === row.itemName.trim().toLowerCase() &&
-                            item.brand.trim().toLowerCase() === row.brand.trim().toLowerCase() &&
-                            item.batchNumber.trim() === row.batch.trim() &&
-                            item.chamberId === row.chamberId
-                    );
-                };
-
-                const usedRentalItemIds = new Set<string>();
-
-                for (const row of voucher.items) {
-                    const matchingItem = findMatchingRentalItem(row);
-
-                    if (matchingItem) {
-                        const qty = typeof row.bags === 'number' ? row.bags : 0;
-                        const wt = row.totalWeight;
-                        const exp = row.expDate ? new Date(row.expDate) : new Date(voucher.date);
-                        const storage = new Date(voucher.date);
-
-                        await rentalItemsService.update(matchingItem.id, {
-                            name: row.itemName.trim(),
-                            brand: row.brand.trim(),
-                            batchNumber: row.batch.trim(),
-                            chamberId: row.chamberId,
-                            roomId: row.roomId,
-                            blockId: row.blockId,
-                            inwardQuantity: qty,
-                            quantityAvailable: qty,
-                            unit: row.unit.trim().toUpperCase() || 'KG',
-                            inwardWeight: wt,
-                            balanceWeight: wt,
-                            expiryDate: exp,
-                            storageDate: storage,
-                            clientId: voucher.clientId,
-                            driverName: voucher.driverName,
-                            vehicleNumber: voucher.vehicleNo,
-                        });
-
-                        usedRentalItemIds.add(matchingItem.id);
-                    } else {
-                        const qty = typeof row.bags === 'number' ? row.bags : 0;
-                        const wt = row.totalWeight;
-                        const exp = row.expDate ? new Date(row.expDate) : new Date(voucher.date);
-                        const storage = new Date(voucher.date);
-                        const vendorId = vendors[0]?.id ?? 'vendor_01';
-
-                        const newItem: RentalItem = {
-                            id: createId('rental_item'),
-                            inwardNumber: voucher.inwardNo,
-                            name: row.itemName.trim(),
-                            brand: row.brand.trim(),
-                            batchNumber: row.batch.trim(),
-                            category: 'General',
-                            description: '',
-                            rentalRate: 0,
-                            rentalCycles: ['daily'],
-                            inwardQuantity: qty,
-                            outwardQuantity: 0,
-                            quantityAvailable: qty,
-                            unit: row.unit.trim().toUpperCase() || 'KG',
-                            inwardWeight: wt,
-                            outwardWeight: 0,
-                            balanceWeight: wt,
-                            expiryDate: exp,
-                            storageDate: storage,
-                            temperatureRange: '',
-                            vendorId,
-                            clientId: voucher.clientId,
-                            chamberId: row.chamberId,
-                            roomId: row.roomId,
-                            blockId: row.blockId,
-                            block: '',
-                            zone: '',
-                            driverName: voucher.driverName,
-                            vehicleNumber: voucher.vehicleNo,
-                            images: [],
-                            condition: 'Good',
-                        };
-
-                        await rentalItemsService.createWithId(newItem);
-                        usedRentalItemIds.add(newItem.id);
-                    }
-                }
-
-                for (const existingItem of existingRentalItems) {
-                    if (!usedRentalItemIds.has(existingItem.id)) {
-                        await rentalItemsService.delete(existingItem.id);
-                    }
-                }
-
+                await executeInwardUpdate(voucher, rentalItems, vendors);
                 const updatedItems = await rentalItemsService.getAll();
                 setRentalItems(updatedItems);
             } else {
-                console.log('Saving rental items:', createdItems.length);
                 for (const item of createdItems) {
                     await rentalItemsService.createWithId(item);
                 }
-                console.log('All items saved successfully');
                 setRentalItems((prev) => [...createdItems, ...prev]);
             }
 
@@ -241,6 +241,7 @@ export default function InventoryPage() {
                 vouchers={vouchers}
                 onVoucherNoChange={setActiveInwardNo}
                 onUpsert={handleUpsert}
+                canDirectlyUpdate={canDirectlyUpdate}
             />
         </div>
     );

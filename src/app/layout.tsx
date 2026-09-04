@@ -24,7 +24,7 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className={cn('font-body antialiased min-h-screen bg-background')} suppressHydrationWarning>
+      <body className={cn('font-body antialiased min-h-screen bg-background print:min-h-0 print:h-auto')} suppressHydrationWarning>
         <UserProvider>
           {children}
         </UserProvider>

@@ -11,14 +11,11 @@ import { useToast } from '@/hooks/use-toast';
 
 import {
   collection,
-  doc,
   getDocs,
-  setDoc,
   query,
-  where,
   orderBy,
-  increment,
-  updateDoc,
+  doc,
+  getDoc,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { clientsService, chambersService, rentalItemsService } from '@/lib/firestore';
@@ -29,8 +26,48 @@ import {
   type OutwardVoucher,
   type OutwardConsoleMode,
 } from '@/components/outward/bulk-outward-entry-form';
+import { hasEntryApprovalsPermission } from '@/lib/utils';
+import { approvalService } from '@/lib/services/approval.service';
+import { executeOutwardUpdate } from '@/lib/services/outward-update.service';
+import type { OutwardVoucher as StockReportOutwardVoucher } from '@/lib/types/stock-report';
 
 const OUTWARD_COLLECTION = 'outwardVouchers';
+
+/**
+ * Convert form OutwardVoucher to stock-report OutwardVoucher for approval requests
+ */
+function convertToStockReportVoucher(voucher: OutwardVoucher): StockReportOutwardVoucher {
+  return {
+    id: voucher.id,
+    outwardNo: voucher.outwardNo,
+    clientId: voucher.clientId,
+    clientName: voucher.clientName,
+    date: voucher.date,
+    items: voucher.items.map(item => ({
+      id: item.id,
+      itemName: item.itemName,
+      brand: item.brand,
+      batch: item.batch,
+      chamberId: item.chamberId,
+      roomId: item.roomId,
+      blockId: item.blockId,
+      qty: item.qty,
+      bags: item.bags,
+      bagWeight: item.bagWeight,
+      totalWeight: item.totalWeight,
+      inwardNumber: item.inwardNumber,
+      expDate: item.expDate,
+      sourceRentalItemId: item.sourceRentalItemId,
+    })),
+    createdById: voucher.createdById,
+    createdByName: voucher.createdByName,
+    createdAt: voucher.createdAt,
+    updatedById: voucher.updatedById,
+    updatedByName: voucher.updatedByName,
+    updatedAt: voucher.updatedAt,
+    updateReason: voucher.updateReason,
+  };
+}
 
 // ── Firestore helpers ─────────────────────────────────────────────────────────
 
@@ -43,54 +80,6 @@ async function loadOutwardVouchersFromFirestore(): Promise<OutwardVoucher[]> {
   } catch (err) {
     console.error('Failed to load outward vouchers:', err);
     return [];
-  }
-}
-
-async function saveOutwardVoucherToFirestore(voucher: OutwardVoucher): Promise<void> {
-  const { id, ...rest } = voucher;
-  await setDoc(doc(db, OUTWARD_COLLECTION, id), rest);
-}
-
-/**
- * Atomically deducts stock from rentalItems using Firestore increment().
- * This is safe for concurrent writes.
- */
-async function applyStockDeduction(
-  items: OutwardVoucher['items']
-): Promise<void> {
-  for (const row of items) {
-    if (!row.sourceRentalItemId) continue;
-    const bags = typeof row.bags === 'number' ? row.bags : 0;
-    const wt = row.totalWeight || 0;
-    if (bags <= 0) continue;
-
-    await updateDoc(doc(db, 'rentalItems', row.sourceRentalItemId), {
-      outwardQuantity: increment(bags),
-      quantityAvailable: increment(-bags),
-      outwardWeight: increment(wt),
-      balanceWeight: increment(-wt),
-    });
-  }
-}
-
-/**
- * Reverses a previous stock deduction (for edit mode).
- */
-async function reverseStockDeduction(
-  items: OutwardVoucher['items']
-): Promise<void> {
-  for (const row of items) {
-    if (!row.sourceRentalItemId) continue;
-    const bags = typeof row.bags === 'number' ? row.bags : 0;
-    const wt = row.totalWeight || 0;
-    if (bags <= 0) continue;
-
-    await updateDoc(doc(db, 'rentalItems', row.sourceRentalItemId), {
-      outwardQuantity: increment(-bags),
-      quantityAvailable: increment(bags),
-      outwardWeight: increment(-wt),
-      balanceWeight: increment(wt),
-    });
   }
 }
 
@@ -107,6 +96,9 @@ export default function OutwardRegisterPage() {
   const [vouchers, setVouchers] = useState<OutwardVoucher[]>([]);
   const [activeOutwardNo, setActiveOutwardNo] = useState<string>('');
   const [loading, setLoading] = useState(true);
+
+  // Check if user has direct update permission
+  const canDirectlyUpdate = hasEntryApprovalsPermission(user);
 
   useEffect(() => {
     async function fetchAll() {
@@ -138,21 +130,96 @@ export default function OutwardRegisterPage() {
     voucher: OutwardVoucher;
   }) => {
     try {
-      if (mode === 'edit') {
-        // Reverse previous stock deduction before applying new one
-        const existing = vouchers.find(
+      // Check if user has direct update permission
+      // For edit mode without approval permission, create approval request
+      if (mode === 'edit' && !canDirectlyUpdate) {
+        console.log('User does not have direct update permission, creating approval request');
+
+        // Get original voucher ID from local state
+        const originalVoucherId = vouchers.find(
           (v) => v.outwardNo.toUpperCase() === voucher.outwardNo.toUpperCase()
-        );
-        if (existing) {
-          await reverseStockDeduction(existing.items);
+        )?.id;
+
+        if (!originalVoucherId) {
+          toast({
+            variant: "destructive",
+            title: "Original voucher not found",
+            description: "Cannot create approval request without original voucher data",
+          });
+          return;
         }
+
+        // Fetch original voucher from Firestore (source of truth)
+        const voucherSnap = await getDoc(doc(db, OUTWARD_COLLECTION, originalVoucherId));
+        if (!voucherSnap.exists()) {
+          toast({
+            variant: "destructive",
+            title: "Original voucher not found",
+            description: "Cannot create approval request without original voucher data",
+          });
+          return;
+        }
+
+        const originalVoucherData = {
+          id: voucherSnap.id,
+          ...voucherSnap.data(),
+        } as OutwardVoucher;
+
+        // Create approval request
+        const result = await approvalService.createApprovalRequest({
+          entryType: 'OUTWARD',
+          entryId: originalVoucherData.id,
+          entryNumber: originalVoucherData.outwardNo,
+          originalData: convertToStockReportVoucher(originalVoucherData),
+          requestedData: convertToStockReportVoucher(voucher),
+          requestReason: voucher.updateReason || '',
+          requester: {
+            id: user?.id || '',
+            name: user?.name || 'Unknown',
+            role: user?.role || 'SUB_ADMIN',
+          },
+        });
+
+        if (!result.success) {
+          toast({
+            variant: "destructive",
+            title: "Failed to create approval request",
+            description: result.error || 'Unknown error',
+          });
+          return;
+        }
+
+        // Success - show approval request message
+        toast({
+          title: "Update request submitted successfully",
+          description: "Your request is pending approval.",
+        });
+
+        // Update vouchers state to reflect the requested changes (for display only)
+        setVouchers((prev) => {
+          const idx = prev.findIndex((v) => v.outwardNo.toUpperCase() === voucher.outwardNo.toUpperCase());
+          if (idx === -1) return prev;
+          const next = [...prev];
+          next[idx] = voucher;
+          return next;
+        });
+
+        return;
       }
 
-      // Save voucher to Firestore
-      await saveOutwardVoucherToFirestore(voucher);
+      // Direct update path (NEW mode or EDIT mode with approval permission)
+      // Find existing voucher for reverse stock deduction (edit mode only)
+      const existing = mode === 'edit' ? vouchers.find(
+        (v) => v.outwardNo.toUpperCase() === voucher.outwardNo.toUpperCase()
+      ) : undefined;
 
-      // Apply stock deduction atomically
-      await applyStockDeduction(voucher.items);
+      // Get current version for version increment
+      const currentVersion = mode === 'edit' 
+        ? vouchers.find((v) => v.outwardNo.toUpperCase() === voucher.outwardNo.toUpperCase())?.version
+        : undefined;
+
+      // Use reusable service for outward update
+      await executeOutwardUpdate(voucher, existing, currentVersion, false, undefined);
 
       // Refresh rental items from Firestore to get updated stock
       const updatedItems = await rentalItemsService.getAll();
@@ -177,6 +244,8 @@ export default function OutwardRegisterPage() {
         title: 'Failed to save outward entry',
         description: String(err),
       });
+      // Rethrow error so the form knows the operation failed
+      throw err;
     }
   };
 
@@ -216,6 +285,7 @@ export default function OutwardRegisterPage() {
         vouchers={vouchers}
         onVoucherNoChange={setActiveOutwardNo}
         onUpsert={handleUpsert}
+        canDirectlyUpdate={canDirectlyUpdate}
       />
     </div>
   );

@@ -11,6 +11,7 @@ type Body = {
   mobile?: string;
   password?: string;
   role?: UserRole;
+  permissions?: string[];
 };
 
 export async function POST(request: Request) {
@@ -36,6 +37,7 @@ export async function POST(request: Request) {
   const mobile = (body.mobile || '').trim();
   const password = body.password || '';
   const role = body.role;
+  const permissions = body.permissions || [];
 
   if (!name || !email || !password || !role) {
     return NextResponse.json(
@@ -82,6 +84,7 @@ export async function POST(request: Request) {
         mobile,
         role,
         status: 'ACTIVE',
+        permissions,
         createdBy: caller.uid,
         createdAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),

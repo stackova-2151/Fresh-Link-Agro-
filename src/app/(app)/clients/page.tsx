@@ -94,7 +94,7 @@ export default function ClientsPage() {
             </TableHeader>
             <TableBody>
               {clients.map((client) => (
-                <TableRow key={client.id} className="align-top">
+                <TableRow key={client.id} className="align-top table-row-hover">
                   <TableCell>
                     <div className="font-bold text-base text-primary uppercase">{client.name}</div>
                     <div className="mt-2 space-y-1 text-xs text-muted-foreground">
@@ -105,13 +105,17 @@ export default function ClientsPage() {
                   </TableCell>
                   <TableCell>
                     <div className="space-y-1.5">
-                      <div className="flex flex-col">
+                      <div className="flex flex-col gap-0.5">
                         <span className="text-[10px] uppercase font-bold text-slate-400">GSTIN</span>
-                        <code className="text-xs bg-slate-100 px-1 py-0.5 rounded">{client.gstNumber || 'NOT PROVIDED'}</code>
+                        {client.gstNumber
+                          ? <span className="display-badge font-mono">{client.gstNumber}</span>
+                          : <span className="display-badge-empty">NOT PROVIDED</span>}
                       </div>
-                      <div className="flex flex-col">
+                      <div className="flex flex-col gap-0.5">
                         <span className="text-[10px] uppercase font-bold text-slate-400">PAN</span>
-                        <code className="text-xs bg-slate-100 px-1 py-0.5 rounded">{client.panNumber || 'NOT PROVIDED'}</code>
+                        {client.panNumber
+                          ? <span className="display-badge font-mono">{client.panNumber}</span>
+                          : <span className="display-badge-empty">NOT PROVIDED</span>}
                       </div>
                     </div>
                   </TableCell>
@@ -133,7 +137,7 @@ export default function ClientsPage() {
                   <TableCell className="text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p0"><MoreHorizontal className="h-4 w-4" /></Button>
+                        <Button variant="ghost" className="kebab-btn h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Actions</DropdownMenuLabel>

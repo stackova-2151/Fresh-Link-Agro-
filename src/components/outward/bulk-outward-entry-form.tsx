@@ -4,7 +4,7 @@ import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
-import { format } from 'date-fns';
+import { format, isValid } from 'date-fns';
 import { PortalAutocomplete, type ItemBrandSuggestion } from '@/components/shared/portal-autocomplete';
 
 import { Button } from '@/components/ui/button';
@@ -17,6 +17,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { useInwardStockAutocomplete, type InwardStockSuggestion } from '@/hooks/use-item-autocomplete';
 import { PrintConfirmationDialog } from '@/components/shared/print-confirmation-dialog';
+import { useClientAutocomplete } from '@/hooks/use-client-autocomplete';
 
 import type { Chamber, Client, RentalItem, User } from '@/lib/types';
 
@@ -48,6 +49,8 @@ export type OutwardVoucher = {
   driverName: string;
   mobile: string;
   enteredBy: string;
+  version?: number;
+  voucherWriteApprovalRequestId?: string;
   notes: string;
   items: OutwardVoucherItem[];
   // Audit fields
@@ -70,11 +73,12 @@ type Props = {
   vouchers: OutwardVoucher[];
   onUpsert: (result: { mode: OutwardConsoleMode; voucher: OutwardVoucher }) => Promise<void>;
   onVoucherNoChange?: (outwardNo: string) => void;
+  canDirectlyUpdate?: boolean;
 };
 
 type RowField = keyof Omit<OutwardVoucherItem, 'id' | 'totalWeight' | 'expDate' | 'sourceRentalItemId'>;
 
-const GRID_FIELDS: RowField[] = ['itemName', 'brand', 'batch', 'chamberId', 'roomId', 'blockId', 'qty', 'bagWeight', 'inwardNumber'];
+const GRID_FIELDS: RowField[] = ['itemName', 'qty'];
 
 function createId(prefix: string) {
   return `${prefix}_${Math.random().toString(16).slice(2)}_${Date.now()}`;
@@ -143,6 +147,20 @@ function toIsoDate(d: Date) {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+/**
+ * Safely formats a date string or Date object.
+ * Returns empty string if the date is invalid.
+ */
+function safeFormatDate(value: string | Date | null | undefined, formatString: string): string {
+  if (!value) return '';
+  
+  const date = value instanceof Date ? value : new Date(value);
+  
+  if (!isValid(date)) return '';
+  
+  return format(date, formatString);
+}
+
 function parseNumberValue(value: string) {
   if (value === '') return '' as const;
   const parsed = Number(value);
@@ -163,6 +181,34 @@ function getUniqueBagWeightsFromInward(items: RentalItem[], inwardNumber: string
   return [...new Set(weights)].filter((w) => w > 0);
 }
 
+/**
+ * Pure helper function to synchronize a RentalItem to an OutwardVoucherItem.
+ * This is the SINGLE SOURCE OF TRUTH for RentalItem → Outward row synchronization.
+ * Used by both handleItemSelect (autocomplete) and applyInwardSelectionToRow (dropdown).
+ */
+function mapRentalItemToOutwardRow(row: OutwardVoucherItem, item: RentalItem): OutwardVoucherItem {
+  // Calculate bag weight from the selected RentalItem
+  const calculatedBagWeight = item.inwardQuantity > 0
+    ? item.inwardWeight / item.inwardQuantity
+    : 0;
+
+  return {
+    ...row,
+    sourceRentalItemId: item.id,
+    itemName: item.name,
+    brand: item.brand,
+    batch: item.batchNumber,
+    chamberId: item.chamberId ?? '',
+    roomId: item.roomId,
+    blockId: item.blockId,
+    inwardNumber: item.inwardNumber,
+    expDate: toIsoDate(item.expiryDate),
+    bagWeight: parseFloat(calculatedBagWeight.toFixed(2)),
+    bags: row.qty,
+    totalWeight: calcTotalWeight(row.qty, calculatedBagWeight),
+  };
+}
+
 export function BulkOutwardEntryForm({
   clients,
   chambers,
@@ -171,6 +217,7 @@ export function BulkOutwardEntryForm({
   vouchers,
   onUpsert,
   onVoucherNoChange,
+  canDirectlyUpdate = true,
 }: Props) {
   const { toast } = useToast();
 
@@ -180,9 +227,9 @@ export function BulkOutwardEntryForm({
   const [voucherDate, setVoucherDate] = useState<string>(todayIso);
   const [outwardNo, setOutwardNo] = useState<string>(() => generateNextOutwardNo(vouchers));
 
-  const [clientId, setClientId] = useState<string>('');
-  const [clientInput, setClientInput] = useState<string>('');
-  const [filteredClients, setFilteredClients] = useState<Client[]>([]);
+  // Client autocomplete — shared hook (fixes ArrowDown/Up off-by-one)
+  const clientAC = useClientAutocomplete({ clients });
+  const clientId = clientAC.selectedClient?.id ?? '';
 
   // Use client-specific autocomplete for outward entry
   const { filterByInwardStock } = useInwardStockAutocomplete(clientId, existingItems);
@@ -224,7 +271,7 @@ export function BulkOutwardEntryForm({
     return vouchersByOutwardNo.get(outwardNo.trim().toUpperCase());
   }, [vouchersByOutwardNo, outwardNo]);
 
-  const selectedClient = useMemo(() => clients.find((c) => c.id === clientId) ?? null, [clientId, clients]);
+  const selectedClient = clientAC.selectedClient;
 
   const cellRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const activeInputRef = useRef<HTMLInputElement | null>(null);
@@ -273,6 +320,52 @@ export function BulkOutwardEntryForm({
         return;
       }
 
+      // When on the last field (qty), validate before adding new row
+      const row = rows[rowIndex];
+      if (!row) return;
+
+      // Validate that a stock source is selected
+      if (!row.sourceRentalItemId) {
+        toast({
+          title: 'Stock source required',
+          description: 'Please select an item from the Item Name suggestions first.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // Validate qty is valid
+      const qty = typeof row.qty === 'number' ? row.qty : 0;
+      if (qty <= 0) {
+        toast({
+          title: 'Invalid quantity',
+          description: 'Please enter a valid quantity greater than 0.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // Validate qty against available stock
+      const stock = existingItems.find((i) => i.id === row.sourceRentalItemId);
+      if (!stock) {
+        toast({
+          title: 'Stock not found',
+          description: 'The selected stock source is no longer available.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      if (qty > stock.quantityAvailable) {
+        toast({
+          title: 'Insufficient stock',
+          description: `Only ${stock.quantityAvailable} available. You requested ${qty}.`,
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // All validations passed - add new row
       const nextRowIndex = rowIndex + 1;
       const hasNextRow = Boolean(rows[nextRowIndex]);
       if (!hasNextRow) {
@@ -283,36 +376,8 @@ export function BulkOutwardEntryForm({
 
       focusCell(nextRowIndex, 'itemName');
     },
-    [focusCell, rows]
+    [focusCell, rows, existingItems, toast]
   );
-
-  const handleClientInputChange = useCallback(
-    (value: string) => {
-      setClientInput(value);
-      setClientId('');
-
-      if (!value.trim()) {
-        setFilteredClients([]);
-        setShowClientSuggestions(false);
-        setClientHighlightIndex(0);
-        return;
-      }
-
-      const results = clients.filter((c) => c.name.toLowerCase().includes(value.toLowerCase()));
-      setFilteredClients(results);
-      setShowClientSuggestions(true);
-      setClientHighlightIndex(0);
-    },
-    [clients]
-  );
-
-  const handleClientSelect = useCallback((client: Client) => {
-    setClientId(client.id);
-    setClientInput(client.name);
-    setShowClientSuggestions(false);
-    setFilteredClients([]);
-    setClientHighlightIndex(0);
-  }, []);
 
   const triggerClientView = useCallback(
     (client: Client) => {
@@ -324,56 +389,14 @@ export function BulkOutwardEntryForm({
     [vouchers]
   );
 
-  const handleClientKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLInputElement>) => {
-      if (e.key === 'ArrowDown') {
-        if (!showClientSuggestions || filteredClients.length === 0) return;
-        e.preventDefault();
-        setClientHighlightIndex((prev) => (prev + 1) % filteredClients.length);
-        return;
-      }
-
-      if (e.key === 'ArrowUp') {
-        if (!showClientSuggestions || filteredClients.length === 0) return;
-        e.preventDefault();
-        setClientHighlightIndex((prev) => (prev === 0 ? filteredClients.length - 1 : prev - 1));
-        return;
-      }
-
-      if (e.key === 'Escape') {
-        setShowClientSuggestions(false);
-        return;
-      }
-
-      if (e.key === 'Enter') {
-        e.preventDefault();
-
-        if (showClientSuggestions && filteredClients.length > 0) {
-          const selected = filteredClients[clientHighlightIndex];
-          if (selected) handleClientSelect(selected);
-          return;
-        }
-
-        if (selectedClient) {
-          triggerClientView(selectedClient);
-        }
-      }
-    },
-    [clientHighlightIndex, filteredClients, handleClientSelect, selectedClient, showClientSuggestions, triggerClientView]
-  );
-
   const loadVoucher = useCallback(
     (voucher: OutwardVoucher) => {
       setMode('edit');
       setClientViewRows([]);
-      setShowClientSuggestions(false);
+      clientAC.forceSelect({ id: voucher.clientId, name: voucher.clientName } as Client);
 
       setOutwardNo(voucher.outwardNo);
       setVoucherDate(voucher.date);
-      setClientId(voucher.clientId);
-      setClientInput(voucher.clientName);
-      setFilteredClients([]);
-      setClientHighlightIndex(0);
 
       setGatePassNo(voucher.gatePassNo);
       setVehicleNo(voucher.vehicleNo);
@@ -394,11 +417,7 @@ export function BulkOutwardEntryForm({
       setVoucherDate(todayIso);
       setOutwardNo(nextOutwardNo ?? generateNextOutwardNo(vouchers));
 
-      setClientId('');
-      setClientInput('');
-      setFilteredClients([]);
-      setShowClientSuggestions(false);
-      setClientHighlightIndex(0);
+      clientAC.clearSelection();
 
       setGatePassNo('');
       setVehicleNo('');
@@ -410,14 +429,13 @@ export function BulkOutwardEntryForm({
       setRows([createEmptyRow()]);
       setClientViewRows([]);
     },
-    [todayIso, vouchers]
+    [clientAC, todayIso, vouchers]
   );
 
   const handleOutwardLookup = useCallback(() => {
     const key = outwardNo.trim().toUpperCase();
 
     setClientViewRows([]);
-    setShowClientSuggestions(false);
 
     const found = vouchersByOutwardNo.get(key);
     if (found) {
@@ -455,32 +473,12 @@ export function BulkOutwardEntryForm({
       const next = [...prev];
       const row = { ...next[rowIndex] };
 
-      row.inwardNumber = item.inwardNumber;
-      row.expDate = toIsoDate(item.expiryDate);
-      row.sourceRentalItemId = item.id;
-
-      // Smart BagWt: get unique bag weights from matching inward rows
-      const uniqueWeights = getUniqueBagWeightsFromInward(
-        existingItems,
-        item.inwardNumber,
-        item.name,
-        item.brand,
-        item.chamberId ?? '',
-        item.batchNumber
-      );
-      if (uniqueWeights.length === 1) {
-        row.bagWeight = uniqueWeights[0];
-      }
-      // If multiple, leave bagWeight as-is so dropdown appears
-
-      row.totalWeight = calcTotalWeight(row.qty, row.bagWeight);
-      // Sync bags = qty for internal stock deduction compatibility
-      row.bags = row.qty;
-
-      next[rowIndex] = row;
+      // Use shared synchronization function to ensure ALL fields are consistent
+      const synchronizedRow = mapRentalItemToOutwardRow(row, item);
+      next[rowIndex] = synchronizedRow;
       return next;
     });
-  }, [existingItems]);
+  }, []);
 
   const handleRowChange = useCallback(
     (rowIndex: number, field: RowField, value: string) => {
@@ -536,6 +534,32 @@ export function BulkOutwardEntryForm({
     const nonBlank = rows.filter((r) => !isRowBlank(r));
     if (nonBlank.length === 0) return { ok: false as const, message: 'Add at least 1 item row before saving', rowIndex: null as number | null };
 
+    // Check for duplicate sourceRentalItemId and aggregate total requested quantity
+    const sourceIdAggregates = new Map<string, { totalQty: number; rows: number[] }>();
+    for (const r of nonBlank) {
+      if (r.sourceRentalItemId) {
+        const qty = typeof r.qty === 'number' ? r.qty : 0;
+        const idx = rows.findIndex((x) => x.id === r.id);
+        const current = sourceIdAggregates.get(r.sourceRentalItemId) || { totalQty: 0, rows: [] };
+        current.totalQty += qty;
+        current.rows.push(idx);
+        sourceIdAggregates.set(r.sourceRentalItemId, current);
+      }
+    }
+
+    // Validate aggregated quantities against available stock
+    for (const [sourceId, { totalQty, rows: rowIndices }] of sourceIdAggregates.entries()) {
+      const stock = existingItems.find((i) => i.id === sourceId);
+      if (!stock) return { ok: false as const, message: 'Selected inward stock not found', rowIndex: rowIndices[0] };
+
+      if (totalQty > stock.quantityAvailable) {
+        if (rowIndices.length > 1) {
+          return { ok: false as const, message: `Total qty (${totalQty}) for this stock exceeds available (${stock.quantityAvailable}). Multiple rows reference the same stock.`, rowIndex: rowIndices[0] };
+        }
+        return { ok: false as const, message: `Qty exceeds available stock (${stock.quantityAvailable})`, rowIndex: rowIndices[0] };
+      }
+    }
+
     for (const r of nonBlank) {
       const idx = rows.findIndex((x) => x.id === r.id);
       if (!r.itemName.trim()) return { ok: false as const, message: 'Item Name is required', rowIndex: idx };
@@ -544,15 +568,6 @@ export function BulkOutwardEntryForm({
       if (typeof r.qty !== 'number' || r.qty <= 0) return { ok: false as const, message: 'Qty must be > 0', rowIndex: idx };
       if (typeof r.bagWeight !== 'number' || r.bagWeight <= 0) return { ok: false as const, message: 'Bag Wt must be > 0', rowIndex: idx };
       if (!r.sourceRentalItemId) return { ok: false as const, message: 'Select Inward No from suggestions', rowIndex: idx };
-
-      const stock = existingItems.find((i) => i.id === r.sourceRentalItemId);
-      if (!stock) return { ok: false as const, message: 'Selected inward stock not found', rowIndex: idx };
-
-      // Internal stock check uses bags (synced from qty at save-time)
-      const effectiveBags = typeof r.qty === 'number' ? r.qty : 0;
-      if (effectiveBags > stock.quantityAvailable) {
-        return { ok: false as const, message: `Qty exceeds available stock (${stock.quantityAvailable})`, rowIndex: idx };
-      }
     }
 
     return { ok: true as const };
@@ -600,29 +615,20 @@ export function BulkOutwardEntryForm({
 
   const handleItemSelect = useCallback(
     (rowIndex: number, suggestion: InwardStockSuggestion) => {
+      // Resolve the exact RentalItem from existingItems using sourceRentalItemId
+      const rentalItem = existingItems.find((i) => i.id === suggestion.sourceRentalItemId);
+      if (!rentalItem) {
+        console.error('[OUTWARD] RentalItem not found for suggestion:', suggestion.sourceRentalItemId);
+        return;
+      }
+
       setRows((prev) => {
         const next = [...prev];
         const row = { ...next[rowIndex] };
 
-        // Auto-fill all fields from inward stock suggestion
-        row.itemName = suggestion.itemName;
-        row.brand = suggestion.brand;
-        row.batch = suggestion.batchNumber;
-        row.chamberId = suggestion.chamberId;
-        row.roomId = suggestion.roomId; // Preserve roomId from inward stock
-        row.blockId = suggestion.blockId; // Preserve blockId from inward stock
-        row.inwardNumber = suggestion.inwardNumber;
-        row.expDate = suggestion.expiryDate instanceof Date 
-          ? suggestion.expiryDate.toISOString().split('T')[0]
-          : new Date(suggestion.expiryDate).toISOString().split('T')[0];
-        row.sourceRentalItemId = suggestion.sourceRentalItemId;
-        row.bagWeight = suggestion.bagWeight;
-
-        // Recalculate total weight
-        row.totalWeight = calcTotalWeight(row.qty, row.bagWeight);
-        row.bags = row.qty; // Sync bags with qty
-
-        next[rowIndex] = row;
+        // Use shared synchronization function
+        const synchronizedRow = mapRentalItemToOutwardRow(row, rentalItem);
+        next[rowIndex] = synchronizedRow;
         return next;
       });
 
@@ -635,7 +641,7 @@ export function BulkOutwardEntryForm({
       // Focus next editable field (qty)
       setTimeout(() => focusCell(rowIndex, 'qty'), 0);
     },
-    [focusCell]
+    [existingItems, focusCell]
   );
 
   const handlePrintDialogClose = useCallback(() => {
@@ -735,7 +741,8 @@ export function BulkOutwardEntryForm({
       });
       clearForNewEntry();
     } catch (error) {
-      // Error is already handled by parent component's toast
+      // Error is handled by parent component's toast
+      // Form should not show success UI
       console.error('Failed to save voucher:', error);
     }
   }, [
@@ -858,7 +865,7 @@ export function BulkOutwardEntryForm({
             )}
           </div>
           <div className="text-right text-xs text-muted-foreground">
-            <div>{format(new Date(voucherDate), 'dd/MM/yyyy')}</div>
+            <div>{safeFormatDate(voucherDate, 'dd/MM/yyyy')}</div>
           </div>
         </div>
       </CardHeader>
@@ -875,7 +882,6 @@ export function BulkOutwardEntryForm({
                 setOutwardNo(next);
                 setMode(vouchersByOutwardNo.has(next.trim().toUpperCase()) ? 'edit' : 'new');
                 setClientViewRows([]);
-                setShowClientSuggestions(false);
               }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
@@ -893,27 +899,25 @@ export function BulkOutwardEntryForm({
             <div className="relative">
               <Input
                 placeholder="Type client name..."
-                value={clientInput}
-                onChange={(e) => handleClientInputChange(e.target.value)}
-                onKeyDown={handleClientKeyDown}
-                onFocus={() => {
-                  if (filteredClients.length > 0) setShowClientSuggestions(true);
+                value={clientAC.inputValue}
+                onChange={clientAC.handleInputChange}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !clientAC.isOpen && selectedClient) {
+                    e.preventDefault();
+                    triggerClientView(selectedClient);
+                    return;
+                  }
+                  clientAC.handleKeyDown(e);
                 }}
-                onBlur={() => {
-                  setTimeout(() => setShowClientSuggestions(false), 0);
-                }}
+                onFocus={clientAC.handleFocus}
+                onBlur={clientAC.handleBlur}
                 readOnly={isEditMode}
               />
 
-              {showClientSuggestions && filteredClients.length > 0 && (
-                <div className="absolute z-[100] mt-1 max-h-64 w-full overflow-auto rounded-md border bg-background shadow-lg">
-                  {filteredClients.map((client, index) => (
-                    <div
-                      key={client.id}
-                      className={`cursor-pointer px-3 py-2 text-sm ${index === clientHighlightIndex ? 'bg-muted' : ''}`}
-                      onMouseDown={() => handleClientSelect(client)}
-                      onMouseEnter={() => setClientHighlightIndex(index)}
-                    >
+              {clientAC.isOpen && clientAC.suggestions.length > 0 && (
+                <div ref={clientAC.listRef} className="absolute z-[100] mt-1 max-h-64 w-full overflow-auto rounded-md border bg-background shadow-lg">
+                  {clientAC.suggestions.map((client, index) => (
+                    <div key={client.id} {...clientAC.getSuggestionProps(client, index)}>
                       {client.name}
                     </div>
                   ))}
@@ -1016,7 +1020,7 @@ export function BulkOutwardEntryForm({
                   <TableHead className="w-[90px] text-right">Qty</TableHead>
                   <TableHead className="w-[110px] text-right">Bag Wt</TableHead>
                   <TableHead className="w-[120px] text-right">Tot Wt</TableHead>
-                  <TableHead className="w-[140px]">Inward No</TableHead>
+                  <TableHead className="w-[140px]">Stock Source</TableHead>
                   <TableHead className="w-[140px]">Exp Date</TableHead>
                   <TableHead className="w-[70px] text-right">Del</TableHead>
                 </TableRow>
@@ -1086,14 +1090,8 @@ export function BulkOutwardEntryForm({
                         <Input
                           ref={(el) => setCellRef(`${rowKey}:brand`, el)}
                           value={row.brand}
-                          onChange={(e) => handleRowChange(idx, 'brand', e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
-                              tryAdvanceOnEnter(idx, 'brand');
-                            }
-                          }}
-                          className="h-8"
+                          readOnly
+                          className="h-8 bg-muted/30"
                         />
                       </TableCell>
 
@@ -1101,30 +1099,23 @@ export function BulkOutwardEntryForm({
                         <Input
                           ref={(el) => setCellRef(`${rowKey}:batch`, el)}
                           value={row.batch}
-                          onChange={(e) => handleRowChange(idx, 'batch', e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
-                              tryAdvanceOnEnter(idx, 'batch');
-                            }
-                          }}
-                          className="h-8"
+                          readOnly
+                          className="h-8 bg-muted/30"
                         />
                       </TableCell>
 
                       <TableCell className="p-1">
-                        <Select value={row.chamberId} onValueChange={(val) => handleRowChange(idx, 'chamberId', val)}>
-                          <SelectTrigger className="h-8">
-                            <SelectValue placeholder="Select" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {chambers.map((c) => (
-                              <SelectItem key={c.id} value={c.id}>
-                                {c.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        {(() => {
+                          const selectedChamber = chambers.find(c => c.id === row.chamberId);
+                          return (
+                            <Input
+                              value={selectedChamber?.name || ''}
+                              readOnly
+                              className="h-8 bg-muted/30"
+                              placeholder="-"
+                            />
+                          );
+                        })()}
                       </TableCell>
 
                       <TableCell className="p-1">
@@ -1177,41 +1168,13 @@ export function BulkOutwardEntryForm({
                       </TableCell>
 
                       <TableCell className="p-1">
-                        {(() => {
-                          const opts = getBagWeightOptions(row);
-                          if (opts.length > 1) {
-                            return (
-                              <div className="relative">
-                                <Input
-                                  ref={(el) => setCellRef(`${rowKey}:bagWeight`, el)}
-                                  inputMode="decimal"
-                                  value={row.bagWeight}
-                                  onChange={(e) => handleRowChange(idx, 'bagWeight', e.target.value)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter') { e.preventDefault(); tryAdvanceOnEnter(idx, 'bagWeight'); }
-                                  }}
-                                  className="h-8 text-right"
-                                  list={`bw-opts-${rowKey}`}
-                                />
-                                <datalist id={`bw-opts-${rowKey}`}>
-                                  {opts.map((w) => <option key={w} value={w} />)}
-                                </datalist>
-                              </div>
-                            );
-                          }
-                          return (
-                            <Input
-                              ref={(el) => setCellRef(`${rowKey}:bagWeight`, el)}
-                              inputMode="decimal"
-                              value={row.bagWeight}
-                              onChange={(e) => handleRowChange(idx, 'bagWeight', e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') { e.preventDefault(); tryAdvanceOnEnter(idx, 'bagWeight'); }
-                              }}
-                              className="h-8 text-right"
-                            />
-                          );
-                        })()}
+                        <Input
+                          ref={(el) => setCellRef(`${rowKey}:bagWeight`, el)}
+                          inputMode="decimal"
+                          value={row.bagWeight}
+                          readOnly
+                          className="h-8 text-right bg-muted/30"
+                        />
                       </TableCell>
 
                       <TableCell className="p-1">
@@ -1223,12 +1186,7 @@ export function BulkOutwardEntryForm({
                           <Input
                             ref={(el) => setCellRef(`${rowKey}:inwardNumber`, el)}
                             value={row.inwardNumber}
-                            onChange={(e) => {
-                              handleRowChange(idx, 'inwardNumber', e.target.value);
-                              if (e.target) {
-                                showInwardDropdown(rowKey, e.target);
-                              }
-                            }}
+                            readOnly
                             onFocus={(e) => {
                               if (e.target) {
                                 showInwardDropdown(rowKey, e.target);
@@ -1259,20 +1217,18 @@ export function BulkOutwardEntryForm({
 
                               if (e.key === 'Enter') {
                                 e.preventDefault();
+                                // Only select suggestion if user has explicitly navigated to it
                                 if (showInwardSuggestions && activeInwardMatches.length > 0) {
                                   const selected = activeInwardMatches[inwardHighlightIndex];
                                   if (selected) {
                                     applyInwardSelectionToRow(idx, selected);
                                     hideInwardDropdown();
-                                    tryAdvanceOnEnter(idx, 'inwardNumber');
                                   }
-                                  return;
                                 }
-
-                                tryAdvanceOnEnter(idx, 'inwardNumber');
+                                // Do NOT add a new row - that only happens on Qty field
                               }
                             }}
-                            className="h-8 font-mono"
+                            className="h-8 font-mono bg-muted/30 cursor-pointer"
                           />
                         </div>
                       </TableCell>
@@ -1309,7 +1265,7 @@ export function BulkOutwardEntryForm({
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div className="flex gap-2">
               <Button type="button" onClick={handleSave}>
-                {mode === 'edit' ? 'Update Entry' : 'Save Entry'}
+                {mode === 'edit' ? (canDirectlyUpdate ? 'Update Entry' : 'Request Update') : 'Save Entry'}
               </Button>
               {mode === 'edit' && (
                 <Button type="button" variant="outline" onClick={() => clearForNewEntry()}>
@@ -1334,7 +1290,7 @@ export function BulkOutwardEntryForm({
             
             {mode === 'edit' && (
               <div className="flex flex-col gap-2">
-                <Label>Update Reason *</Label>
+                <Label>Update Reason <span className="required-star">*</span></Label>
                 <Textarea 
                   value={updateReason} 
                   onChange={(e) => setUpdateReason(e.target.value)}
@@ -1373,26 +1329,34 @@ export function BulkOutwardEntryForm({
               width: inwardDropdownPosition.width,
             }}
           >
-            {activeInwardMatches.map((item, index) => (
-              <div
-                key={item.id}
-                className={`cursor-pointer px-3 py-2 text-sm ${index === inwardHighlightIndex ? 'bg-muted' : ''}`}
-                onMouseDown={() => {
-                  const rowIndex = rows.findIndex(r => r.id === activeInwardRowId);
-                  if (rowIndex !== -1) {
-                    applyInwardSelectionToRow(rowIndex, item);
-                    hideInwardDropdown();
-                  }
-                }}
-                onMouseEnter={() => setInwardHighlightIndex(index)}
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <div className="font-mono text-xs">{item.inwardNumber}</div>
-                  <div className="text-xs text-muted-foreground">Exp: {toIsoDate(item.expiryDate)}</div>
+            {activeInwardMatches.map((item, index) => {
+              const bagWeight = item.inwardQuantity > 0
+                ? (item.inwardWeight / item.inwardQuantity).toFixed(2)
+                : '0';
+              return (
+                <div
+                  key={item.id}
+                  className={`cursor-pointer px-3 py-2 text-sm ${index === inwardHighlightIndex ? 'bg-muted' : ''}`}
+                  onMouseDown={() => {
+                    const rowIndex = rows.findIndex(r => r.id === activeInwardRowId);
+                    if (rowIndex !== -1) {
+                      applyInwardSelectionToRow(rowIndex, item);
+                      hideInwardDropdown();
+                    }
+                  }}
+                  onMouseEnter={() => setInwardHighlightIndex(index)}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="font-mono text-xs">{item.inwardNumber}</div>
+                    <div className="text-xs text-muted-foreground">{bagWeight} KG/bag</div>
+                    <div className="text-xs text-muted-foreground">Exp: {toIsoDate(item.expiryDate)}</div>
+                  </div>
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    Avail: {item.quantityAvailable} | Batch: {item.batchNumber}
+                  </div>
                 </div>
-                <div className="mt-1 text-xs text-muted-foreground">Avail: {item.quantityAvailable}</div>
-              </div>
-            ))}
+              );
+            })}
           </div>,
           document.body
         )

@@ -76,7 +76,7 @@ export default function InvoicesPage() {
               </TableHeader>
               <TableBody>
                 {invoices.map((invoice) => (
-                  <TableRow key={invoice.id}>
+                  <TableRow key={invoice.id} className="table-row-hover">
                     <TableCell className="font-medium">{invoice.invoiceNumber}</TableCell>
                     <TableCell>{clientNames[invoice.clientId] || 'Unknown'}</TableCell>
                     <TableCell>{format(new Date(invoice.date), 'PPP')}</TableCell>
@@ -96,7 +96,7 @@ export default function InvoicesPage() {
                     <TableCell className="text-right">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button>
+                          <Button variant="ghost" className="kebab-btn h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuLabel>Actions</DropdownMenuLabel>

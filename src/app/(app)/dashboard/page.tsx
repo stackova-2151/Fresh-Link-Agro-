@@ -16,11 +16,14 @@ import {
   type UserCounts,
   type WarehouseMetrics,
 } from '@/lib/dashboard-metrics';
+import { clientsService, rentalItemsService } from '@/lib/firestore';
+import { occupancyService, type BlockStockDetails } from '@/lib/services/occupancy.service';
+import type { Client, RentalItem } from '@/lib/types';
 
 import { Archive, ArrowDownRight, ArrowUpRight, Users, Warehouse, Loader2 } from 'lucide-react';
 import { WarehouseSummary } from '@/components/dashboard/warehouse-summary';
 import { ChamberOccupancyCard } from '@/components/dashboard/chamber-occupancy-card';
-import { BlockDetailPanel } from '@/components/dashboard/block-detail-panel';
+import { BlockStockDetailsModal } from '@/components/dashboard/block-stock-details-modal';
 import type { BlockOccupancy } from '@/lib/types/room-block';
 
 export default function DashboardPage() {
@@ -33,7 +36,10 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [expandedChambers, setExpandedChambers] = useState<Set<string>>(new Set());
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
-  const [selectedBlock, setSelectedBlock] = useState<{ block: BlockOccupancy; roomName: string } | null>(null);
+  const [selectedBlock, setSelectedBlock] = useState<{ block: BlockOccupancy; roomName: string; chamberId: string; chamberName: string } | null>(null);
+  const [stockDetails, setStockDetails] = useState<BlockStockDetails | null>(null);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [rentalItems, setRentalItems] = useState<RentalItem[]>([]);
 
   const toggleChamber = (chamberId: string) => {
     setExpandedChambers((prev) => {
@@ -57,27 +63,48 @@ export default function DashboardPage() {
     setSelectedRoomId(null);
   };
 
-  const handleBlockClick = (block: BlockOccupancy, roomName: string) => {
-    setSelectedBlock({ block, roomName });
+  const handleBlockClick = (block: BlockOccupancy, roomName: string, chamberId: string, chamberName: string) => {
+    setSelectedBlock({ block, roomName, chamberId, chamberName });
+    
+    // Calculate stock details for the selected block
+    // Use selectedRoomId from state for accurate room filtering
+    if (selectedRoomId) {
+      const details = occupancyService.getBlockStockDetails(
+        chamberId,
+        chamberName,
+        selectedRoomId,
+        roomName,
+        block.blockId,
+        block.blockName,
+        rentalItems,
+        clients
+      );
+      setStockDetails(details);
+    }
   };
 
   const handleCloseBlockDetail = () => {
     setSelectedBlock(null);
+    setStockDetails(null);
   };
 
   useEffect(() => {
     async function loadMetrics() {
       try {
-        const [tc, st, uc, wm] = await Promise.all([
+        const [tc, st, uc, wm, cl, ri] = await Promise.all([
           getTodayCounts(),
           getTotalStock(),
           getUserCounts(),
           getWarehouseMetrics(),
+          clientsService.getAll(),
+          rentalItemsService.getAll(),
         ]);
         setTodayCounts(tc);
         setStock(st);
         setUserCounts(uc);
         setWarehouseMetrics(wm);
+        setClients(cl);
+        setRentalItems(ri);
       } catch (err) {
         console.error('Failed to load dashboard metrics:', err);
       } finally {
@@ -151,14 +178,12 @@ export default function DashboardPage() {
         />
       </div>
 
-      {/* Block Detail Panel */}
-      {selectedBlock && (
-        <BlockDetailPanel
-          block={selectedBlock.block}
-          roomName={selectedBlock.roomName}
-          onClose={handleCloseBlockDetail}
-        />
-      )}
+      {/* Block Stock Details Modal */}
+      <BlockStockDetailsModal
+        open={!!selectedBlock}
+        onOpenChange={handleCloseBlockDetail}
+        stockDetails={stockDetails}
+      />
 
       {/* Chamber Occupancy */}
       <Card>

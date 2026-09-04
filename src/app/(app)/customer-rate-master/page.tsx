@@ -26,6 +26,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { useClientAutocomplete } from '@/hooks/use-client-autocomplete';
 
 type RateRow = {
   id: string;
@@ -42,11 +43,10 @@ type RateRow = {
 
 export default function CustomerRateMasterPage() {
   const [clients, setClients] = useState<Client[]>([]);
-  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
-  const [clientInput, setClientInput] = useState<string>('');
-  const [filteredClients, setFilteredClients] = useState<Client[]>([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [highlightIndex, setHighlightIndex] = useState(0);
+
+  const clientAC = useClientAutocomplete({ clients });
+  // Alias for readability in handlers below
+  const selectedClient = clientAC.selectedClient;
   
   const [rateRows, setRateRows] = useState<RateRow[]>([]);
   const [loading, setLoading] = useState(false);
@@ -69,63 +69,7 @@ export default function CustomerRateMasterPage() {
     loadClients();
   }, [toast]);
 
-  // Client autocomplete
-  const handleClientInputChange = useCallback((value: string) => {
-    setClientInput(value);
-    setSelectedClient(null);
 
-    if (!value.trim()) {
-      setFilteredClients([]);
-      setShowSuggestions(false);
-      setHighlightIndex(0);
-      return;
-    }
-
-    const results = clients.filter((c) => c.name.toLowerCase().includes(value.toLowerCase()));
-    setFilteredClients(results);
-    setShowSuggestions(true);
-    setHighlightIndex(0);
-  }, [clients]);
-
-  const handleClientSelect = useCallback((client: Client) => {
-    setSelectedClient(client);
-    setClientInput(client.name);
-    setShowSuggestions(false);
-    setFilteredClients([]);
-    setHighlightIndex(0);
-    setRateRows([]);
-  }, []);
-
-  const handleClientKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'ArrowDown') {
-      if (!showSuggestions || filteredClients.length === 0) return;
-      e.preventDefault();
-      setHighlightIndex((prev) => (prev + 1) % filteredClients.length);
-      return;
-    }
-
-    if (e.key === 'ArrowUp') {
-      if (!showSuggestions || filteredClients.length === 0) return;
-      e.preventDefault();
-      setHighlightIndex((prev) => (prev === 0 ? filteredClients.length - 1 : prev - 1));
-      return;
-    }
-
-    if (e.key === 'Escape') {
-      setShowSuggestions(false);
-      setFilteredClients([]);
-      setHighlightIndex(0);
-      return;
-    }
-
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      if (showSuggestions && filteredClients.length > 0) {
-        const selected = filteredClients[highlightIndex];
-        if (selected) handleClientSelect(selected);
-      }
-    }
-  }, [filteredClients, handleClientSelect, highlightIndex, showSuggestions]);
 
   // Process button - fetch distinct inward items and merge with existing rates
   const handleProcess = useCallback(async () => {
@@ -316,7 +260,7 @@ export default function CustomerRateMasterPage() {
     <div className="space-y-6">
       <PageHeader title="Customer Rate Master" description="Manage rental rates for customer items.">
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setClientInput('')} disabled={!selectedClient}>
+          <Button variant="outline" onClick={() => clientAC.clearSelection()} disabled={!selectedClient}>
             Clear
           </Button>
         </div>
@@ -336,22 +280,17 @@ export default function CustomerRateMasterPage() {
               <Input
                 id="customer-search"
                 placeholder="Search customer..."
-                value={clientInput}
-                onChange={(e) => handleClientInputChange(e.target.value)}
-                onKeyDown={handleClientKeyDown}
+                value={clientAC.inputValue}
+                onChange={clientAC.handleInputChange}
+                onKeyDown={clientAC.handleKeyDown}
+                onBlur={clientAC.handleBlur}
+                onFocus={clientAC.handleFocus}
                 className="pl-10"
               />
-              {showSuggestions && filteredClients.length > 0 && (
-                <div className="absolute z-50 w-full mt-1 bg-background border rounded-md shadow-lg max-h-60 overflow-y-auto">
-                  {filteredClients.map((client, index) => (
-                    <div
-                      key={client.id}
-                      className={`px-3 py-2 cursor-pointer transition-colors ${
-                        index === highlightIndex ? 'bg-muted' : 'hover:bg-muted'
-                      }`}
-                      onMouseDown={() => handleClientSelect(client)}
-                      onMouseEnter={() => setHighlightIndex(index)}
-                    >
+              {clientAC.isOpen && clientAC.suggestions.length > 0 && (
+                <div ref={clientAC.listRef} className="absolute z-50 w-full mt-1 bg-background border rounded-md shadow-lg max-h-60 overflow-y-auto">
+                  {clientAC.suggestions.map((client, index) => (
+                    <div key={client.id} {...clientAC.getSuggestionProps(client, index)}>
                       <div className="font-medium">{client.name}</div>
                       <div className="text-xs text-muted-foreground">{client.phone || client.optionalPhone || 'No phone'}</div>
                     </div>
@@ -393,9 +332,9 @@ export default function CustomerRateMasterPage() {
                   </TableHeader>
                   <TableBody>
                     {rateRows.map((row, index) => (
-                      <TableRow key={`${row.itemDescription}-${index}`}>
+                      <TableRow key={`${row.itemDescription}-${index}`} className="table-row-hover">
                         <TableCell className="font-medium uppercase">{row.itemDescription}</TableCell>
-                        <TableCell>
+                        <TableCell className="cell-editable">
                           <Input
                             type="text"
                             value={row.rentPer}
@@ -404,7 +343,7 @@ export default function CustomerRateMasterPage() {
                             placeholder=""
                           />
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="cell-editable">
                           <Input
                             type="text"
                             value={row.ratePer}
@@ -413,7 +352,7 @@ export default function CustomerRateMasterPage() {
                             placeholder=""
                           />
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="cell-editable">
                           <Input
                             type="number"
                             value={row.rate === '' ? '' : row.rate}
@@ -423,7 +362,7 @@ export default function CustomerRateMasterPage() {
                             step="0.01"
                           />
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="cell-editable">
                           <Input
                             type="text"
                             value={row.loadingPer}
@@ -432,7 +371,7 @@ export default function CustomerRateMasterPage() {
                             placeholder=""
                           />
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="cell-editable">
                           <Input
                             type="number"
                             value={row.loading === '' ? '' : row.loading}
@@ -442,7 +381,7 @@ export default function CustomerRateMasterPage() {
                             step="0.01"
                           />
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="cell-editable">
                           <Input
                             type="text"
                             value={row.loadingRatePer}
@@ -451,7 +390,7 @@ export default function CustomerRateMasterPage() {
                             placeholder=""
                           />
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="cell-editable">
                           <Input
                             type="text"
                             value={row.hsnCode}
@@ -460,7 +399,7 @@ export default function CustomerRateMasterPage() {
                             placeholder="HSN"
                           />
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="cell-editable">
                           <Input
                             type="number"
                             value={row.gstRate === '' ? '' : row.gstRate}

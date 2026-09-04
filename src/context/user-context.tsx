@@ -36,30 +36,13 @@ const UserContext = createContext<UserContextType | undefined>(undefined);
 
 async function fetchFirestoreUser(uid: string): Promise<User | null> {
   try {
-    console.log("========== FETCH FIRESTORE USER ==========");
-    console.log("UID:", uid);
-
     const ref = doc(db, "users", uid);
-    console.log("Document Path:", ref.path);
-
     const snap = await getDoc(ref);
 
-    console.log("Document Exists:", snap.exists());
-
-    if (!snap.exists()) {
-      console.log("❌ Firestore document not found");
-      return null;
-    }
+    if (!snap.exists()) return null;
 
     const data = snap.data();
-
-    console.log("Firestore Data:", data);
-    console.log("Status:", data.status);
-
-    if (data.status === "INACTIVE") {
-      console.log("❌ User is INACTIVE");
-      return null;
-    }
+    if (data.status === "INACTIVE") return null;
 
     const toIso = (v: unknown): string | undefined => {
       if (!v) return undefined;
@@ -79,12 +62,13 @@ async function fetchFirestoreUser(uid: string): Promise<User | null> {
       mobile: data.mobile,
       role: data.role,
       status: data.status,
+      permissions: data.permissions,
       createdBy: data.createdBy,
       createdAt: toIso(data.createdAt),
       updatedAt: toIso(data.updatedAt),
     };
   } catch (e) {
-    console.error("🔥 Firestore Error:", e);
+    console.error("Firestore user fetch error:", e);
     return null;
   }
 }

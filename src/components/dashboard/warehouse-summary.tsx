@@ -17,24 +17,25 @@ export function WarehouseSummary({ metrics }: WarehouseSummaryProps) {
 
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-      <Card>
+      {/* Hero card — teal-900 filled */}
+      <Card className="bg-teal-900 border-teal-800">
         <CardContent className="p-4">
           <div className="flex items-center gap-2 mb-2">
-            <Warehouse className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm font-medium text-muted-foreground">Warehouse Occupancy</span>
+            <Warehouse className="h-4 w-4 text-teal-200" />
+            <span className="text-sm font-medium text-teal-100">Warehouse Occupancy</span>
           </div>
-          <div className="text-2xl font-bold mb-1">{metrics.occupancyPercent.toFixed(2)}%</div>
-          <div className="text-xs text-muted-foreground mb-2">
+          <div className="text-2xl font-bold mb-1 text-white">{metrics.occupancyPercent.toFixed(2)}%</div>
+          <div className="text-xs text-teal-100 mb-2">
             {metrics.occupiedMT.toFixed(2)} / {metrics.totalCapacityMT.toFixed(2)} MT
           </div>
-          <Progress value={Math.min(metrics.occupancyPercent, 100)} className="h-1.5" />
+          <Progress value={Math.min(metrics.occupancyPercent, 100)} />
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="border-l-4 border-l-teal-600">
         <CardContent className="p-4">
           <div className="flex items-center gap-2 mb-2">
-            <Layers className="h-4 w-4 text-muted-foreground" />
+            <Layers className="h-4 w-4 text-teal-600" />
             <span className="text-sm font-medium text-muted-foreground">Total Chambers</span>
           </div>
           <div className="text-2xl font-bold mb-1">{metrics.totalChambers}</div>
@@ -44,23 +45,20 @@ export function WarehouseSummary({ metrics }: WarehouseSummaryProps) {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="border-l-4 border-l-teal-600">
         <CardContent className="p-4">
           <div className="flex items-center gap-2 mb-2">
-            <Building2 className="h-4 w-4 text-muted-foreground" />
+            <Building2 className="h-4 w-4 text-teal-600" />
             <span className="text-sm font-medium text-muted-foreground">Warehouse Capacity</span>
           </div>
           <div className="text-2xl font-bold mb-1">{metrics.totalCapacityMT.toFixed(2)} MT</div>
-          {/* <div className="text-xs text-muted-foreground">
-            {metrics.availableMT.toFixed(2)} MT Available
-          </div> */}
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="border-l-4 border-l-teal-600">
         <CardContent className="p-4">
           <div className="flex items-center gap-2 mb-2">
-            <Warehouse className="h-4 w-4 text-muted-foreground" />
+            <Warehouse className="h-4 w-4 text-teal-600" />
             <span className="text-sm font-medium text-muted-foreground">Occupied Space</span>
           </div>
           <div className="text-2xl font-bold mb-1">{metrics.occupiedMT.toFixed(2)} MT</div>

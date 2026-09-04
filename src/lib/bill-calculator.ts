@@ -26,7 +26,7 @@ interface BillItem {
   rate: number;
   issuesQty: number;
   issuesWeight: number;
-  outDetailDate?: string;
+  outDetailDate: string | null;
   closingQty: number;
   closingWeight: number;
   amount: number;
@@ -373,6 +373,7 @@ export async function calculateBill(params: BillCalculationParams): Promise<Gene
         amount: finalItemAmount,
         hsnCode: rate.hsnCode,
         gstRate: rate.gstRate,
+        outDetailDate: null,
       });
     });
 

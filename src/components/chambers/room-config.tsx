@@ -130,7 +130,7 @@ export function RoomConfig({ rooms, onRoomsChange }: RoomConfigProps) {
       ) : (
         <div className="space-y-3">
           {rooms.map((room) => (
-            <Card key={room.roomId}>
+            <Card key={room.roomId} className="room-card">
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
                   <div className="flex-1 grid grid-cols-2 gap-4">

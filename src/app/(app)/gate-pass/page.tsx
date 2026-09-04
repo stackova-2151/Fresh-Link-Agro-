@@ -133,7 +133,7 @@ export default function GatePassPage() {
             </TableHeader>
             <TableBody>
               {filteredGatePasses.map((gatePass) => (
-                <TableRow key={gatePass.id}>
+                <TableRow key={gatePass.id} className="table-row-hover">
                   <TableCell className="font-medium">{gatePass.gatePassNumber}</TableCell>
                   <TableCell>{gatePass.clientName}</TableCell>
                   <TableCell>{gatePass.vehicleNumber}</TableCell>
@@ -147,7 +147,7 @@ export default function GatePassPage() {
                   <TableCell><div className="flex items-center gap-1"><Thermometer className="h-4 w-4 text-muted-foreground" />{gatePass.inboundTemperature}°C</div></TableCell>
                   <TableCell>
                     <DropdownMenu>
-                      <DropdownMenuTrigger asChild><Button variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                      <DropdownMenuTrigger asChild><Button variant="ghost" className="kebab-btn h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
                         <DropdownMenuItem onClick={() => { setSelectedGatePass(gatePass); setShowViewDialog(true); }}>View Details</DropdownMenuItem>

@@ -21,6 +21,7 @@
 
 import type {
   Chamber,
+  Client,
   RentalItem,
 } from '@/lib/types';
 import type {
@@ -32,6 +33,51 @@ import type {
   ChamberOccupancy,
   WarehouseOccupancy,
 } from '@/lib/types/room-block';
+
+/**
+ * Stock item details for block popup display
+ */
+export interface StockItem {
+  rentalItemId: string;
+  inwardNumber: string;
+  inwardDate: string;
+  itemName: string;
+  brand: string;
+  batch: string;
+  openingQty: number;
+  openingWeight: number;
+  outwardQty: number;
+  outwardWeight: number;
+  balanceQty: number;
+  balanceWeight: number;
+  expDate: string;
+}
+
+/**
+ * Customer stock group for block popup display
+ */
+export interface CustomerStockGroup {
+  customerId: string;
+  customerName: string;
+  items: StockItem[];
+  totalBalanceQty: number;
+  totalBalanceWeight: number;
+}
+
+/**
+ * Complete block stock details for popup display
+ */
+export interface BlockStockDetails {
+  chamberId: string;
+  chamberName: string;
+  roomId: string;
+  roomName: string;
+  blockId: string;
+  blockName: string;
+  customerGroups: CustomerStockGroup[];
+  totalBalanceQty: number;
+  totalBalanceWeight: number;
+}
 
 /**
  * Occupancy Calculation Service
@@ -255,6 +301,122 @@ class OccupancyService {
       return sum + Math.max(0, weight);
     }, 0);
     return occupiedKG / 1000;
+  }
+
+  /**
+   * Get stock details for a specific block
+   * 
+   * This function retrieves all rental items for a specific chamber/room/block,
+   * filters for items with current balance > 0, groups them by customer,
+   * and calculates customer totals and block grand total.
+   * 
+   * @param chamberId - Chamber ID for filtering
+   * @param chamberName - Chamber name for display
+   * @param roomId - Room ID for filtering
+   * @param roomName - Room name for display
+   * @param blockId - Block ID for filtering
+   * @param blockName - Block name for display
+   * @param rentalItems - All rental items
+   * @param clients - All clients for customer name lookup
+   * @returns Block stock details grouped by customer
+   */
+  getBlockStockDetails(
+    chamberId: string,
+    chamberName: string,
+    roomId: string,
+    roomName: string,
+    blockId: string,
+    blockName: string,
+    rentalItems: RentalItem[],
+    clients: Client[]
+  ): BlockStockDetails {
+    // Filter items by exact location (chamber + room + block)
+    const blockItems = rentalItems.filter(
+      (item: RentalItem) =>
+        item.chamberId === chamberId &&
+        item.roomId === roomId &&
+        item.blockId === blockId
+    );
+
+    // Filter only items with current balance > 0
+    const activeItems = blockItems.filter(
+      (item: RentalItem) =>
+        (item.quantityAvailable > 0 || item.balanceWeight > 0)
+    );
+
+    // Group items by customer
+    const customerMap = new Map<string, CustomerStockGroup>();
+
+    activeItems.forEach((item: RentalItem) => {
+      const clientId = item.clientId;
+      const client = clients.find((c: Client) => c.id === clientId);
+      const customerName = client?.name || 'Unknown Customer';
+
+      if (!customerMap.has(clientId)) {
+        customerMap.set(clientId, {
+          customerId: clientId,
+          customerName,
+          items: [],
+          totalBalanceQty: 0,
+          totalBalanceWeight: 0,
+        });
+      }
+
+      const group = customerMap.get(clientId)!;
+
+      // Format dates for display
+      const inwardDate = item.storageDate instanceof Date
+        ? item.storageDate.toISOString().split('T')[0]
+        : new Date(item.storageDate).toISOString().split('T')[0];
+
+      const expDate = item.expiryDate instanceof Date
+        ? item.expiryDate.toISOString().split('T')[0]
+        : new Date(item.expiryDate).toISOString().split('T')[0];
+
+      // Create stock item
+      const stockItem: StockItem = {
+        rentalItemId: item.id,
+        inwardNumber: item.inwardNumber,
+        inwardDate,
+        itemName: item.name,
+        brand: item.brand,
+        batch: item.batchNumber,
+        openingQty: item.inwardQuantity,
+        openingWeight: item.inwardWeight,
+        outwardQty: item.outwardQuantity,
+        outwardWeight: item.outwardWeight,
+        balanceQty: item.quantityAvailable,
+        balanceWeight: item.balanceWeight,
+        expDate,
+      };
+
+      group.items.push(stockItem);
+      group.totalBalanceQty += item.quantityAvailable;
+      group.totalBalanceWeight += item.balanceWeight;
+    });
+
+    // Calculate block grand total
+    const customerGroups = Array.from(customerMap.values());
+    const totalBalanceQty = customerGroups.reduce(
+      (sum: number, group: CustomerStockGroup) => sum + group.totalBalanceQty,
+      0
+    );
+    const totalBalanceWeight = customerGroups.reduce(
+      (sum: number, group: CustomerStockGroup) => sum + group.totalBalanceWeight,
+      0
+    );
+
+    return {
+      chamberId,
+      chamberName,
+      roomId,
+      roomName,
+      blockId,
+      blockName,
+      customerGroups,
+      totalBalanceQty,
+      totalBalanceWeight,
+    };
   }
 }
 

@@ -23,12 +23,14 @@ import {
   Receipt,
   Printer,
   ChevronDown,
+  CheckCircle,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useUser } from '@/context/user-context';
 import type { UserRole } from '@/lib/types';
 import type React from 'react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { hasEntryApprovalsPermission } from '@/lib/utils';
 
 type NavLinkItem = {
   type: 'link';
@@ -76,8 +78,7 @@ const allMenuItems: NavItem[] = [
     icon: Printer,
     roles: ['SUB_ADMIN'],
     children: [
-      { type: 'link', href: '/printing/inward-register', label: 'Inward Register', roles: ['SUB_ADMIN'], icon: Printer },
-      { type: 'link', href: '/printing/outward-register', label: 'Outward Register', roles: ['SUB_ADMIN'], icon: Printer },
+      { type: 'link', href: '/printing/register', label: 'Register', roles: ['SUB_ADMIN'], icon: Printer },
       {
         type: 'group',  
         label: 'Stock Report',
@@ -85,8 +86,10 @@ const allMenuItems: NavItem[] = [
         roles: ['SUB_ADMIN'],
         children: [
           { type: 'link', href: '/printing/stock-report/item-wise', label: 'Item Wise', roles: ['SUB_ADMIN'], icon: Receipt },
+          { type: 'link', href: '/printing/stock-report/inward-wise', label: 'Inward Wise', roles: ['SUB_ADMIN'], icon: Receipt },
           { type: 'link', href: '/printing/stock-report/chamber-wise', label: 'Chamber Wise', roles: ['SUB_ADMIN'], icon: Receipt },
           { type: 'link', href: '/printing/stock-report/all-customer-wise', label: 'All Customer Wise', roles: ['SUB_ADMIN'], icon: Receipt },
+          { type: 'link', href: '/printing/stock-report/inward-outward-wise', label: 'Inward/Outward Wise', roles: ['SUB_ADMIN'], icon: Receipt },
         ],
       },
     ],
@@ -126,10 +129,23 @@ const allMenuItems: NavItem[] = [
     icon: Receipt,
     roles: ['SUB_ADMIN'],
   },
+  {
+    type: 'link',
+    href: '/entry-approvals',
+    label: 'Entry Approvals',
+    icon: CheckCircle,
+    roles: ['MASTER_ADMIN', 'ADMIN'],
+  },
 ];
 
-function isNavItemAccessible(item: NavItem, role: UserRole | undefined) {
+function isNavItemAccessible(item: NavItem, role: UserRole | undefined, user: any) {
   if (!role) return false;
+  
+  // Special check for Entry Approvals: SUB_ADMIN needs permission
+  if (item.type === 'link' && item.href === '/entry-approvals' && role === 'SUB_ADMIN') {
+    return hasEntryApprovalsPermission(user);
+  }
+  
   if (item.type === 'link') return item.roles.includes(role);
   return item.roles.includes(role) && item.children.some((c) => c.roles.includes(role));
 }
@@ -146,8 +162,8 @@ export function SidebarNav() {
 
   // Memoized: only recomputes when role changes (not on every navigation)
   const menuItems = useMemo(
-    () => allMenuItems.filter((item) => isNavItemAccessible(item, role)),
-    [role]
+    () => allMenuItems.filter((item) => isNavItemAccessible(item, role, user)),
+    [role, user]
   );
 
   // Memoized: only recomputes when pathname changes
@@ -163,7 +179,7 @@ export function SidebarNav() {
   );
 
   const defaultPrintingOpen = useMemo(
-    () => pathname.startsWith('/printing') || pathname.startsWith('/reports'),
+    () => pathname.startsWith('/printing') || pathname.startsWith('/reports') || pathname === '/printing/register',
     [pathname]
   );
 
@@ -232,7 +248,8 @@ export function SidebarNav() {
                     </SidebarMenuButton>
                   </CollapsibleTrigger>
                   <CollapsibleContent>
-                    <SidebarMenuSub>
+                  <SidebarMenuSub
+                   className={isPrintingGroup ? "pl-0" : undefined}>
                       {item.children
                         .filter((child) => {
                           if (child.type === 'link') {
@@ -267,7 +284,7 @@ export function SidebarNav() {
                                     </SidebarMenuSubButton>
                                   </CollapsibleTrigger>
                                   <CollapsibleContent>
-                                    <SidebarMenuSub className="ml-4">
+                                    <SidebarMenuSub className="ml-0 pl-1">
                                       {child.children
                                         .filter((subChild) => {
                                           if (subChild.type === 'link') {

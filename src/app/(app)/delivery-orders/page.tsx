@@ -101,7 +101,7 @@ export default function DeliveryOrdersPage() {
             </TableHeader>
             <TableBody>
               {orders.map((order) => (
-                <TableRow key={order.id}>
+                <TableRow key={order.id} className="table-row-hover">
                   <TableCell className="font-mono font-bold">{order.orderNumber}</TableCell>
                   <TableCell>{format(new Date(order.date), 'dd.MM.yyyy')}</TableCell>
                   <TableCell className="font-medium">
@@ -113,7 +113,7 @@ export default function DeliveryOrdersPage() {
                   <TableCell className="text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0">
+                        <Button variant="ghost" className="kebab-btn h-8 w-8 p-0">
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>

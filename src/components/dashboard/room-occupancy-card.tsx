@@ -21,7 +21,7 @@ export function RoomOccupancyCard({ room, onViewBlocks }: RoomOccupancyCardProps
   };
 
   return (
-    <Card className="hover:shadow-md transition-shadow">
+    <Card>
       <CardContent className="p-4 space-y-3">
         <div className="flex items-center justify-between">
           <h3 className="font-semibold text-base">{room.roomName}</h3>
@@ -52,7 +52,6 @@ export function RoomOccupancyCard({ room, onViewBlocks }: RoomOccupancyCardProps
           </div>
           <Progress 
             value={Math.min(room.occupancyPercent, 100)} 
-            className="h-1.5"
           />
         </div>
 
@@ -63,7 +62,7 @@ export function RoomOccupancyCard({ room, onViewBlocks }: RoomOccupancyCardProps
           onClick={() => onViewBlocks(room.roomId)}
         >
           View Blocks
-          <ChevronRight className="ml-2 h-4 w-4" />
+          <ChevronRight className="ml-2 h-4 w-4 icon-nudge" />
         </Button>
       </CardContent>
     </Card>

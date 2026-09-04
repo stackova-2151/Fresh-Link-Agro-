@@ -92,7 +92,7 @@ export class BillCalculatorV2 {
       console.log('[BILL-DATA] Inward Vouchers Details:');
       inwardVouchers.forEach((voucher, idx) => {
         console.log(`[BILL-DATA] Voucher ${idx + 1}:`);
-        console.log(`[BILL-DATA]   Voucher No: ${voucher.voucherNumber || voucher.id}`);
+        console.log(`[BILL-DATA]   Voucher No: ${voucher.inwardNo || voucher.id}`);
         console.log(`[BILL-DATA]   Date: ${new Date(voucher.date).toLocaleDateString('en-IN')}`);
         console.log(`[BILL-DATA]   Items: ${voucher.items?.length || 0}`);
         voucher.items?.forEach((item, itemIdx) => {

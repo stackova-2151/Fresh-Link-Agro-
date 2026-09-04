@@ -118,6 +118,7 @@ export interface InwardVoucherItem {
   unit: string;
   bagWeight: number | '';
   totalWeight: number;
+  rentalItemId?: string;       // Optional: Link to the exact rental item document (for unique identity tracking)
 }
 
 export interface InwardVoucher {
@@ -135,6 +136,10 @@ export interface InwardVoucher {
   updatedByName?: string;
   updatedAt?: string;
   updateReason?: string;
+  // Version control and concurrency lock
+  version?: number;
+  activeApprovalRequestId?: string;
+  voucherWriteApprovalRequestId?: string; // Idempotency marker for approval-driven voucher writes
 }
 
 export interface OutwardVoucherItem {
@@ -169,4 +174,73 @@ export interface OutwardVoucher {
   updatedByName?: string;
   updatedAt?: string;
   updateReason?: string;
+  // Version control and concurrency lock
+  version?: number;
+  activeApprovalRequestId?: string;
+  voucherWriteApprovalRequestId?: string; // Idempotency marker for approval-driven voucher writes
+}
+
+export interface StockReportInwardWiseRow {
+  srNo?: number;
+  itemName: string;
+  brand?: string;
+  batch?: string;
+  inwardQty?: number;
+  inwardWeight?: number;
+  outwardNo?: string;
+  outwardDate?: string;
+  outwardQty?: number;
+  outwardWeight?: number;
+  balanceQty: number;
+  balanceWeight: number;
+  rowType: 'INWARD' | 'OUTWARD';
+}
+
+export interface StockReportInwardWiseData {
+  customerName: string;
+  inwardNo: string;
+  inwardDate?: string;
+  gatePassNo?: string;
+  selectedItemName?: string;
+  rows: StockReportInwardWiseRow[];
+  totalInwardQty: number;
+  totalInwardWeight: number;
+  totalOutwardQty: number;
+  totalOutwardWeight: number;
+  totalBalanceQty: number;
+  totalBalanceWeight: number;
+  reportDate: string;
+}
+
+export interface StockReportInwardOutwardWiseRow {
+  inwardNo: string;
+  inwardDate: string;
+  itemName: string;
+  brand: string;
+  batch: string;
+  inwardQty?: number;
+  inwardWeight?: number;
+  outwardNo?: string;
+  outwardDate?: string;
+  outwardQty?: number;
+  outwardWeight?: number;
+  balanceQty: number;
+  balanceWeight: number;
+  rowType: 'INWARD' | 'OUTWARD';
+}
+
+export interface StockReportInwardOutwardWiseData {
+  customerName: string;
+  customerId: string;
+  fromDate: string;
+  toDate: string;
+  selectedItemName?: string;
+  rows: StockReportInwardOutwardWiseRow[];
+  totalInwardQty: number;
+  totalInwardWeight: number;
+  totalOutwardQty: number;
+  totalOutwardWeight: number;
+  totalBalanceQty: number;
+  totalBalanceWeight: number;
+  reportDate: string;
 }

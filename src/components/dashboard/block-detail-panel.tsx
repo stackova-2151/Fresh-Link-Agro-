@@ -85,7 +85,6 @@ export function BlockDetailPanel({ block, roomName, onClose }: BlockDetailPanelP
           </div>
           <Progress 
             value={Math.min(block.occupancyPercent, 100)} 
-            className={`h-2 ${getOccupancyColor(block.occupancyPercent)}`}
           />
         </div>
 

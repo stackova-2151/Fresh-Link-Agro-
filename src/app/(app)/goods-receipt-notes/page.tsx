@@ -85,7 +85,7 @@ export default function GoodsReceiptNotesPage() {
             </TableHeader>
             <TableBody>
               {notes.map((note) => (
-                <TableRow key={note.id}>
+                <TableRow key={note.id} className="table-row-hover">
                   <TableCell className="font-mono font-bold">{note.inwardNumber}</TableCell>
                   <TableCell>{format(new Date(note.date), 'dd.MM.yyyy')}</TableCell>
                   <TableCell className="font-medium">{clientNames[note.clientId] || 'Unknown'}</TableCell>
@@ -95,7 +95,7 @@ export default function GoodsReceiptNotesPage() {
                   <TableCell className="text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button>
+                        <Button variant="ghost" className="kebab-btn h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Actions</DropdownMenuLabel>

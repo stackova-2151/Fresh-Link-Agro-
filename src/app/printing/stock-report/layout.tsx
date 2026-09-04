@@ -16,9 +16,9 @@ export default function StockReportLayout({ children }: { children: React.ReactN
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="bg-gray-50 print:bg-white print:min-h-0 print:h-auto">
       {/* Header with Back button */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-50">
+      <div className="bg-white border-b border-gray-200 sticky top-0 z-50 no-print">
         <div className="w-full px-6 lg:px-8 py-4">
           <Button
             variant="ghost"
@@ -32,9 +32,17 @@ export default function StockReportLayout({ children }: { children: React.ReactN
       </div>
 
       {/* Content */}
-      <div className="w-full px-6 lg:px-8 py-8">
+      <div className="w-full px-6 lg:px-8 py-8 print:px-0 print:py-0 print:min-h-0 print:h-auto">
         {children}
       </div>
+
+      <style jsx global>{`
+        @media print {
+          .no-print {
+            display: none !important;
+          }
+        }
+      `}</style>
     </div>
   );
 }

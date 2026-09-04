@@ -3,7 +3,7 @@
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { format } from 'date-fns';
+import { format, isValid } from 'date-fns';
 import { PortalAutocomplete, type ItemBrandSuggestion, type AutocompleteSuggestion } from '@/components/shared/portal-autocomplete';
 
 import { Button } from '@/components/ui/button';
@@ -17,6 +17,14 @@ import { useToast } from '@/hooks/use-toast';
 import { useItemAutocomplete } from '@/hooks/use-item-autocomplete';
 import { useUnitAutocomplete, type UnitSuggestion } from '@/hooks/use-unit-autocomplete';
 import { PrintConfirmationDialog } from '@/components/shared/print-confirmation-dialog';
+import { useClientAutocomplete } from '@/hooks/use-client-autocomplete';
+import {
+  parseStrictDate,
+  toUiDate,
+  getTodayUiDate,
+  getDateValidationError,
+  type ParseDateResult,
+} from '@/lib/date-utils';
 
 import type { Chamber, Client, RentalItem, User, Vendor } from '@/lib/types';
 import type { Room, Block } from '@/lib/types/room-block';
@@ -36,6 +44,7 @@ export type InwardVoucherItem = {
   unit: string;
   bagWeight: number | '';
   totalWeight: number;
+  rentalItemId?: string;       // Optional: Link to the exact rental item document (for unique identity tracking)
 };
 
 export type InwardVoucher = {
@@ -49,6 +58,8 @@ export type InwardVoucher = {
   gatePassNo: string;
   date: string;
   enteredBy: string;
+  version?: number;
+  voucherWriteApprovalRequestId?: string;
   notes: string;
   items: InwardVoucherItem[];
   // Audit fields
@@ -72,6 +83,7 @@ type Props = {
   vouchers: InwardVoucher[];
   onUpsert: (result: { mode: InwardConsoleMode; voucher: InwardVoucher; createdItems: RentalItem[] }) => Promise<void>;
   onVoucherNoChange?: (inwardNo: string) => void;
+  canDirectlyUpdate?: boolean;
 };
 
 type RowField = keyof Omit<InwardVoucherItem, 'id' | 'totalWeight'>;
@@ -95,12 +107,16 @@ function createId(prefix: string) {
 }
 
 function createEmptyRow(): InwardVoucherItem {
+  // Store dates in DD-MM-YYYY format in row state
+  // Display shows the same format directly
+  // Conversion to Date object happens during save validation
+  const today = getTodayUiDate();
   return {
     id: createId('row'),
     itemName: '',
     brand: '',
-    mfgDate: '',
-    expDate: '',
+    mfgDate: today,
+    expDate: today,
     batch: '',
     chamberId: '',
     roomId: undefined,
@@ -134,6 +150,18 @@ function isRowBlank(row: InwardVoucherItem) {
 function validateRow(row: InwardVoucherItem, chambers: Chamber[]) {
   if (!row.itemName.trim()) return 'Item Name is required';
   if (!row.chamberId) return 'Chamber is required';
+  
+  // Validate Manufacturing Date (stored in DD-MM-YYYY format)
+  if (row.mfgDate && row.mfgDate.trim()) {
+    const mfgError = getDateValidationError(row.mfgDate);
+    if (mfgError) return `Invalid Manufacturing Date: ${mfgError}. Use DD-MM-YYYY format.`;
+  }
+  
+  // Validate Expiry Date (stored in DD-MM-YYYY format)
+  if (row.expDate && row.expDate.trim()) {
+    const expError = getDateValidationError(row.expDate);
+    if (expError) return `Invalid Expiry Date: ${expError}. Use DD-MM-YYYY format.`;
+  }
   
   // Check if chamber has rooms configured
   const selectedChamber = chambers.find(c => c.id === row.chamberId);
@@ -209,50 +237,20 @@ function formatInwardNo(seq: number) {
 }
 
 // Date format conversion helpers
-// UI format: dd-mm-yyyy
-// Internal/Firestore format: yyyy-MM-dd
+// Old date functions removed - using centralized date-utils.ts
 
-function uiDateToIsoDate(uiDate: string): string {
-  if (!uiDate || uiDate.trim() === '') return '';
+/**
+ * Safely formats a date string or Date object.
+ * Returns empty string if the date is invalid.
+ */
+function safeFormatDate(value: string | Date | null | undefined, formatString: string): string {
+  if (!value) return '';
   
-  const parts = uiDate.split('-');
-  if (parts.length !== 3) return uiDate; // Return as-is if not expected format
+  const date = value instanceof Date ? value : new Date(value);
   
-  const [day, month, year] = parts;
+  if (!isValid(date)) return '';
   
-  // Validate parts are numeric
-  if (!/^\d+$/.test(day) || !/^\d+$/.test(month) || !/^\d+$/.test(year)) {
-    return uiDate;
-  }
-  
-  // Validate ranges
-  const dayNum = parseInt(day, 10);
-  const monthNum = parseInt(month, 10);
-  const yearNum = parseInt(year, 10);
-  
-  if (dayNum < 1 || dayNum > 31 || monthNum < 1 || monthNum > 12 || yearNum < 1900 || yearNum > 2100) {
-    return uiDate;
-  }
-  
-  // Convert to yyyy-MM-dd
-  return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-}
-
-function isoDateToUiDate(isoDate: string): string {
-  if (!isoDate || isoDate.trim() === '') return '';
-  
-  const parts = isoDate.split('-');
-  if (parts.length !== 3) return isoDate;
-  
-  const [year, month, day] = parts;
-  
-  // Validate parts are numeric
-  if (!/^\d+$/.test(year) || !/^\d+$/.test(month) || !/^\d+$/.test(day)) {
-    return isoDate;
-  }
-  
-  // Convert to dd-mm-yyyy
-  return `${day}-${month}-${year}`;
+  return format(date, formatString);
 }
 
 function generateNextInwardNo(vouchers: InwardVoucher[], existingItems: RentalItem[]) {
@@ -279,6 +277,7 @@ export function BulkInwardEntryForm({
   vouchers,
   onUpsert,
   onVoucherNoChange,
+  canDirectlyUpdate = true,
 }: Props) {
   const { toast } = useToast();
   const { filterSuggestions } = useItemAutocomplete();
@@ -294,11 +293,12 @@ export function BulkInwardEntryForm({
   const [mode, setMode] = useState<InwardConsoleMode>('new');
   const [voucherDate, setVoucherDate] = useState<string>(todayIso);
   const [inwardNo, setInwardNo] = useState<string>(() => generateNextInwardNo(vouchers, existingItems));
-  const [clientId, setClientId] = useState<string>('');
-  const [clientInput, setClientInput] = useState<string>('');
-  const [filteredClients, setFilteredClients] = useState<Client[]>([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [highlightIndex, setHighlightIndex] = useState(0);
+
+  // Client autocomplete — shared hook (fixes ArrowDown/Up off-by-one)
+  const clientAC = useClientAutocomplete({ clients });
+  const clientId = clientAC.selectedClient?.id ?? '';
+  const selectedClient = clientAC.selectedClient;
+
   const [driverName, setDriverName] = useState<string>('');
   const [mobile, setMobile] = useState<string>('');
   const [vehicleNo, setVehicleNo] = useState<string>('');
@@ -410,10 +410,15 @@ export function BulkInwardEntryForm({
           row.blockId = undefined;
         }
 
-        // Convert UI date format (dd-mm-yyyy) to ISO format (yyyy-MM-dd) for date fields
+        // For date fields, only normalize separators (convert / to -) and store raw UI format
+        // Do NOT convert to ISO format on every keystroke - this blocks typing
+        // Conversion to ISO format happens during save validation
         let processedValue = value;
         if (field === 'mfgDate' || field === 'expDate') {
-          processedValue = uiDateToIsoDate(value);
+          // Normalize separators: convert / to -
+          processedValue = value.replace(/\//g, '-');
+          // Store as-is in DD-MM-YYYY format (or incomplete while typing)
+          // Do NOT call uiDateToIsoDate here - it requires a complete valid date
         }
 
         if (field === 'bags' || field === 'bagWeight') {
@@ -536,8 +541,6 @@ export function BulkInwardEntryForm({
     });
   }, [savedVoucherNo, toast, vouchers, existingItems]);
 
-  const selectedClient = useMemo(() => clients.find((c) => c.id === clientId) ?? null, [clientId, clients]);
-
   const vouchersByInwardNo = useMemo(() => {
     const map = new Map<string, InwardVoucher>();
     vouchers.forEach((v) => map.set(v.inwardNo.toUpperCase(), v));
@@ -547,34 +550,6 @@ export function BulkInwardEntryForm({
   const currentVoucher = useMemo(() => {
     return vouchersByInwardNo.get(inwardNo.trim().toUpperCase());
   }, [vouchersByInwardNo, inwardNo]);
-
-  const handleClientInputChange = useCallback(
-    (value: string) => {
-      setClientInput(value);
-      setClientId('');
-
-      if (!value.trim()) {
-        setFilteredClients([]);
-        setShowSuggestions(false);
-        setHighlightIndex(0);
-        return;
-      }
-
-      const results = clients.filter((c) => c.name.toLowerCase().includes(value.toLowerCase()));
-      setFilteredClients(results);
-      setShowSuggestions(true);
-      setHighlightIndex(0);
-    },
-    [clients]
-  );
-
-  const handleClientSelect = useCallback((client: Client) => {
-    setClientId(client.id);
-    setClientInput(client.name);
-    setShowSuggestions(false);
-    setFilteredClients([]);
-    setHighlightIndex(0);
-  }, []);
 
   const triggerClientView = useCallback(
     (client: Client) => {
@@ -586,54 +561,12 @@ export function BulkInwardEntryForm({
     [vouchers]
   );
 
-  const handleClientKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLInputElement>) => {
-      if (e.key === 'ArrowDown') {
-        if (!showSuggestions || filteredClients.length === 0) return;
-        e.preventDefault();
-        setHighlightIndex((prev) => (prev + 1) % filteredClients.length);
-        return;
-      }
-
-      if (e.key === 'ArrowUp') {
-        if (!showSuggestions || filteredClients.length === 0) return;
-        e.preventDefault();
-        setHighlightIndex((prev) => (prev === 0 ? filteredClients.length - 1 : prev - 1));
-        return;
-      }
-
-      if (e.key === 'Escape') {
-        setShowSuggestions(false);
-        return;
-      }
-
-      if (e.key === 'Enter') {
-        e.preventDefault();
-
-        if (showSuggestions && filteredClients.length > 0) {
-          const selected = filteredClients[highlightIndex];
-          if (selected) handleClientSelect(selected);
-          return;
-        }
-
-        if (selectedClient) {
-          triggerClientView(selectedClient);
-        }
-      }
-    },
-    [filteredClients, handleClientSelect, highlightIndex, selectedClient, showSuggestions, triggerClientView]
-  );
-
   const loadVoucher = useCallback(
     (voucher: InwardVoucher) => {
       setMode('edit');
       setClientViewRows([]);
-      setShowSuggestions(false);
+      clientAC.forceSelect({ id: voucher.clientId, name: voucher.clientName } as Client);
       setInwardNo(voucher.inwardNo);
-      setClientId(voucher.clientId);
-      setClientInput(voucher.clientName);
-      setFilteredClients([]);
-      setHighlightIndex(0);
       setDriverName(voucher.driverName);
       setMobile(voucher.mobile);
       setVehicleNo(voucher.vehicleNo);
@@ -641,7 +574,15 @@ export function BulkInwardEntryForm({
       setVoucherDate(voucher.date);
       setNotes(voucher.notes);
       setUpdateReason('');
-      setRows(voucher.items.length ? voucher.items.map((i) => ({ ...i })) : [createEmptyRow()]);
+      // Convert Firestore dates to DD-MM-YYYY format for editing
+      const rowsWithConvertedDates = voucher.items.length
+        ? voucher.items.map((i) => ({
+            ...i,
+            mfgDate: i.mfgDate ? toUiDate(new Date(i.mfgDate)) : '',
+            expDate: i.expDate ? toUiDate(new Date(i.expDate)) : '',
+          }))
+        : [createEmptyRow()];
+      setRows(rowsWithConvertedDates);
       setTimeout(() => focusCell(0, 'itemName'), 0);
     },
     [focusCell]
@@ -652,11 +593,7 @@ export function BulkInwardEntryForm({
       setMode('new');
       setVoucherDate(todayIso);
       setInwardNo(nextInwardNo ?? generateNextInwardNo(vouchers, existingItems));
-      setClientId('');
-      setClientInput('');
-      setFilteredClients([]);
-      setShowSuggestions(false);
-      setHighlightIndex(0);
+      clientAC.clearSelection();
       setDriverName('');
       setMobile('');
       setVehicleNo('');
@@ -666,14 +603,13 @@ export function BulkInwardEntryForm({
       setRows([createEmptyRow()]);
       setClientViewRows([]);
     },
-    [existingItems, todayIso, vouchers]
+    [clientAC, existingItems, todayIso, vouchers]
   );
 
   const handleInwardLookup = useCallback(() => {
     const key = inwardNo.trim().toUpperCase();
 
     setClientViewRows([]);
-    setShowSuggestions(false);
     const found = vouchersByInwardNo.get(key);
     if (found) {
       loadVoucher(found);
@@ -761,39 +697,27 @@ export function BulkInwardEntryForm({
       return;
     }
 
-    const voucher: InwardVoucher = {
-      id: voucherId,
-      inwardNo,
-      clientId: client.id,
-      clientName: client.name,
-      driverName,
-      mobile,
-      vehicleNo,
-      gatePassNo,
-      date: voucherDate,
-      enteredBy,
-      notes,
-      items: nonBlankRows,
-      // Audit fields - creator fields for both create and update
-      createdById: existingVoucher?.createdById ?? user?.id ?? '',
-      createdByName: existingVoucher?.createdByName ?? user?.name ?? 'Unknown',
-      createdAt: existingVoucher?.createdAt ?? new Date().toISOString(),
-      // Audit fields - updater fields only for edit mode
-      ...(nextMode === 'edit' ? {
-        updatedById: user?.id ?? '',
-        updatedByName: user?.name ?? 'Unknown',
-        updatedAt: new Date().toISOString(),
-        updateReason: updateReason.trim(),
-      } : {}),
-    };
-
-    const vendorId = vendors[0]?.id ?? 'vendor_01';
-
     const createdItems: RentalItem[] = nonBlankRows.map((r) => {
       const qty = typeof r.bags === 'number' ? r.bags : 0;
       const wt = r.totalWeight;
-      const exp = r.expDate ? new Date(r.expDate) : new Date(voucherDate);
+      
+      // Convert DD-MM-YYYY to Date object using strict parsing
+      let exp: Date;
+      if (r.expDate && r.expDate.trim()) {
+        const expResult = parseStrictDate(r.expDate);
+        if (!expResult.success || !expResult.date) {
+          throw new Error(
+            `Invalid expiry date for item "${r.itemName}": ${expResult.error}`
+          );
+        }
+        exp = expResult.date;
+      } else {
+        exp = new Date(voucherDate);
+      }
+      
       const storage = new Date(voucherDate);
+
+      const vendorId = vendors[0]?.id ?? 'vendor_01';
 
       // Get block name for legacy field
       let legacyBlock = '';
@@ -804,8 +728,10 @@ export function BulkInwardEntryForm({
         legacyBlock = selectedBlock?.blockName || '';
       }
 
+      const rentalItemId = createId('rental_item');
+
       return {
-        id: createId('rental_item'),
+        id: rentalItemId,
         inwardNumber: inwardNo,
         name: r.itemName.trim(),
         brand: r.brand.trim(),
@@ -837,6 +763,50 @@ export function BulkInwardEntryForm({
         condition: 'Good',
       };
     });
+
+    // Assign rentalItemId to each voucher item for unique identity tracking
+    const voucherItemsWithRentalId = nonBlankRows.map((row, index) => {
+      // Preserve existing rentalItemId for edit mode (existing rows)
+      if (row.rentalItemId) {
+        return { ...row };
+      }
+      // Generate new rentalItemId for new rows
+      const assignedRentalItemId = createdItems[index].id;
+      console.log('[NEW INWARD] Rental item ID assignment:', {
+        inwardNo,
+        itemName: row.itemName,
+        voucherRentalItemId: assignedRentalItemId,
+        createdRentalItemId: createdItems[index].id,
+        invariant: assignedRentalItemId === createdItems[index].id ? 'PASS' : 'FAIL'
+      });
+      return { ...row, rentalItemId: assignedRentalItemId };
+    });
+
+    const voucher: InwardVoucher = {
+      id: voucherId,
+      inwardNo,
+      clientId: client.id,
+      clientName: client.name,
+      driverName,
+      mobile,
+      vehicleNo,
+      gatePassNo,
+      date: voucherDate,
+      enteredBy,
+      notes,
+      items: voucherItemsWithRentalId,
+      // Audit fields - creator fields for both create and update
+      createdById: existingVoucher?.createdById ?? user?.id ?? '',
+      createdByName: existingVoucher?.createdByName ?? user?.name ?? 'Unknown',
+      createdAt: existingVoucher?.createdAt ?? new Date().toISOString(),
+      // Audit fields - updater fields only for edit mode
+      ...(nextMode === 'edit' ? {
+        updatedById: user?.id ?? '',
+        updatedByName: user?.name ?? 'Unknown',
+        updatedAt: new Date().toISOString(),
+        updateReason: updateReason.trim(),
+      } : {}),
+    };
 
     try {
       await onUpsert({ mode: nextMode, voucher, createdItems });
@@ -899,7 +869,7 @@ export function BulkInwardEntryForm({
             )}
           </div>
           <div className="text-right text-xs text-muted-foreground">
-            <div>{format(new Date(voucherDate), 'dd/MM/yyyy')}</div>
+            <div>{safeFormatDate(voucherDate, 'dd/MM/yyyy')}</div>
           </div>
         </div>
       </CardHeader>
@@ -915,7 +885,6 @@ export function BulkInwardEntryForm({
                 setInwardNo(e.target.value.toUpperCase());
                 setMode(vouchersByInwardNo.has(e.target.value.trim().toUpperCase()) ? 'edit' : 'new');
                 setClientViewRows([]);
-                setShowSuggestions(false);
               }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
@@ -933,27 +902,26 @@ export function BulkInwardEntryForm({
             <div className="relative">
               <Input
                 placeholder="Type client name..."
-                value={clientInput}
-                onChange={(e) => handleClientInputChange(e.target.value)}
-                onKeyDown={handleClientKeyDown}
-                onFocus={() => {
-                  if (filteredClients.length > 0) setShowSuggestions(true);
+                value={clientAC.inputValue}
+                onChange={clientAC.handleInputChange}
+                onKeyDown={(e) => {
+                  // If dropdown is closed and Enter is pressed with a selected client, trigger client view
+                  if (e.key === 'Enter' && !clientAC.isOpen && selectedClient) {
+                    e.preventDefault();
+                    triggerClientView(selectedClient);
+                    return;
+                  }
+                  clientAC.handleKeyDown(e);
                 }}
-                onBlur={() => {
-                  setTimeout(() => setShowSuggestions(false), 0);
-                }}
+                onFocus={clientAC.handleFocus}
+                onBlur={clientAC.handleBlur}
                 readOnly={isEditMode}
               />
 
-              {showSuggestions && filteredClients.length > 0 && (
-                <div className="absolute left-0 top-full z-[9999] mt-1 w-full max-h-64 overflow-y-auto rounded-md border bg-background shadow-xl">
-                  {filteredClients.map((client, index) => (
-                    <div
-                      key={client.id}
-                      className={`cursor-pointer px-3 py-2 text-sm ${index === highlightIndex ? 'bg-muted' : ''}`}
-                      onMouseDown={() => handleClientSelect(client)}
-                      onMouseEnter={() => setHighlightIndex(index)}
-                    >
+              {clientAC.isOpen && clientAC.suggestions.length > 0 && (
+                <div ref={clientAC.listRef} className="absolute left-0 top-full z-[9999] mt-1 w-full max-h-64 overflow-y-auto rounded-md border bg-background shadow-xl">
+                  {clientAC.suggestions.map((client, index) => (
+                    <div key={client.id} {...clientAC.getSuggestionProps(client, index)}>
                       {client.name}
                     </div>
                   ))}
@@ -1001,9 +969,9 @@ export function BulkInwardEntryForm({
                   <TableHead className="w-[170px]">Chamber</TableHead>
                   <TableHead className="w-[90px]">Room</TableHead>
                   <TableHead className="w-[40px]">Block</TableHead>
-                  <TableHead className="w-[90px] text-right">Bags</TableHead>
+                  <TableHead className="w-[90px] text-right">QTY</TableHead>
                   <TableHead className="w-[120px]">Unit</TableHead>
-                  <TableHead className="w-[40px] text-right">Bag Wt</TableHead>
+                  <TableHead className="w-[40px] text-right">QTY Wt</TableHead>
                   <TableHead className="w-[160px] text-right">Tot Wt</TableHead>
                 </TableRow>
               </TableHeader>
@@ -1013,8 +981,8 @@ export function BulkInwardEntryForm({
                     <TableCell className="font-mono text-xs">{row.inwardNo}</TableCell>
                     <TableCell>{row.itemName}</TableCell>
                     <TableCell>{row.brand}</TableCell>
-                    <TableCell>{isoDateToUiDate(row.mfgDate)}</TableCell>
-                    <TableCell>{isoDateToUiDate(row.expDate)}</TableCell>
+                    <TableCell>{row.mfgDate || ''}</TableCell>
+                    <TableCell>{row.expDate || ''}</TableCell>
                     <TableCell>{row.batch}</TableCell>
                     <TableCell>{chambers.find((c) => c.id === row.chamberId)?.name ?? ''}</TableCell>
                     <TableCell>
@@ -1063,9 +1031,9 @@ export function BulkInwardEntryForm({
                   <TableHead className="w-[170px]">Chamber</TableHead>
                   <TableHead className="w-[90px]">Room</TableHead>
                   <TableHead className="w-[40px]">Block</TableHead>
-                  <TableHead className="w-[90px] text-right">Bags</TableHead>
+                  <TableHead className="w-[90px] text-right">QTY</TableHead>
                   <TableHead className="w-[120px]">Unit</TableHead>
-                  <TableHead className="w-[40px] text-right">Bag Wt</TableHead>
+                  <TableHead className="w-[40px] text-right">QTY Wt</TableHead>
                   <TableHead className="w-[160px] text-right">Tot Wt</TableHead>
                   <TableHead className="w-[70px] text-right">Del</TableHead>
                 </TableRow>
@@ -1148,7 +1116,7 @@ export function BulkInwardEntryForm({
                           ref={(el) => setCellRef(`${rowKey}:mfgDate`, el)}
                           type="text"
                           placeholder="dd-mm-yyyy"
-                          value={isoDateToUiDate(row.mfgDate)}
+                          value={row.mfgDate || ''}
                           onChange={(e) => handleRowChange(idx, 'mfgDate', e.target.value)}
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') {
@@ -1156,7 +1124,7 @@ export function BulkInwardEntryForm({
                               tryAdvanceOnEnter(idx, 'mfgDate');
                             }
                           }}
-                          className="h-8 w-full"
+                          className="h-8"
                         />
                       </TableCell>
                       <TableCell className="p-1">
@@ -1164,7 +1132,7 @@ export function BulkInwardEntryForm({
                           ref={(el) => setCellRef(`${rowKey}:expDate`, el)}
                           type="text"
                           placeholder="dd-mm-yyyy"
-                          value={isoDateToUiDate(row.expDate)}
+                          value={row.expDate || ''}
                           onChange={(e) => handleRowChange(idx, 'expDate', e.target.value)}
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') {
@@ -1172,7 +1140,7 @@ export function BulkInwardEntryForm({
                               tryAdvanceOnEnter(idx, 'expDate');
                             }
                           }}
-                          className="h-8 w-full"
+                          className="h-8"
                         />
                       </TableCell>
                       <TableCell className="p-1">
@@ -1376,7 +1344,7 @@ export function BulkInwardEntryForm({
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div className="flex gap-2">
               <Button type="button" onClick={handleSave}>
-                {mode === 'edit' ? 'Update Entry' : 'Save Entry'}
+                {mode === 'edit' ? (canDirectlyUpdate ? 'Update Entry' : 'Request Update') : 'Save Entry'}
               </Button>
               {mode === 'edit' && (
                 <Button type="button" variant="outline" onClick={() => clearForNewEntry()}>
@@ -1401,7 +1369,7 @@ export function BulkInwardEntryForm({
             
             {mode === 'edit' && (
               <div className="flex flex-col gap-2">
-                <Label>Update Reason *</Label>
+                <Label>Update Reason <span className="required-star">*</span></Label>
                 <Textarea 
                   value={updateReason} 
                   onChange={(e) => setUpdateReason(e.target.value)}

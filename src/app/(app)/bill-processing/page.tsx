@@ -20,14 +20,15 @@ import { useToast } from "@/hooks/use-toast";
 import { clientsService } from "@/lib/firestore";
 import { generatedBillsService } from "@/lib/firestore";
 import type { Client, GeneratedBill } from "@/lib/types";
+import { useClientAutocomplete } from "@/hooks/use-client-autocomplete";
 
 export default function BillProcessingPage() {
   const [clients, setClients] = useState<Client[]>([]);
-  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
-  const [clientInput, setClientInput] = useState<string>('');
-  const [filteredClients, setFilteredClients] = useState<Client[]>([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [highlightIndex, setHighlightIndex] = useState(0);
+
+  const clientAC = useClientAutocomplete({
+    clients,
+    onSelect: () => {}, // selectedClient read from clientAC.selectedClient
+  });
   
   const [monthEndDate, setMonthEndDate] = useState<Date>();
   const [gstDate, setGstDate] = useState<Date>();
@@ -61,76 +62,10 @@ export default function BillProcessingPage() {
     }
   }, [monthEndDate]);
 
-  // Client autocomplete
-  const handleClientInputChange = useCallback((value: string) => {
-    setClientInput(value);
-    setSelectedClient(null);
 
-    if (!value.trim()) {
-      setFilteredClients([]);
-      setShowSuggestions(false);
-      setHighlightIndex(0);
-      return;
-    }
-
-    const results = clients.filter((c) => c.name.toLowerCase().includes(value.toLowerCase()));
-    setFilteredClients(results);
-    setShowSuggestions(true);
-    setHighlightIndex(0);
-  }, [clients]);
-
-  const handleClientSelect = useCallback((client: Client) => {
-    setSelectedClient(client);
-    setClientInput(client.name);
-    setShowSuggestions(false);
-    setFilteredClients([]);
-    setHighlightIndex(0);
-  }, []);
-
-  const handleClientKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'ArrowDown') {
-      if (!showSuggestions || filteredClients.length === 0) return;
-      e.preventDefault();
-      setHighlightIndex((prev) => (prev + 1) % filteredClients.length);
-      return;
-    }
-
-    if (e.key === 'ArrowUp') {
-      if (!showSuggestions || filteredClients.length === 0) return;
-      e.preventDefault();
-      setHighlightIndex((prev) => (prev === 0 ? filteredClients.length - 1 : prev - 1));
-      return;
-    }
-
-    if (e.key === 'Escape') {
-      setShowSuggestions(false);
-      setFilteredClients([]);
-      setHighlightIndex(0);
-      return;
-    }
-
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      if (showSuggestions && filteredClients.length > 0) {
-        const selected = filteredClients[highlightIndex];
-        if (selected) handleClientSelect(selected);
-      }
-    }
-  }, [filteredClients, handleClientSelect, highlightIndex, showSuggestions]);
 
   const handleGenerateBill = async () => {
-    console.log('========================================================');
-    console.log('[BILL-START] GENERATE BUTTON CLICKED');
-    console.log('========================================================');
-    console.log('[BILL-START] Customer:', selectedClient?.name || 'ALL CUSTOMERS');
-    console.log('[BILL-START] ClientId:', selectedClient?.id || 'ALL');
-    console.log('[BILL-START] Month End Date:', monthEndDate ? new Date(monthEndDate).toLocaleDateString('en-IN') : 'NOT SELECTED');
-    console.log('[BILL-START] GST Date:', gstDate ? new Date(gstDate).toLocaleDateString('en-IN') : 'NOT SELECTED');
-    
     if (!monthEndDate || !gstDate) {
-      console.error('[ERROR] Date validation failed');
-      console.error('[ERROR] MonthEndDate:', monthEndDate);
-      console.error('[ERROR] GSTDate:', gstDate);
       toast({ title: 'Error', description: 'Please select month end date and GST date.', variant: 'destructive' });
       return;
     }
@@ -145,52 +80,16 @@ export default function BillProcessingPage() {
       const gstDateIso = gstDate.toISOString();
       const billDateIso = new Date().toISOString();
 
-      const clientsToProcess = selectedClient ? [selectedClient] : clients;
+      const clientsToProcess = clientAC.selectedClient ? [clientAC.selectedClient] : clients;
       const totalClients = clientsToProcess.length;
-
-      console.log('[BILL-START] Billing Month:', billMonth);
-      console.log('[BILL-START] Clients to Process:', totalClients);
 
       for (let i = 0; i < totalClients; i++) {
         const client = clientsToProcess[i];
-        const progressPercent = Math.round(((i + 1) / totalClients) * 100);
-        
         setProgressMessage(`Processing ${client.name} (${i + 1}/${totalClients})...`);
-        setProgress(progressPercent);
+        setProgress(Math.round(((i + 1) / totalClients) * 100));
 
-        console.log('========================================================');
-        console.log(`[BILL-START] Processing Client ${i + 1}/${totalClients}: ${client.name}`);
-        console.log('========================================================');
-        console.log('[BILL-START] Client ID:', client.id);
-
-        // Check if bill already exists
-        console.log('[BILL-START] Checking for existing bills...');
-        console.log('[BILL-START] Client ID:', client.id);
-        console.log('[BILL-START] Bill Month:', billMonth);
         const existingBills = await generatedBillsService.getByClientAndMonth(client.id, billMonth);
-        console.log('[BILL-START] Existing Bill Count:', existingBills.length);
         
-        // Validate document IDs in existing bills
-        if (existingBills.length > 0) {
-          console.log('[BILL-START] Validating existing bill document IDs...');
-          existingBills.forEach((bill, idx) => {
-            console.log(`[BILL-START] Existing Bill ${idx + 1}:`);
-            console.log('[BILL-START]   Firestore Document ID:', bill.id);
-            console.log('[BILL-START]   GeneratedBill.id:', bill.id);
-            console.log('[BILL-START]   Bill Number:', bill.billNumber);
-            
-            if (!bill.id || bill.id === '') {
-              console.error('[ERROR] Firestore Document ID is empty for existing bill');
-              console.error('[ERROR] Bill Number:', bill.billNumber);
-              console.error('[ERROR] Client ID:', bill.clientId);
-              console.error('[ERROR] Bill Month:', bill.billMonth);
-              console.error('[ERROR] This indicates getByClientAndMonth() is not mapping document.id correctly');
-            }
-          });
-        }
-        
-        // Calculate bill (always recalculate with latest data)
-        console.log('[BILL-START] Calling calculateBill()...');
         const { billCalculatorV2 } = await import('@/lib/bill-calculator-v2');
         const calculationResult = await billCalculatorV2.calculateBill({
           clientId: client.id,
@@ -201,48 +100,14 @@ export default function BillProcessingPage() {
           gstDate: gstDateIso,
           billDate: billDateIso,
           billMonth,
-          createdBy: 'admin', // TODO: Get from user context
+          createdBy: 'admin',
         });
-        console.log('[BILL-START] calculateBill() returned');
 
-        // Convert to GeneratedBill, preserving existing bill if found
         const existingBill = existingBills.length > 0 ? existingBills[0] : undefined;
         const bill = billCalculatorV2.convertToGeneratedBill(calculationResult, existingBill);
-        
-        console.log('[BILL-SAVE] Bill object received from calculator:');
-        console.log('[BILL-SAVE]   Bill Number:', bill.billNumber);
-        console.log('[BILL-SAVE]   GeneratedBill.id:', bill.id);
-        console.log('[BILL-SAVE]   Gross Amount:', bill.grossAmount);
-        console.log('[BILL-SAVE]   Net Amount:', bill.netAmount);
-        console.log('[BILL-SAVE]   Items Count:', bill.items.length);
-        console.log('[BILL-SAVE]   Object keys:', Object.keys(bill));
-        console.log('[BILL-SAVE]   Full object:', JSON.stringify(bill, null, 2));
 
         if (existingBill) {
-          // UPDATE EXISTING BILL
-          console.log('[BILL] Existing Bill Found');
-          console.log('[BILL] Updating Existing Bill');
-          
-          // Validate Firestore document ID
-          if (!existingBill.id || existingBill.id === '') {
-            console.error('[ERROR] Firestore Document ID is empty');
-            console.error('[ERROR] GeneratedBill.id:', existingBill.id);
-            console.error('[ERROR] Bill Number:', existingBill.billNumber);
-            console.error('[ERROR] Client ID:', existingBill.clientId);
-            console.error('[ERROR] Bill Month:', existingBill.billMonth);
-            console.error('[ERROR] This indicates Firestore read methods are not mapping document.id correctly');
-            throw new Error('Cannot update bill: Firestore Document ID is empty. Check Firestore service methods (getAll, getByClient, getByClientAndMonth) to ensure they return { id: doc.id, ...doc.data() }');
-          }
-          
-          console.log('[BILL] Firestore Document ID:', existingBill.id);
-          console.log('[BILL] GeneratedBill.id:', existingBill.id);
-          console.log('[BILL] Bill Number:', existingBill.billNumber);
-          console.log('[BILL] Old Gross Amount:', existingBill.grossAmount);
-          console.log('[BILL] New Gross Amount:', bill.grossAmount);
-          console.log('[BILL] Old Net Amount:', existingBill.netAmount);
-          console.log('[BILL] New Net Amount:', bill.netAmount);
-          
-          // Prepare update data - keep same bill number and ID
+          if (!existingBill.id) throw new Error('Cannot update bill: Firestore Document ID is empty.');
           const updateData: Partial<GeneratedBill> = {
             items: bill.items,
             grossAmount: bill.grossAmount,
@@ -258,109 +123,28 @@ export default function BillProcessingPage() {
             hasInwardThisMonth: bill.hasInwardThisMonth,
             inwardCount: bill.inwardCount,
             updatedAt: new Date().toISOString(),
-            lastCalculatedAt: new Date().toISOString()
+            lastCalculatedAt: new Date().toISOString(),
           };
-
-          console.log('[FIRESTORE-SAVE] Updating existing bill in Firestore...');
-          console.log('[FIRESTORE-SAVE] Collection: generatedBills');
-          console.log('[FIRESTORE-SAVE] Document ID:', existingBill.id);
-          console.log('[FIRESTORE-SAVE] Bill Number:', existingBill.billNumber);
-          
-          try {
-            await generatedBillsService.update(existingBill.id, updateData);
-            console.log('[FIRESTORE-SAVE] Update Completed Successfully');
-            console.log('[BILL] UpdatedAt:', new Date().toISOString());
-          } catch (updateError) {
-            console.error('[ERROR] Firestore Update Failed');
-            console.error('[ERROR] Operation: generatedBillsService.update');
-            console.error('[ERROR] Document ID:', existingBill.id);
-            console.error('[ERROR] Error Message:', updateError instanceof Error ? updateError.message : 'Unknown error');
-            console.error('[ERROR] Stack:', updateError instanceof Error ? updateError.stack : 'No stack');
-            throw updateError;
-          }
+          await generatedBillsService.update(existingBill.id, updateData);
         } else {
-          // CREATE NEW BILL
-          console.log('[BILL] Creating New Monthly Bill');
-          console.log('[BILL] Bill Number:', bill.billNumber);
-          console.log('[BILL] Customer:', client.name);
-          console.log('[BILL] Billing Month:', billMonth);
-          
-          // Save to Firestore
-          console.log('[FIRESTORE-SAVE] Saving new bill to Firestore...');
-          console.log('[FIRESTORE-SAVE] Collection: generatedBills');
-          console.log('[FIRESTORE-SAVE] Bill Number:', bill.billNumber);
-          console.log('[FIRESTORE-SAVE] Gross Amount:', bill.grossAmount);
-          console.log('[FIRESTORE-SAVE] Net Amount:', bill.netAmount);
-          
-          try {
-            const savedBill = await generatedBillsService.create(bill);
-            
-            // Validate Firestore document ID was assigned
-            if (!savedBill.id || savedBill.id === '') {
-              console.error('[ERROR] Firestore did not assign Document ID');
-              console.error('[ERROR] GeneratedBill.id:', savedBill.id);
-              console.error('[ERROR] Bill Number:', savedBill.billNumber);
-              console.error('[ERROR] This indicates Firestore create() method is not returning the document ID');
-              throw new Error('Firestore create did not assign Document ID. Check Firestore service create() method to ensure it returns { id: ref.id, ...data }');
-            }
-            
-            console.log('[FIRESTORE-SAVE] Firestore Document ID:', savedBill.id);
-            console.log('[FIRESTORE-SAVE] GeneratedBill.id:', savedBill.id);
-            console.log('[FIRESTORE-SAVE] Saved Document:');
-            console.log('[FIRESTORE-SAVE]', JSON.stringify(savedBill, null, 2));
-            console.log('[FIRESTORE-SAVE] Save Completed Successfully');
-          } catch (saveError) {
-            console.error('[ERROR] Firestore Save Failed');
-            console.error('[ERROR] Operation: generatedBillsService.create');
-            console.error('[ERROR] Error Message:', saveError instanceof Error ? saveError.message : 'Unknown error');
-            console.error('[ERROR] Stack:', saveError instanceof Error ? saveError.stack : 'No stack');
-            throw saveError;
-          }
+          const savedBill = await generatedBillsService.create(bill);
+          if (!savedBill.id) throw new Error('Firestore create did not assign Document ID.');
         }
       }
 
       setProgress(100);
       setProgressMessage('Complete!');
-      
-      console.log('========================================================');
-      console.log('[BILL-START] BILL GENERATION COMPLETE');
-      console.log('[BILL-START] Total Clients Processed:', totalClients);
-      console.log('========================================================');
-      console.log('[BILL-START] FINAL RUNTIME SUMMARY');
-      console.log('[BILL-START] ====================');
-      console.log('[BILL-START] Flow: Calculation → Check Existing → Update/Create → Firestore → Load → Display');
-      console.log('[BILL-START] Architecture: One Customer + One Month = One Bill (Update on regenerate)');
-      console.log('[BILL-START] Check console logs above for any value changes between stages');
-      console.log('[BILL-START] Look for [BILL-CALC], [BILL-SAVE], [FIRESTORE-SAVE], [FIRESTORE-LOAD], [SALE-BILL] prefixes');
-      console.log('========================================================');
-      
-      toast({ 
-        title: 'Success', 
-        description: `Bills generated/updated for ${totalClients} customers.` 
-      });
+      toast({ title: 'Success', description: `Bills generated/updated for ${totalClients} customers.` });
 
-      // Reset form
-      setSelectedClient(null);
-      setClientInput('');
+      clientAC.clearSelection();
       setMonthEndDate(undefined);
       setGstDate(undefined);
     } catch (error) {
-      console.error('[ERROR] BILL GENERATION ERROR');
-      console.error('[ERROR] Operation: handleGenerateBill');
-      console.error('[ERROR] Error Message:', error instanceof Error ? error.message : 'Unknown error');
-      console.error('[ERROR] Stack:', error instanceof Error ? error.stack : 'No stack');
-      
-      toast({ 
-        title: 'Error', 
-        description: 'Failed to generate bills.', 
-        variant: 'destructive' 
-      });
+      console.error('Bill generation error:', error);
+      toast({ title: 'Error', description: 'Failed to generate bills.', variant: 'destructive' });
     } finally {
       setGenerating(false);
-      setTimeout(() => {
-        setProgress(0);
-        setProgressMessage('');
-      }, 2000);
+      setTimeout(() => { setProgress(0); setProgressMessage(''); }, 2000);
     }
   };
 
@@ -390,38 +174,34 @@ export default function BillProcessingPage() {
                 <Input
                   id="customer"
                   type="text"
-                  value={clientInput}
-                  onChange={(e) => handleClientInputChange(e.target.value)}
-                  onKeyDown={handleClientKeyDown}
+                  value={clientAC.inputValue}
+                  onChange={clientAC.handleInputChange}
+                  onKeyDown={clientAC.handleKeyDown}
+                  onBlur={clientAC.handleBlur}
+                  onFocus={clientAC.handleFocus}
                   placeholder="Search customer (optional - leave blank for all customers)"
                   className="w-full"
                 />
-                {showSuggestions && filteredClients.length > 0 && (
-                  <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto">
-                    {filteredClients.map((client, index) => (
-                      <div
-                        key={client.id}
-                        className={`px-4 py-2 cursor-pointer ${
-                          index === highlightIndex ? 'bg-sky-100' : 'hover:bg-gray-100'
-                        }`}
-                        onClick={() => handleClientSelect(client)}
-                      >
+                {clientAC.isOpen && clientAC.suggestions.length > 0 && (
+                  <div ref={clientAC.listRef} className="absolute z-50 w-full mt-1 bg-background border rounded-md shadow-lg max-h-60 overflow-auto">
+                    {clientAC.suggestions.map((client, index) => (
+                      <div key={client.id} {...clientAC.getSuggestionProps(client, index)}>
                         {client.name}
                       </div>
                     ))}
                   </div>
                 )}
               </div>
-              {selectedClient && (
+              {clientAC.selectedClient && (
                 <p className="text-sm text-muted-foreground">
-                  Selected: {selectedClient.name}
+                  Selected: {clientAC.selectedClient.name}
                 </p>
               )}
             </div>
 
             {/* Month End Date */}
             <div className="space-y-2">
-              <Label>Month End Date *</Label>
+              <Label>Month End Date <span className="required-star">*</span></Label>
               <Popover open={monthEndOpen} onOpenChange={setMonthEndOpen}>
                 <PopoverTrigger asChild>
                   <Button
@@ -431,7 +211,7 @@ export default function BillProcessingPage() {
                       !monthEndDate && "text-muted-foreground"
                     )}
                   >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    <CalendarIcon className="mr-2 h-4 w-4 text-teal-600" />
                     {monthEndDate ? format(monthEndDate, "PPP") : "Select month end date"}
                   </Button>
                 </PopoverTrigger>
@@ -451,7 +231,7 @@ export default function BillProcessingPage() {
 
             {/* GST Date */}
             <div className="space-y-2">
-              <Label>GST Date *</Label>
+              <Label>GST Date <span className="required-star">*</span></Label>
               <Popover open={gstOpen} onOpenChange={setGstOpen}>
                 <PopoverTrigger asChild>
                   <Button
@@ -461,7 +241,7 @@ export default function BillProcessingPage() {
                       !gstDate && "text-muted-foreground"
                     )}
                   >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    <CalendarIcon className="mr-2 h-4 w-4 text-teal-600" />
                     {gstDate ? format(gstDate, "PPP") : "Select GST date"}
                   </Button>
                 </PopoverTrigger>
@@ -496,7 +276,6 @@ export default function BillProcessingPage() {
               <Button 
                 onClick={handleGenerateBill}
                 disabled={!monthEndDate || !gstDate || generating}
-                className="bg-sky-500 hover:bg-sky-600"
               >
                 {generating ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

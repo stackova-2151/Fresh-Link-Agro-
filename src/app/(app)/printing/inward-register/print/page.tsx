@@ -21,7 +21,6 @@ type RegisterRow = {
   itemDescription: string;
   brand: string;
   inwardQty: number;
-  unit: string;
   inwardWeight: number;
   driverName: string;
   vehicleNo: string;
@@ -114,7 +113,6 @@ function InwardRegisterPrintContent() {
         itemDescription: item.itemName,
         brand: item.brand,
         inwardQty: parseNumberOrZero(item.bags),
-        unit: item.unit || '',
         inwardWeight: parseNumberOrZero(item.totalWeight),
         driverName: voucher.driverName,
         vehicleNo: voucher.vehicleNo,
@@ -240,91 +238,83 @@ function InwardRegisterPrintContent() {
           </div>
         )}
 
-        {rows.length === 0 ? (
-          <div className="p-8 text-center">No inward entries found for selected filters.</div>
-        ) : (
-          <>
-          <table className="w-full text-[11px] border-collapse border-2 border-slate-800 print-table">
-            <thead className="bg-slate-50">
-              <tr className="border-b-2 border-slate-800">
-                <th className="border-r border-slate-800 p-2 ">Inw No</th>
-                <th className="border-r border-slate-800 p-2">Inw Date</th>
-                <th className="border-r border-slate-800 p-2">Customer Name</th>
-                <th className="border-r border-slate-800 p-2">Item Description</th>
-                <th className="border-r border-slate-800 p-2">Brand</th>
-                <th className="border-r border-slate-800 p-2">Inw Qty</th>
-                <th className="border-r border-slate-800 p-2">Unit</th>
-                <th className="border-r border-slate-800 p-2">Inw Weight</th>
-                <th className="border-r border-slate-800 p-2">Driver Name</th>
-                <th className="p-2">Vehicle No</th>
+        {/* Always render table structure regardless of whether there are entries in the period */}
+        <table className="w-full text-[11px] border-collapse border-2 border-slate-800 print-table">
+          <thead className="bg-slate-50">
+            <tr className="border-b-2 border-slate-800">
+              <th className="border-r border-slate-800 p-2 ">Inw No</th>
+              <th className="border-r border-slate-800 p-2">Inw Date</th>
+              <th className="border-r border-slate-800 p-2">Customer Name</th>
+              <th className="border-r border-slate-800 p-2">Item Description</th>
+              <th className="border-r border-slate-800 p-2">Brand</th>
+              <th className="border-r border-slate-800 p-2">Inw Qty</th>
+              <th className="border-r border-slate-800 p-2">Inw Weight</th>
+              <th className="border-r border-slate-800 p-2">Driver Name</th>
+              <th className="p-2">Vehicle No</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r, idx) => (
+              <tr key={`${r.inwardNo}:${idx}`} className="border-b border-slate-500">
+                <td className="border-r border-slate-800 p-2 font-mono">{r.inwardNo}</td>
+                <td className="border-r border-slate-800 p-2">{format(new Date(r.inwardDate), 'dd.MM.yyyy')}</td>
+                <td className="border-r border-slate-800 p-2 uppercase">{r.customerName}</td>
+                <td className="border-r border-slate-800 p-2 uppercase">{r.itemDescription}</td>
+                <td className="border-r border-slate-800 p-2 uppercase">{r.brand || '-'}</td>
+                <td className="border-r border-slate-800 p-2 text-right font-mono">{r.inwardQty}</td>
+                <td className="border-r border-slate-800 p-2 text-right font-mono">{r.inwardWeight.toFixed(2)}</td>
+                <td className="border-r border-slate-800 p-2 uppercase">{r.driverName || ''}</td>
+                <td className="p-2 uppercase font-mono">{r.vehicleNo || ''}</td>
+              </tr>
+            ))}
+           <tr className="border-t-2 border-slate-800 bg-slate-50 font-bold">
+              <td className="text-right uppercase">Total</td>
+              <td className=""/>
+              <td className="" />
+              <td className="" />
+              <td className="border-r border-slate-800 p-2" />
+              <td className="border-r border-slate-800 p-2 text-right font-mono">{totals.totalQty}</td>
+              <td className="border-r border-slate-800 p-2 text-right font-mono">{totals.totalWeight.toFixed(2)}</td>
+              <td className="border-r border-slate-800 p-2" />
+              <td className="p-2" />
+            </tr>
+          </tbody>
+        </table>
+
+        {/* Summary block: Opening Stock / Total Inward / Total Outward / Total Balance */}
+        <div className="summary-block mt-2 flex justify-start">
+          <table className="text-[11px] border-collapse border-2 border-slate-700 w-[380px]">
+            <thead>
+              <tr className="bg-slate-50 border-b-2 border-slate-800">
+                <th className="border-r border-slate-800 p-2 text-left w-[180px]"></th>
+                <th className="border-r border-slate-800 p-2 text-right w-[100px]">Qty</th>
+                <th className="p-2 text-right w-[100px]">Weight</th>
               </tr>
             </thead>
             <tbody>
-              {rows.map((r, idx) => (
-                <tr key={`${r.inwardNo}:${idx}`} className="border-b border-slate-500">
-                  <td className="border-r border-slate-800 p-2 font-mono">{r.inwardNo}</td>
-                  <td className="border-r border-slate-800 p-2">{format(new Date(r.inwardDate), 'dd.MM.yyyy')}</td>
-                  <td className="border-r border-slate-800 p-2 uppercase">{r.customerName}</td>
-                  <td className="border-r border-slate-800 p-2 uppercase">{r.itemDescription}</td>
-                  <td className="border-r border-slate-800 p-2 uppercase">{r.brand || '-'}</td>
-                  <td className="border-r border-slate-800 p-2 text-right font-mono">{r.inwardQty}</td>
-                  <td className="border-r border-slate-800 p-2 text-center uppercase">{r.unit}</td>
-                  <td className="border-r border-slate-800 p-2 text-right font-mono">{r.inwardWeight.toFixed(2)}</td>
-                  <td className="border-r border-slate-800 p-2 uppercase">{r.driverName || ''}</td>
-                  <td className="p-2 uppercase font-mono">{r.vehicleNo || ''}</td>
-                </tr>
-              ))}
-             <tr className="border-t-2 border-slate-800 bg-slate-50 font-bold">
-                <td className="text-right uppercase">Total</td>
-                <td className=""/>
-                <td className="" />
-                <td className="" />
-                <td className="border-r border-slate-800 p-2" />
-                <td className="border-r border-slate-800 p-2 text-right font-mono">{totals.totalQty}</td>
-                <td className="border-r border-slate-800 p-2" />
-                <td className="border-r border-slate-800 p-2 text-right font-mono">{totals.totalWeight.toFixed(2)}</td>
-                <td className="border-r border-slate-800 p-2" />
-                <td className="p-2" />
+              <tr className="border-b border-slate-500">
+                <td className="border-r border-slate-800 p-2 font-bold uppercase">Opening Stock</td>
+                <td className="border-r border-slate-800 p-2 text-right font-mono">{summary.openingStock.qty}</td>
+                <td className="p-2 text-right font-mono">{summary.openingStock.weight.toFixed(2)}</td>
+              </tr>
+              <tr className="border-b border-slate-500">
+                <td className="border-r border-slate-800 p-2 font-bold uppercase">Total Inward</td>
+                <td className="border-r border-slate-800 p-2 text-right font-mono">{summary.totalInward.qty}</td>
+                <td className="p-2 text-right font-mono">{summary.totalInward.weight.toFixed(2)}</td>
+              </tr>
+              <tr className="border-b border-slate-500">
+                <td className="border-r border-slate-800 p-2 font-bold uppercase">Total Outward</td>
+                <td className="border-r border-slate-800 p-2 text-right font-mono">{summary.totalOutward.qty}</td>
+                <td className="p-2 text-right font-mono">{summary.totalOutward.weight.toFixed(2)}</td>
+              </tr>
+              <tr className="border-b border-slate-500">
+                <td className="border-r border-slate-800 p-2 font-bold uppercase">Total Balance</td>
+                <td className="border-r border-slate-800 p-2 text-right font-mono">{summary.totalBalance.qty}</td>
+                <td className="p-2 text-right font-mono">{summary.totalBalance.weight.toFixed(2)}</td>
               </tr>
             </tbody>
           </table>
-
-          {/* Summary block: Opening Stock / Total Inward / Total Outward / Total Balance */}
-          <div className="summary-block mt-2 flex justify-start">
-            <table className="text-[11px] border-collapse border-2 border-slate-700 w-[380px]">
-              <thead>
-                <tr className="bg-slate-50 border-b-2 border-slate-800">
-                  <th className="border-r border-slate-800 p-2 text-left w-[180px]"></th>
-                  <th className="border-r border-slate-800 p-2 text-right w-[100px]">Qty</th>
-                  <th className="p-2 text-right w-[100px]">Weight</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr className="border-b border-slate-500">
-                  <td className="border-r border-slate-800 p-2 font-bold uppercase">Opening Stock</td>
-                  <td className="border-r border-slate-800 p-2 text-right font-mono">{summary.openingStock.qty}</td>
-                  <td className="p-2 text-right font-mono">{summary.openingStock.weight.toFixed(2)}</td>
-                </tr>
-                <tr className="border-b border-slate-500">
-                  <td className="border-r border-slate-800 p-2 font-bold uppercase">Total Inward</td>
-                  <td className="border-r border-slate-800 p-2 text-right font-mono">{summary.totalInward.qty}</td>
-                  <td className="p-2 text-right font-mono">{summary.totalInward.weight.toFixed(2)}</td>
-                </tr>
-                <tr className="border-b border-slate-500">
-                  <td className="border-r border-slate-800 p-2 font-bold uppercase">Total Outward</td>
-                  <td className="border-r border-slate-800 p-2 text-right font-mono">{summary.totalOutward.qty}</td>
-                  <td className="p-2 text-right font-mono">{summary.totalOutward.weight.toFixed(2)}</td>
-                </tr>
-                <tr className="border-b border-slate-500">
-                  <td className="border-r border-slate-800 p-2 font-bold uppercase">Total Balance</td>
-                  <td className="border-r border-slate-800 p-2 text-right font-mono">{summary.totalBalance.qty}</td>
-                  <td className="p-2 text-right font-mono">{summary.totalBalance.weight.toFixed(2)}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-  </>
-        )}
+        </div>
       </div>
 
       <style jsx global>{`

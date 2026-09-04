@@ -43,8 +43,11 @@ import { useUser } from '@/context/user-context';
 import { authHeaders } from '@/lib/auth-client';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Eye, EyeOff } from 'lucide-react';
 
 import type { User } from '@/lib/types';
+import { PERMISSIONS } from '@/lib/types';
 
 type SubAdminFormState = {
   name: string;
@@ -53,6 +56,7 @@ type SubAdminFormState = {
   mobile: string;
   password: string;
   confirmPassword: string;
+  permissions: string[];
 };
 
 const MIN_PASSWORD_LEN = 6;
@@ -82,6 +86,7 @@ async function loadSubAdmins(): Promise<User[]> {
       mobile: data.mobile,
       role: data.role,
       status: data.status,
+      permissions: data.permissions ?? [],
       createdAt: data.createdAt?.toDate?.()?.toISOString(),
       updatedAt: data.updatedAt?.toDate?.()?.toISOString(),
     } as User;
@@ -89,7 +94,7 @@ async function loadSubAdmins(): Promise<User[]> {
 }
 
 const emptyForm = (): SubAdminFormState => ({
-  name: '', username: '', email: '', mobile: '', password: '', confirmPassword: '',
+  name: '', username: '', email: '', mobile: '', password: '', confirmPassword: '', permissions: [],
 });
 
 export default function SubAdminManagementPage() {
@@ -102,6 +107,10 @@ export default function SubAdminManagementPage() {
   const [editing, setEditing] = useState<User | null>(null);
   const [isSending, setIsSending] = useState(false);
   const [form, setForm] = useState<SubAdminFormState>(emptyForm());
+  const [showCreatePw, setShowCreatePw] = useState(false);
+  const [showCreateConfirmPw, setShowCreateConfirmPw] = useState(false);
+  const [showEditPw, setShowEditPw] = useState(false);
+  const [showEditConfirmPw, setShowEditConfirmPw] = useState(false);
 
   const load = async () => {
     try {
@@ -155,6 +164,7 @@ export default function SubAdminManagementPage() {
           mobile: form.mobile.trim(),
           password: form.password,
           role: 'SUB_ADMIN',
+          permissions: form.permissions,
         }),
       });
 
@@ -193,7 +203,7 @@ export default function SubAdminManagementPage() {
 
   const openEdit = (sa: User) => {
     setEditing(sa);
-    setForm({ name: sa.name || '', username: sa.username || '', email: sa.email || '', mobile: sa.mobile || '', password: '', confirmPassword: '' });
+    setForm({ name: sa.name || '', username: sa.username || '', email: sa.email || '', mobile: sa.mobile || '', password: '', confirmPassword: '', permissions: sa.permissions || [] });
     setEditOpen(true);
   };
 
@@ -205,12 +215,13 @@ export default function SubAdminManagementPage() {
     setIsSending(true);
     try {
       const headers = await authHeaders();
-      const body: Record<string, string> = {
+      const body: Record<string, unknown> = {
         uid: editing.uid || editing.id,
         name: form.name.trim(),
         email: form.email.trim().toLowerCase(),
         username: form.username.trim().toLowerCase(),
         mobile: form.mobile.trim(),
+        permissions: form.permissions,
       };
       if (form.password) body.password = form.password;
 
@@ -275,7 +286,7 @@ export default function SubAdminManagementPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Sub Admins</CardTitle>
-            <Dialog open={createOpen} onOpenChange={(open) => { if (!isSending) setCreateOpen(open); }}>
+            <Dialog open={createOpen} onOpenChange={(open) => { if (!isSending) { setCreateOpen(open); if (!open) { setShowCreatePw(false); setShowCreateConfirmPw(false); } } }}>
               <DialogTrigger asChild><Button>Create Sub Admin</Button></DialogTrigger>
               <DialogContent>
                 <DialogHeader>
@@ -283,15 +294,49 @@ export default function SubAdminManagementPage() {
                   <DialogDescription>Sub admins login using email and password.</DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4">
-                  {fields.map(({ key, label, type }) => (
+                  {/* Profile fields */}
+                  {[fields[0], fields[1], fields[2], fields[3]].map(({ key, label }) => (
                     <div key={key} className="grid gap-2">
                       <Label htmlFor={`sa_${key}`}>{label}</Label>
-                      <Input id={`sa_${key}`} type={type || 'text'} value={form[key]} onChange={(e) => setForm((p) => ({ ...p, [key]: e.target.value }))} />
+                      <Input id={`sa_${key}`} type="text" value={form[key]} onChange={(e) => setForm((p) => ({ ...p, [key]: e.target.value }))} />
                     </div>
                   ))}
+                  {/* Password fields with eye toggle */}
+                  <div className="grid gap-2">
+                    <Label htmlFor="sa_password">Password</Label>
+                    <div className="relative">
+                      <Input id="sa_password" type={showCreatePw ? 'text' : 'password'} value={form.password} onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))} className="pr-10" />
+                      <button type="button" tabIndex={-1} onClick={() => setShowCreatePw(v => !v)} className="absolute inset-y-0 right-0 pr-3 flex items-center" style={{ color: '#0F6E56' }} aria-label={showCreatePw ? 'Hide password' : 'Show password'}>
+                        {showCreatePw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="sa_confirmPassword">Confirm Password</Label>
+                    <div className="relative">
+                      <Input id="sa_confirmPassword" type={showCreateConfirmPw ? 'text' : 'password'} value={form.confirmPassword} onChange={(e) => setForm((p) => ({ ...p, confirmPassword: e.target.value }))} className="pr-10" />
+                      <button type="button" tabIndex={-1} onClick={() => setShowCreateConfirmPw(v => !v)} className="absolute inset-y-0 right-0 pr-3 flex items-center" style={{ color: '#0F6E56' }} aria-label={showCreateConfirmPw ? 'Hide password' : 'Show password'}>
+                        {showCreateConfirmPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="entryApprovals"
+                      checked={form.permissions.includes(PERMISSIONS.ENTRY_APPROVALS)}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setForm((p) => ({ ...p, permissions: [...p.permissions, PERMISSIONS.ENTRY_APPROVALS] }));
+                        } else {
+                          setForm((p) => ({ ...p, permissions: p.permissions.filter(p => p !== PERMISSIONS.ENTRY_APPROVALS) }));
+                        }
+                      }}
+                    />
+                    <Label htmlFor="entryApprovals" className="cursor-pointer">Entry Approvals</Label>
+                  </div>
                 </div>
                 <DialogFooter>
-                  <Button variant="outline" onClick={() => { setForm(emptyForm()); setCreateOpen(false); }} disabled={isSending}>Cancel</Button>
+                  <Button variant="outline" onClick={() => { setForm(emptyForm()); setCreateOpen(false); setShowCreatePw(false); setShowCreateConfirmPw(false); }} disabled={isSending}>Cancel</Button>
                   <Button onClick={handleCreate} disabled={isSending}>{isSending ? 'Creating...' : 'Create'}</Button>
                 </DialogFooter>
               </DialogContent>
@@ -354,22 +399,59 @@ export default function SubAdminManagementPage() {
         </Card>
 
         {/* Edit Dialog */}
-        <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <Dialog open={editOpen} onOpenChange={(open) => { setEditOpen(open); if (!open) { setShowEditPw(false); setShowEditConfirmPw(false); } }}>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Edit Sub Admin</DialogTitle>
               <DialogDescription>Update sub admin account details.</DialogDescription>
             </DialogHeader>
             <div className="grid gap-4">
-              {fields.map(({ key, label, type }) => (
+              {/* Profile fields */}
+              {[fields[0], fields[1], fields[2], fields[3]].map(({ key, label }) => (
                 <div key={key} className="grid gap-2">
-                  <Label htmlFor={`edit_sa_${key}`}>{key === 'password' ? 'New Password (optional)' : key === 'confirmPassword' ? 'Confirm New Password' : label}</Label>
-                  <Input id={`edit_sa_${key}`} type={type || 'text'} value={form[key]} onChange={(e) => setForm((p) => ({ ...p, [key]: e.target.value }))} />
+                  <Label htmlFor={`edit_sa_${key}`}>{label}</Label>
+                  <Input id={`edit_sa_${key}`} type="text" value={form[key]} onChange={(e) => setForm((p) => ({ ...p, [key]: e.target.value }))} />
                 </div>
               ))}
+              {/* Section divider */}
+              <hr style={{ border: 'none', borderTop: '0.5px solid hsl(var(--border))', margin: '0.25rem 0' }} />
+              <p style={{ fontSize: '13px', fontWeight: 500, color: 'hsl(var(--text-secondary))' }}>Change password</p>
+              {/* Password fields with eye toggle */}
+              <div className="grid gap-2">
+                <Label htmlFor="edit_sa_password">New Password (optional)</Label>
+                <div className="relative">
+                  <Input id="edit_sa_password" type={showEditPw ? 'text' : 'password'} value={form.password} onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))} className="pr-10" />
+                  <button type="button" tabIndex={-1} onClick={() => setShowEditPw(v => !v)} className="absolute inset-y-0 right-0 pr-3 flex items-center" style={{ color: '#0F6E56' }} aria-label={showEditPw ? 'Hide password' : 'Show password'}>
+                    {showEditPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit_sa_confirmPassword">Confirm New Password</Label>
+                <div className="relative">
+                  <Input id="edit_sa_confirmPassword" type={showEditConfirmPw ? 'text' : 'password'} value={form.confirmPassword} onChange={(e) => setForm((p) => ({ ...p, confirmPassword: e.target.value }))} className="pr-10" />
+                  <button type="button" tabIndex={-1} onClick={() => setShowEditConfirmPw(v => !v)} className="absolute inset-y-0 right-0 pr-3 flex items-center" style={{ color: '#0F6E56' }} aria-label={showEditConfirmPw ? 'Hide password' : 'Show password'}>
+                    {showEditConfirmPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="editEntryApprovals"
+                  checked={form.permissions.includes(PERMISSIONS.ENTRY_APPROVALS)}
+                  onCheckedChange={(checked) => {
+                    if (checked) {
+                      setForm((p) => ({ ...p, permissions: [...p.permissions, PERMISSIONS.ENTRY_APPROVALS] }));
+                    } else {
+                      setForm((p) => ({ ...p, permissions: p.permissions.filter(p => p !== PERMISSIONS.ENTRY_APPROVALS) }));
+                    }
+                  }}
+                />
+                <Label htmlFor="editEntryApprovals" className="cursor-pointer">Entry Approvals</Label>
+              </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => { setEditOpen(false); setEditing(null); setForm(emptyForm()); }}>Cancel</Button>
+              <Button variant="outline" onClick={() => { setEditOpen(false); setEditing(null); setForm(emptyForm()); setShowEditPw(false); setShowEditConfirmPw(false); }}>Cancel</Button>
               <Button onClick={handleEdit} disabled={isSending}>{isSending ? 'Saving...' : 'Save'}</Button>
             </DialogFooter>
           </DialogContent>

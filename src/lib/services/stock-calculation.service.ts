@@ -1,6 +1,6 @@
 /**
  * Stock Calculation Service
- * 
+ *
  * Calculates opening stock, issues, and closing stock for each inward voucher.
  * This service ensures each inward voucher becomes one row in the bill.
  */
@@ -12,6 +12,8 @@ import type {
   OutwardVoucherItem
 } from '@/lib/types/stock-report';
 import type { InwardStockBalance } from '@/lib/types/billing';
+import { resolveRentalItem } from '@/lib/services/rental-item-resolution.service';
+import type { RentalItem } from '@/lib/types';
 
 /**
  * Stock Calculation Service
@@ -19,16 +21,18 @@ import type { InwardStockBalance } from '@/lib/types/billing';
 class StockCalculationService {
   /**
    * Calculate stock balances for each inward voucher
-   * 
+   *
    * @param inwardVouchers - All inward vouchers for the customer
    * @param outwardVouchers - All outward vouchers for the customer
    * @param monthEndDate - Filter date for transactions
+   * @param rentalItems - All rental items for exact identity matching
    * @returns Array of stock balances per inward voucher
    */
   calculateInwardStockBalances(
     inwardVouchers: InwardVoucher[],
     outwardVouchers: OutwardVoucher[],
-    monthEndDate: string
+    monthEndDate: string,
+    rentalItems: RentalItem[] = []
   ): InwardStockBalance[] {
     const balances: InwardStockBalance[] = [];
 
@@ -42,7 +46,8 @@ class StockCalculationService {
         const balance = this.calculateSingleInwardBalance(
           inward,
           inwardItem,
-          outwardMap.get(inward.inwardNo) || []
+          outwardMap.get(inward.inwardNo) || [],
+          rentalItems
         );
 
         balances.push(balance);
@@ -58,14 +63,15 @@ class StockCalculationService {
   private calculateSingleInwardBalance(
     inward: InwardVoucher,
     inwardItem: InwardVoucherItem,
-    outwardItems: OutwardVoucherItem[]
+    outwardItems: OutwardVoucherItem[],
+    rentalItems: RentalItem[]
   ): InwardStockBalance {
     // Opening stock from inward
     const openingQty = typeof inwardItem.bags === 'number' ? inwardItem.bags : 0;
     const openingWeight = inwardItem.totalWeight;
 
     // Calculate issues from outward items
-    const issuesResult = this.calculateIssues(inwardItem, outwardItems);
+    const issuesResult = this.calculateIssues(inwardItem, outwardItems, rentalItems, inward.inwardNo);
 
     // Calculate closing stock
     const closingQty = openingQty - issuesResult.issuesQty;
@@ -94,7 +100,9 @@ class StockCalculationService {
    */
   private calculateIssues(
     inwardItem: InwardVoucherItem,
-    outwardItems: OutwardVoucherItem[]
+    outwardItems: OutwardVoucherItem[],
+    rentalItems: RentalItem[],
+    inwardNo: string
   ): {
     issuesQty: number;
     issuesWeight: number;
@@ -104,20 +112,39 @@ class StockCalculationService {
     let totalIssuesWeight = 0;
     const outwardDates: string[] = [];
 
-    // Match outward items by item name, brand, and batch
+    // Resolve rental item ID for this inward item
+    const resolution = resolveRentalItem(
+      inwardItem.rentalItemId,
+      rentalItems,
+      {
+        inwardNumber: inwardNo,
+        itemName: inwardItem.itemName,
+        brand: inwardItem.brand,
+        batch: inwardItem.batch,
+        chamberId: inwardItem.chamberId,
+      }
+    );
+
+    // Skip if ambiguous or unresolved
+    if (resolution.status === 'ambiguous' || resolution.status === 'unresolved') {
+      console.warn(`Skipping inward item issues calculation due to ${resolution.status}: ${resolution.message}`);
+      return {
+        issuesQty: 0,
+        issuesWeight: 0,
+        outwardDates: []
+      };
+    }
+
+    // Match outward items by exact rental item ID
     for (const outwardItem of outwardItems) {
-      if (
-        outwardItem.itemName === inwardItem.itemName &&
-        outwardItem.brand === inwardItem.brand &&
-        outwardItem.batch === inwardItem.batch
-      ) {
+      if (resolution.rentalItemId && outwardItem.sourceRentalItemId === resolution.rentalItemId) {
         const qty = typeof outwardItem.qty === 'number' ? outwardItem.qty : 0;
         totalIssuesQty += qty;
         totalIssuesWeight += outwardItem.totalWeight;
 
         // Track outward dates (would need parent voucher date)
         // For now, we'll add placeholder
-        outwardDates.push(''); 
+        outwardDates.push('');
       }
     }
 

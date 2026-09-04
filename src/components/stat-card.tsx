@@ -11,10 +11,10 @@ type StatCardProps = {
 
 export function StatCard({ title, value, description, icon, className }: StatCardProps) {
     return (
-        <Card className={cn(className)}>
+        <Card className={cn("border-l-4 border-l-teal-600", className)}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">{title}</CardTitle>
-                {icon}
+                <span className="text-teal-600 [&_svg]:text-teal-600">{icon}</span>
             </CardHeader>
             <CardContent>
                 <div className="text-2xl font-bold">{value}</div>

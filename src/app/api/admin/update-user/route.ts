@@ -10,6 +10,7 @@ type Body = {
   username?: string;
   mobile?: string;
   password?: string;
+  permissions?: string[];
 };
 
 export async function POST(request: Request) {
@@ -25,7 +26,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid JSON body.' }, { status: 400 });
   }
 
-  const { uid, name, email, username, mobile, password } = body;
+  const { uid, name, email, username, mobile, password, permissions } = body;
 
   if (!uid) {
     return NextResponse.json({ error: 'uid is required.' }, { status: 400 });
@@ -63,6 +64,7 @@ export async function POST(request: Request) {
     if (email) firestoreUpdate.email = email.trim().toLowerCase();
     if (username !== undefined) firestoreUpdate.username = username.trim().toLowerCase() || null;
     if (mobile !== undefined) firestoreUpdate.mobile = mobile.trim();
+    if (permissions !== undefined) firestoreUpdate.permissions = permissions;
 
     await getAdminFirestore().collection('users').doc(uid).update(firestoreUpdate);
 

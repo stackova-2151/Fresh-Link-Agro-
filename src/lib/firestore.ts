@@ -28,6 +28,7 @@ import type {
   CustomerRate,
   GeneratedBill,
 } from '@/lib/types';
+import type { EntryApprovalRequest } from '@/lib/types/approval';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -67,6 +68,58 @@ function detectUndefinedFields(obj: unknown, path: string = ''): string[] {
   return undefinedPaths;
 }
 
+/**
+ * Recursively remove undefined values from an object.
+ * Preserves false, 0, '', null, Date, Timestamp, and other valid values.
+ * Returns a new object without modifying the original.
+ * 
+ * This is used to sanitize data before sending to Firestore,
+ * which does not accept undefined values.
+ */
+function sanitizeUndefinedValues<T>(obj: T): T {
+  // Handle primitive types (including null)
+  if (obj === null || typeof obj !== 'object') {
+    return obj;
+  }
+  
+  // Handle undefined - this should not happen at top level
+  // but we handle it recursively
+  if (obj === undefined) {
+    return obj as T;
+  }
+  
+  // Handle Date objects - preserve as-is
+  if (obj instanceof Date) {
+    return obj as T;
+  }
+  
+  // Handle Timestamp objects - preserve as-is
+  if (obj instanceof Timestamp) {
+    return obj as T;
+  }
+  
+  // Handle arrays - recursively sanitize each element
+  if (Array.isArray(obj)) {
+    return obj.map(item => sanitizeUndefinedValues(item)) as T;
+  }
+  
+  // Handle objects - recursively sanitize each property
+  const result: Record<string, unknown> = {};
+  for (const key of Object.keys(obj as Record<string, unknown>)) {
+    const value = (obj as Record<string, unknown>)[key];
+    
+    // Skip undefined values entirely
+    if (value === undefined) {
+      continue;
+    }
+    
+    // Recursively sanitize nested values
+    result[key] = sanitizeUndefinedValues(value);
+  }
+  
+  return result as T;
+}
+
 // Recursively convert Timestamps to Dates in a plain object
 function convertTimestamps<T>(data: Record<string, unknown>): T {
   const result: Record<string, unknown> = {};
@@ -90,40 +143,14 @@ function convertTimestamps<T>(data: Record<string, unknown>): T {
 }
 
 async function getAll<T>(collectionName: string): Promise<T[]> {
-  console.log('[FIRESTORE-READ] getAll called for collection:', collectionName);
   const snap = await getDocs(collection(db, collectionName));
-  console.log('[FIRESTORE-READ] Snapshot docs count:', snap.docs.length);
-  
-  const result = snap.docs.map((d) => {
-    console.log('[FIRESTORE-READ] Processing document:');
-    console.log('[FIRESTORE-READ]   doc.id:', d.id);
-    console.log('[FIRESTORE-READ]   doc.data() keys:', Object.keys(d.data()));
-    console.log('[FIRESTORE-READ]   doc.data().id:', d.data().id);
-    console.log('[FIRESTORE-READ]   Mapping: { ...d.data(), id: d.id }');
-    console.log('[FIRESTORE-READ]   Result: { ...data, id:', d.id, '}');
-    return convertTimestamps<T>({ ...d.data(), id: d.id });
-  });
-  
-  console.log('[FIRESTORE-READ] Returning mapped results with IDs:', result.map(r => (r as any).id));
-  return result;
+  return snap.docs.map((d) => convertTimestamps<T>({ ...d.data(), id: d.id }));
 }
 
 async function getById<T>(collectionName: string, id: string): Promise<T | null> {
-  console.log('[FIRESTORE-READ] getById called for collection:', collectionName);
-  console.log('[FIRESTORE-READ] Requested document ID:', id);
   const snap = await getDoc(doc(db, collectionName, id));
-  if (!snap.exists()) {
-    console.log('[FIRESTORE-READ] Document does not exist');
-    return null;
-  }
-  console.log('[FIRESTORE-READ] Document exists');
-  console.log('[FIRESTORE-READ]   snap.id:', snap.id);
-  console.log('[FIRESTORE-READ]   snap.data() keys:', Object.keys(snap.data()));
-  console.log('[FIRESTORE-READ]   snap.data().id:', snap.data().id);
-  console.log('[FIRESTORE-READ]   Mapping: { ...snap.data(), id: snap.id }');
-  const result = convertTimestamps<T>({ ...snap.data(), id: snap.id });
-  console.log('[FIRESTORE-READ] Returning result with id:', (result as any).id);
-  return result;
+  if (!snap.exists()) return null;
+  return convertTimestamps<T>({ ...snap.data(), id: snap.id });
 }
 
 async function getWhere<T>(
@@ -132,47 +159,22 @@ async function getWhere<T>(
   op: WhereFilterOp,
   value: unknown
 ): Promise<T[]> {
-  console.log('[FIRESTORE-READ] getWhere called for collection:', collectionName);
-  console.log('[FIRESTORE-READ] Query:', field, op, value);
   const q = query(collection(db, collectionName), where(field, op, value));
   const snap = await getDocs(q);
-  console.log('[FIRESTORE-READ] Snapshot docs count:', snap.docs.length);
-  
-  const result = snap.docs.map((d) => {
-    console.log('[FIRESTORE-READ] Processing document:');
-    console.log('[FIRESTORE-READ]   doc.id:', d.id);
-    console.log('[FIRESTORE-READ]   doc.data() keys:', Object.keys(d.data()));
-    console.log('[FIRESTORE-READ]   doc.data().id:', d.data().id);
-    console.log('[FIRESTORE-READ]   Mapping: { ...d.data(), id: d.id }');
-    console.log('[FIRESTORE-READ]   Result: { ...data, id:', d.id, '}');
-    return convertTimestamps<T>({ ...d.data(), id: d.id });
-  });
-  
-  console.log('[FIRESTORE-READ] Returning mapped results with IDs:', result.map(r => (r as any).id));
-  return result;
+  return snap.docs.map((d) => convertTimestamps<T>({ ...d.data(), id: d.id }));
 }
 
 async function create<T extends { id?: string }>(
   collectionName: string,
   data: Omit<T, 'id'>
 ): Promise<T> {
-  console.log('[FIRESTORE-WRITE] create called for collection:', collectionName);
-  console.log('[FIRESTORE-WRITE] Input data keys:', Object.keys(data));
-  console.log('[FIRESTORE-WRITE] Input data.id:', (data as any).id);
-  
-  // Runtime removal of id field to prevent storing it in Firestore document
   const { id, ...dataToStore } = data as any;
-  console.log('[FIRESTORE-WRITE] Data to be stored (WITHOUT id field):');
-  console.log('[FIRESTORE-WRITE]', JSON.stringify(dataToStore, null, 2));
-  
+  const undefinedFields = detectUndefinedFields(dataToStore);
+  if (undefinedFields.length > 0) {
+    throw new Error(`Undefined fields in create payload: ${undefinedFields.join(', ')}`);
+  }
   const ref = await addDoc(collection(db, collectionName), dataToStore);
-  console.log('[FIRESTORE-WRITE] Firestore assigned document ID:', ref.id);
-  
-  const result = { id: ref.id, ...data } as T;
-  console.log('[FIRESTORE-WRITE] Returning result with id:', result.id);
-  console.log('[FIRESTORE-WRITE] Full result:', JSON.stringify(result, null, 2));
-  
-  return result;
+  return { id: ref.id, ...data } as T;
 }
 
 async function createWithId<T extends { id: string }>(
@@ -189,36 +191,13 @@ async function update<T>(
   id: string,
   data: Partial<T>
 ): Promise<void> {
-  console.log('[FIRESTORE-WRITE] update called for collection:', collectionName);
-  console.log('[FIRESTORE-WRITE] Document ID to update:', id);
-  console.log('[FIRESTORE-WRITE] Update data keys:', Object.keys(data));
-  console.log('[FIRESTORE-WRITE] Update data:', JSON.stringify(data, null, 2));
-  
-  // Runtime removal of id field from update payload to prevent storing it in Firestore
   const { id: idToRemove, ...dataToUpdate } = data as any;
-  console.log('[FIRESTORE-WRITE] Data to update (WITHOUT id field):');
-  console.log('[FIRESTORE-WRITE]', JSON.stringify(dataToUpdate, null, 2));
-  
-  // Detect undefined fields in update payload
-  console.log('[FIRESTORE-WRITE] Checking for undefined fields in update payload...');
   const undefinedFields = detectUndefinedFields(dataToUpdate);
   if (undefinedFields.length > 0) {
-    console.error('[ERROR] Undefined fields detected in update payload:');
-    undefinedFields.forEach(path => {
-      console.error(`[ERROR]   ${path} = undefined`);
-    });
-    console.error('[ERROR] Firestore does not support undefined values');
-    console.error('[ERROR] Fix the source code to replace undefined with null, empty string, 0, or remove the property');
     throw new Error(`Undefined fields in update payload: ${undefinedFields.join(', ')}`);
   }
-  console.log('[FIRESTORE-WRITE] No undefined fields detected in update payload');
-  
-  console.log('[FIRESTORE-WRITE] Calling updateDoc with document reference');
-  
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   await updateDoc(doc(db, collectionName, id), dataToUpdate);
-  
-  console.log('[FIRESTORE-WRITE] Update completed successfully');
 }
 
 async function remove(collectionName: string, id: string): Promise<void> {
@@ -365,54 +344,17 @@ export const customerRatesService = {
 // ── Generated Bills ────────────────────────────────────────────────────────────
 
 export const generatedBillsService = {
-  getAll: () => {
-    console.log('[GENERATED-BILLS-SERVICE] getAll called');
-    return getAll<GeneratedBill>('generatedBills');
-  },
-  getById: (id: string) => {
-    console.log('[GENERATED-BILLS-SERVICE] getById called with ID:', id);
-    return getById<GeneratedBill>('generatedBills', id);
-  },
-  getByClient: (clientId: string) => {
-    console.log('[GENERATED-BILLS-SERVICE] getByClient called with clientId:', clientId);
-    return getWhere<GeneratedBill>('generatedBills', 'clientId', '==', clientId);
-  },
-  getByClientAndMonth: (clientId: string, billMonth: string) => {
-    console.log('[GENERATED-BILLS-SERVICE] getByClientAndMonth called');
-    console.log('[GENERATED-BILLS-SERVICE]   clientId:', clientId);
-    console.log('[GENERATED-BILLS-SERVICE]   billMonth:', billMonth);
-    return getWhere<GeneratedBill>('generatedBills', 'clientId', '==', clientId).then((bills) => {
-      console.log('[GENERATED-BILLS-SERVICE] Bills before filter:', bills.length);
-      console.log('[GENERATED-BILLS-SERVICE] Bills IDs before filter:', bills.map(b => b.id));
-      const filtered = bills.filter((b) => b.billMonth === billMonth);
-      console.log('[GENERATED-BILLS-SERVICE] Bills after filter:', filtered.length);
-      console.log('[GENERATED-BILLS-SERVICE] Bills IDs after filter:', filtered.map(b => b.id));
-      return filtered;
-    });
-  },
-  getByMonth: (billMonth: string) => {
-    console.log('[GENERATED-BILLS-SERVICE] getByMonth called with billMonth:', billMonth);
-    return getWhere<GeneratedBill>('generatedBills', 'billMonth', '==', billMonth);
-  },
-  create: (data: Omit<GeneratedBill, 'id'>) => {
-    console.log('[GENERATED-BILLS-SERVICE] create called');
-    console.log('[GENERATED-BILLS-SERVICE] Input data keys:', Object.keys(data));
-    console.log('[GENERATED-BILLS-SERVICE] Input data.id:', (data as any).id);
-    console.log('[GENERATED-BILLS-SERVICE] Input data.billNumber:', (data as any).billNumber);
-    return create<GeneratedBill>('generatedBills', data);
-  },
-  createWithId: (data: GeneratedBill) => {
-    console.log('[GENERATED-BILLS-SERVICE] createWithId called');
-    console.log('[GENERATED-BILLS-SERVICE] Input data.id:', data.id);
-    return createWithId<GeneratedBill>('generatedBills', data);
-  },
-  update: (id: string, data: Partial<GeneratedBill>) => {
-    console.log('[GENERATED-BILLS-SERVICE] update called');
-    console.log('[GENERATED-BILLS-SERVICE] Document ID:', id);
-    console.log('[GENERATED-BILLS-SERVICE] Update data keys:', Object.keys(data));
-    console.log('[GENERATED-BILLS-SERVICE] Update data:', JSON.stringify(data, null, 2));
-    return update<GeneratedBill>('generatedBills', id, data);
-  },
+  getAll: () => getAll<GeneratedBill>('generatedBills'),
+  getById: (id: string) => getById<GeneratedBill>('generatedBills', id),
+  getByClient: (clientId: string) => getWhere<GeneratedBill>('generatedBills', 'clientId', '==', clientId),
+  getByClientAndMonth: (clientId: string, billMonth: string) =>
+    getWhere<GeneratedBill>('generatedBills', 'clientId', '==', clientId).then((bills) =>
+      bills.filter((b) => b.billMonth === billMonth)
+    ),
+  getByMonth: (billMonth: string) => getWhere<GeneratedBill>('generatedBills', 'billMonth', '==', billMonth),
+  create: (data: Omit<GeneratedBill, 'id'>) => create<GeneratedBill>('generatedBills', data),
+  createWithId: (data: GeneratedBill) => createWithId<GeneratedBill>('generatedBills', data),
+  update: (id: string, data: Partial<GeneratedBill>) => update<GeneratedBill>('generatedBills', id, data),
   delete: (id: string) => remove('generatedBills', id),
   deleteByClient: async (clientId: string) => {
     const bills = await getWhere<GeneratedBill>('generatedBills', 'clientId', '==', clientId);
@@ -463,3 +405,37 @@ export const generatedBillsService = {
     }
   },
 };
+
+// ── Entry Approval Requests ─────────────────────────────────────────────────────
+
+export const entryApprovalRequestsService = {
+  getAll: () => getAll<EntryApprovalRequest>('entryApprovalRequests'),
+  getById: (id: string) => getById<EntryApprovalRequest>('entryApprovalRequests', id),
+  getByStatus: (status: EntryApprovalRequest['status']) =>
+    getWhere<EntryApprovalRequest>('entryApprovalRequests', 'status', '==', status),
+  getByEntry: (entryId: string) =>
+    getWhere<EntryApprovalRequest>('entryApprovalRequests', 'entryId', '==', entryId),
+  getByEntryAndStatus: (entryId: string, status: EntryApprovalRequest['status']) => {
+    const q = query(
+      collection(db, 'entryApprovalRequests'),
+      where('entryId', '==', entryId),
+      where('status', '==', status)
+    );
+    return getDocs(q).then((snap) =>
+      snap.docs.map((d) => convertTimestamps<EntryApprovalRequest>({ ...d.data(), id: d.id }))
+    );
+  },
+  create: (data: Omit<EntryApprovalRequest, 'id'>) => {
+    // Sanitize undefined values before creating approval request
+    // This handles historical vouchers that may not have audit fields
+    const sanitizedData = sanitizeUndefinedValues(data);
+    return create<EntryApprovalRequest>('entryApprovalRequests', sanitizedData);
+  },
+  createWithId: (data: EntryApprovalRequest) => createWithId<EntryApprovalRequest>('entryApprovalRequests', data),
+  update: (id: string, data: Partial<EntryApprovalRequest>) =>
+    update<EntryApprovalRequest>('entryApprovalRequests', id, data),
+  delete: (id: string) => remove('entryApprovalRequests', id),
+};
+
+// Export sanitizer for potential use in other contexts
+export { sanitizeUndefinedValues };
